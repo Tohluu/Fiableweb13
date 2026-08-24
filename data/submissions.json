@@ -1,0 +1,1181 @@
+[
+  {
+    "id": 1,
+    "type": "vendor",
+    "createdAt": "2026-08-11T13:49:24.302020+00:00",
+    "data": {
+      "name": "Toluwalose Emmanuel Oyinloye",
+      "businessName": "tytt",
+      "phone": "08103694860",
+      "email": "toluwaloseoyinloye@gmail.com",
+      "service": "subscription",
+      "businessType": "Beauty",
+      "monthlyVolume": "51\u201375",
+      "expressPickup": "",
+      "expressDropoff": "",
+      "bulkDetails": ""
+    }
+  },
+  {
+    "id": 2,
+    "type": "vendor",
+    "createdAt": "2026-08-11T15:14:28.232597+00:00",
+    "data": {
+      "name": "Biodun Ademola",
+      "businessName": "Aurelle Haven",
+      "phone": "08103694860",
+      "email": "aurellehaven@gmail.com",
+      "service": "subscription",
+      "businessType": "Fashion",
+      "monthlyVolume": "31\u201350",
+      "expressPickup": "",
+      "expressDropoff": "",
+      "bulkDetails": ""
+    }
+  },
+  {
+    "id": 3,
+    "type": "vendor",
+    "createdAt": "2026-08-11T15:24:59.235642+00:00",
+    "data": {
+      "name": "Olatayo Oyinloye",
+      "businessName": "Teelearning",
+      "phone": "09032443447",
+      "email": "teelearning@gmail.com",
+      "service": "subscription",
+      "businessType": "Fashion",
+      "monthlyVolume": "31\u201350",
+      "expressPickup": "",
+      "expressDropoff": "",
+      "bulkDetails": ""
+    }
+  },
+  {
+    "id": 4,
+    "type": "vendor",
+    "createdAt": "2026-08-11T15:35:16.298917+00:00",
+    "data": {
+      "name": "Tobi Oyinloye",
+      "businessName": "TobiTobe",
+      "phone": "08033124201",
+      "email": "tobioyin@gmail.com",
+      "plan": "Basic",
+      "service": "subscription",
+      "businessType": "E-commerce",
+      "monthlyVolume": "31\u201350",
+      "expressPickup": "",
+      "expressDropoff": "",
+      "bulkDetails": ""
+    }
+  },
+  {
+    "id": 5,
+    "type": "vendor",
+    "createdAt": "2026-08-11T15:42:46.582113+00:00",
+    "data": {
+      "name": "Emma Ole",
+      "businessName": "EmmaOle",
+      "phone": "08023043897",
+      "email": "EmmaOle@gmail.com",
+      "plan": "Business",
+      "service": "subscription",
+      "businessType": "Beauty",
+      "monthlyVolume": "31\u201350",
+      "expressPickup": "",
+      "expressDropoff": "",
+      "bulkDetails": ""
+    }
+  },
+  {
+    "id": 6,
+    "type": "vendor",
+    "createdAt": "2026-08-11T16:18:06.429696+00:00",
+    "data": {
+      "name": "Segun Oye",
+      "businessName": "Middle",
+      "phone": "08103694860",
+      "email": "segunoye@gmail.com",
+      "plan": "Basic",
+      "service": "subscription",
+      "businessType": "Fashion",
+      "monthlyVolume": "1\u201330",
+      "expressPickup": "",
+      "expressDropoff": "",
+      "bulkDetails": ""
+    }
+  },
+  {
+    "id": 7,
+    "type": "password-reset",
+    "createdAt": "2026-08-12T10:29:05.680725+00:00",
+    "data": {
+      "email": "teelearning@gmail.com"
+    }
+  },
+  {
+    "id": 8,
+    "type": "password-reset",
+    "createdAt": "2026-08-12T10:29:12.867316+00:00",
+    "data": {
+      "email": "teelearning@gmail.com"
+    }
+  },
+  {
+    "id": 9,
+    "type": "password-reset",
+    "createdAt": "2026-08-12T10:33:49.293009+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 10,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T09:44:35.995866+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 11,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T09:44:42.876143+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 12,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T10:56:23.055340+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 13,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T10:56:28.925281+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 14,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T10:56:30.969294+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 15,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T10:56:31.209689+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 16,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T10:56:32.540364+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 17,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T11:06:49.811935+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 18,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T11:07:05.527015+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 19,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T11:07:05.804470+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 20,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T11:07:06.052250+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 21,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T11:21:10.560310+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 22,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T11:21:10.991822+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 23,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T11:21:26.681440+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 24,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T11:21:29.572404+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 25,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T11:21:38.996047+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 26,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T11:21:43.975591+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 27,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T11:21:44.191641+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 28,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T11:21:44.249477+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 29,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T11:21:45.325289+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 30,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T11:25:23.238481+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 31,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T11:46:44.868373+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 32,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T11:51:20.619629+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 33,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T11:51:23.657201+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 34,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T11:51:29.944385+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 35,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T11:57:37.554643+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 36,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T12:00:05.415042+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 37,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T12:00:07.767487+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 38,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T12:00:08.286262+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 39,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T12:00:26.699491+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 40,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T12:00:29.743313+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 41,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T12:00:30.302248+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 42,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T12:00:30.589922+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 43,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T12:00:40.064420+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 44,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T12:00:55.308382+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 45,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T12:01:04.630443+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 46,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T12:01:14.780917+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 47,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T12:01:15.013447+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 48,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T12:01:35.100148+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 49,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T12:02:36.185707+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 50,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T12:02:46.193607+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 51,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T12:02:49.209246+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 52,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T12:02:49.609654+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 53,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T12:07:53.665809+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 54,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T12:07:55.335891+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 55,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T12:07:56.122114+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 56,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T12:07:56.315281+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 57,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T12:07:56.348435+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 58,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T12:07:56.633016+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 59,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T12:07:56.922774+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 60,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T12:12:01.550499+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 61,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T12:12:05.600103+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 62,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T12:12:05.956236+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 63,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T12:12:06.053861+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 64,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T12:12:06.255333+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 65,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T12:12:06.479992+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 66,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T12:12:06.630440+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 67,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T12:12:07.795580+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 68,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T12:12:09.110616+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 69,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T12:12:11.293135+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 70,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T12:12:12.839299+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 71,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T12:12:13.077967+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 72,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T12:13:00.709450+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 73,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T12:13:12.676924+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 74,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T12:13:45.325757+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 75,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T12:16:31.032355+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 76,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T12:27:41.729659+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 77,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T12:27:53.690101+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 78,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T12:45:37.440841+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 79,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T12:47:25.885643+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 80,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T12:52:35.040844+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 81,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T12:56:44.594575+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 82,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T12:58:12.293876+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 83,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T13:02:36.960766+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 84,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T13:05:50.759333+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 85,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T13:13:22.868194+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 86,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T13:13:52.270137+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 87,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T13:25:54.273291+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 88,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T13:34:23.526578+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 89,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T13:41:59.271111+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 90,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T13:48:52.601985+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 91,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T13:48:55.828156+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 92,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T13:48:56.389932+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 93,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T13:48:56.840078+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 94,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T13:48:56.896538+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 95,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T13:49:10.817044+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 96,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T13:49:13.788241+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 97,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T13:49:14.479813+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 98,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T13:49:15.237301+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 99,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T13:49:16.399013+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 100,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T13:53:48.532416+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 101,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T13:53:50.305683+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 102,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T13:53:50.509119+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 103,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T13:53:50.708675+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 104,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T13:53:50.898264+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 105,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T13:53:52.207504+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 106,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T13:53:53.458090+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 107,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T13:53:54.483877+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 108,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T13:53:55.647755+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 109,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T13:54:30.381404+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 110,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T13:54:32.816558+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 111,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T13:54:33.360442+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com"
+    }
+  },
+  {
+    "id": 112,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T14:21:39.512203+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com",
+      "token": "CnfMbl8cI9pyR976fT_zOqTy_JS8kP7C6h8uwAOakki-XiLbg7tRwAFCpFwajdyu"
+    }
+  },
+  {
+    "id": 113,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T14:42:24.595932+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com",
+      "token": "3ZSgN_feoMuh6xao0Xup0VXe7RBovV5v_fzS96rz804hpgf0HY1MiQoTI0aA0sPB"
+    }
+  },
+  {
+    "id": 114,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T14:42:48.508489+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com",
+      "token": "xcD8VxtXKX2-y7Q7W1Jf7EFaSRLJq4AEVwMclybSdRzDa8EKRogZnu6KfO1O9pF8"
+    }
+  },
+  {
+    "id": 115,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T14:43:45.415600+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com",
+      "token": "_CTxZs2s1nbkNLPhvqLcOUEMFoz57DFvJCNlLg75sXqE50JSA60kfrhOK6IlYunE"
+    }
+  },
+  {
+    "id": 116,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T15:00:37.527633+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com",
+      "token": "07eCS-6C39oxzE2tLViTkoiwB41MWRYG4gnlHveqBoy3-4iSjUuj0iz5eJYy9cnE"
+    }
+  },
+  {
+    "id": 117,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T15:00:49.760992+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com",
+      "token": "_kQEgVQp64vFQgiB5d18G9Ev6bl8e0ZtuBofYDoKI-Zf1e_hq-Uz3_GfPzPJ4z24"
+    }
+  },
+  {
+    "id": 118,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T15:01:13.763144+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com",
+      "token": "ExOBEt18QlD757GMdI3zwCdHWvjUES0YsjQOdGIeztSIuO6JIIeKVidwdrQzv2Q9"
+    }
+  },
+  {
+    "id": 119,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T15:02:04.981621+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com",
+      "token": "y4H6hox8HA4w9IAbw82idAUk47wq33oMX2s0ib8nRa7B09x_eUZqksQ-sLe-JW9J"
+    }
+  },
+  {
+    "id": 120,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T15:03:01.430148+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com",
+      "token": "auxDQnHtLCIHn-WMlJwHoedmb--rul1NH3IHr1lWMzXjk-VDTiX1D44k44ydEXL-"
+    }
+  },
+  {
+    "id": 121,
+    "type": "vendor",
+    "createdAt": "2026-08-13T19:05:00.674932+00:00",
+    "data": {
+      "name": "Gbolahan Ojuola",
+      "businessName": "Moma",
+      "phone": "09033456713",
+      "email": "ojuolagbolahan@gmail.com",
+      "plan": "Growth",
+      "service": "subscription",
+      "businessType": "Electronics",
+      "monthlyVolume": "31\u201350",
+      "expressPickup": "",
+      "expressDropoff": "",
+      "bulkDetails": ""
+    }
+  },
+  {
+    "id": 122,
+    "type": "vendor",
+    "createdAt": "2026-08-13T20:15:16.639313+00:00",
+    "data": {
+      "name": "Busayo Olaifa",
+      "businessName": "Olaifa",
+      "phone": "07014525592",
+      "email": "Olaifbo@gmail.com",
+      "plan": "",
+      "service": "subscription",
+      "businessType": "Beauty",
+      "monthlyVolume": "31\u201350",
+      "expressPickup": "",
+      "expressDropoff": "",
+      "bulkDetails": ""
+    }
+  },
+  {
+    "id": 123,
+    "type": "vendor",
+    "createdAt": "2026-08-13T20:17:39.910135+00:00",
+    "data": {
+      "name": "Olaifa",
+      "businessName": "Olaifavv",
+      "phone": "08103694860",
+      "email": "Olaifaboo@gmail.com",
+      "plan": "",
+      "service": "subscription",
+      "businessType": "Beauty",
+      "monthlyVolume": "31\u201350",
+      "expressPickup": "",
+      "expressDropoff": "",
+      "bulkDetails": ""
+    }
+  },
+  {
+    "id": 124,
+    "type": "vendor",
+    "createdAt": "2026-08-13T21:02:57.718809+00:00",
+    "data": {
+      "name": "Wemimo Samuel",
+      "businessName": "WemmyFragrance",
+      "phone": "07014267879",
+      "email": "wemimosamuel@gmail.com",
+      "plan": "",
+      "service": "subscription",
+      "businessType": "Fashion",
+      "monthlyVolume": "1\u201330",
+      "expressPickup": "",
+      "expressDropoff": "",
+      "bulkDetails": ""
+    }
+  },
+  {
+    "id": 125,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T22:01:36.633578+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com",
+      "token": "DbZun4c6_cQODy-YzpZJkwb4KhDvsDiHPFdgR3_wlzadLhDqhMFPfAf5XM4PvRTd"
+    }
+  },
+  {
+    "id": 126,
+    "type": "password-reset",
+    "createdAt": "2026-08-13T22:02:20.508080+00:00",
+    "data": {
+      "email": "teelearning@gmail.com",
+      "token": "isiu5H1jKYXoNQny3bVMOfxPlSP9XtgAVSfJh5DZSfbDFMnDfD5bcej8-VbNz4x3"
+    }
+  },
+  {
+    "id": 127,
+    "type": "password-reset",
+    "createdAt": "2026-08-14T00:45:58.382826+00:00",
+    "data": {
+      "email": "ojuolagbolahan@gmail.com",
+      "token": "imLez3NlBC05DQ-LDIt_V26WLf10jmxBwzLXR1CBvFnHEdyGN0JcJIaRHP-xkLpq"
+    }
+  },
+  {
+    "id": 128,
+    "type": "vendor",
+    "createdAt": "2026-08-15T16:17:05.678780+00:00",
+    "data": {
+      "name": "Adebayo Ojo",
+      "businessName": "OJBabs",
+      "phone": "08103694860",
+      "email": "adebayooj@gmail.com",
+      "plan": "",
+      "service": "subscription",
+      "businessType": "Electronics",
+      "monthlyVolume": "51\u201375",
+      "expressPickup": "",
+      "expressDropoff": "",
+      "bulkDetails": ""
+    }
+  },
+  {
+    "id": 129,
+    "type": "vendor",
+    "createdAt": "2026-08-15T16:25:00.190898+00:00",
+    "data": {
+      "name": "Oluwatosin Ali",
+      "businessName": "AliBabs",
+      "phone": "08103694860",
+      "email": "alibabs@gmail.com",
+      "plan": "",
+      "service": "express",
+      "businessType": "Fashion",
+      "monthlyVolume": "",
+      "expressPickup": "41 Solomon Okonkwo Street",
+      "expressDropoff": "Lekki 1",
+      "bulkDetails": ""
+    }
+  },
+  {
+    "id": 130,
+    "type": "password-reset",
+    "createdAt": "2026-08-24T15:49:44.725315+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com",
+      "token": "GwDRSlOSUTHbK597T0EbbLWIw667Vv4zqlKzSr0XouFu-imo6X0QeOvGFU_4wsmL"
+    }
+  },
+  {
+    "id": 131,
+    "type": "password-reset",
+    "createdAt": "2026-08-24T15:50:06.544630+00:00",
+    "data": {
+      "email": "toluwaloseoyinloye@gmail.com",
+      "token": "kQ7CvAH-18BQgCQrlxO6UBonXzgVQtlq7WsQgMZ3F-cL9TLQR3y1GGmaBokLxl0m"
+    }
+  }
+]

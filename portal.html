@@ -1,0 +1,2184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Fiable Logistics vendor portal">
+  <title>Fiable Vendor Portal</title>
+  <link rel="stylesheet" href="portal.css?v=4">
+</head>
+<body>
+  <div id="authGate" class="auth-gate">
+      <section id="loginView" class="auth-screen hidden">
+        <div class="auth-card">
+          <a class="auth-logo" href="index.html"><img src="images/Logo2.png" alt="Fiable Logistics"></a>
+          <div class="eyebrow">Vendor portal</div>
+          <h2>Welcome back.</h2>
+          <p class="muted">Log in to manage your subscription, deliveries and account.</p>
+
+          <form id="loginForm">
+            <label for="loginEmail">Email address or Subscriber ID</label>
+            <input id="loginEmail" type="text" autocomplete="email" required placeholder="Enter your email or Subscriber ID">
+
+            <label for="loginPassword">Password</label>
+            <div class="password-wrap">
+              <input id="loginPassword" type="password" autocomplete="current-password" required placeholder="Your password">
+              <button type="button" class="password-toggle" data-target="loginPassword">Show</button>
+            </div>
+
+            <div id="loginError" class="login-error" role="alert"></div>
+
+            <button class="btn primary full" type="submit" id="loginBtn">Log in</button>
+          </form>
+
+          <button class="text-btn" id="forgotBtn" type="button">Forgot your password?</button>
+          <p class="auth-footer">New to Fiable? <a href="index.html#get-started">Become a vendor</a></p>
+        </div>
+      </section>
+
+      <section id="forgotView" class="auth-screen hidden">
+        <div class="auth-card">
+          <a class="auth-logo" href="index.html"><img src="images/Logo2.png" alt="Fiable Logistics"></a>
+          <div class="eyebrow">Account recovery</div>
+          <h2>Reset your password.</h2>
+          <p class="muted">Enter your account email and we'll send you a secure password reset link.</p>
+          <form id="forgotForm">
+            <label for="forgotEmail">Email address</label>
+            <input id="forgotEmail" type="email" required placeholder="you@business.com">
+            <button class="btn primary full" type="submit">Send reset link</button>
+          </form>
+          <button class="text-btn" id="backLoginBtn" type="button">← Back to login</button>
+        </div>
+      </section>
+
+    <section id="resetView" class="auth-screen hidden">
+        <div class="auth-card">
+            <a class="auth-logo" href="index.html">
+            <img src="images/Logo2.png" alt="Fiable Logistics">
+            </a>
+            <div class="eyebrow">Account recovery</div>
+            <h2>Create a new password.</h2>
+            <p class="muted">
+            Enter a new password for your Fiable account.
+            </p>
+            <form id="resetForm">
+                <label for="resetPassword">New password</label>
+
+                <div class="password-field">
+                    <input
+                        id="resetPassword"
+                        type="password"
+                        required
+                        minlength="8"
+                        placeholder="Enter your new password"
+                    >
+                    <button
+                        type="button"
+                        class="password-toggle"
+                        data-target="resetPassword"
+                    >
+                        Show
+                    </button>
+                </div>
+
+                <label for="resetConfirmPassword">Confirm new password</label>
+
+                <div class="password-field">
+                    <input
+                        id="resetConfirmPassword"
+                        type="password"
+                        required
+                        minlength="8"
+                        placeholder="Confirm your new password"
+                    >
+                    <button
+                        type="button"
+                        class="password-toggle"
+                        data-target="resetConfirmPassword"
+                    >
+                        Show
+                    </button>
+                </div>
+
+                <button id="resetSubmitBtn" class="btn primary full" type="submit">
+                    Reset password
+                </button>
+            </form>
+            <button class="text-btn" id="resetBackLoginBtn" type="button">
+            ← Back to login
+            </button>
+        </div>
+    </section>
+
+  </div>
+
+  <div class="app-shell" id="appShell">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-top">
+        <a class="brand" href="index.html">
+          <img src="images/Logo2.png" alt="Fiable Logistics">
+        </a>
+        <button class="close-sidebar" id="closeSidebar" type="button" aria-label="Close navigation">×</button>
+      </div>
+
+      <nav class="side-nav" aria-label="Vendor navigation">
+        <button class="nav-item active" data-view="dashboard"><span>⌂</span> Dashboard</button>
+        <button class="nav-item" data-view="deliveries"><span>▣</span> My Deliveries</button>
+        <button class="nav-item" data-view="request"><span>＋</span> Request Delivery</button>
+        <button class="nav-item" data-view="subscription"><span>◈</span> Subscription</button>
+        <button class="nav-item" data-view="account"><span>◯</span> Account</button>
+        <button class="nav-item" data-view="settings"><span>⚙</span> Settings</button>
+      </nav>
+
+      <div class="sidebar-bottom">
+        <a href="index.html">← Back to website</a>
+        <button id="logoutBtn" class="logout-btn" type="button">Log out</button>
+      </div>
+    </aside>
+    
+
+    <div class="mobile-overlay" id="mobileOverlay"></div>
+
+    <main class="main">
+      <header class="topbar">
+        <button class="menu-btn" id="menuBtn" type="button" aria-label="Open navigation">☰</button>
+        <div>
+          <p class="topbar-kicker">Fiable Vendor Portal</p>
+          <h1 id="pageTitle">Dashboard</h1>
+        </div>
+        <div class="user-chip">
+          <div class="avatar" id="userInitial">F</div>
+          <div>
+            <strong id="topUserName">Vendor</strong>
+            <small id="topUserEmail"></small>
+            <small id="topSubscriberId"></small>
+          </div>
+        </div>
+      </header>
+
+      <div id="toast" class="toast" role="status"></div>
+
+      <div id="portalContent" class="content hidden">
+
+        <section class="view active" id="view-dashboard">
+          <div class="welcome-row">
+            <div>
+              <div class="eyebrow">Overview</div>
+              <h2>Good to see you, <span id="welcomeName">Vendor</span>.</h2>
+              <p class="muted">Here is what is happening with your Fiable account.</p>
+            </div>
+            <button class="btn primary" data-go="request" type="button">+ Request delivery</button>
+          </div>
+
+          <div class="stats-grid">
+            <article class="stat-card">
+              <span>Current plan</span>
+              <strong id="statPlan">—</strong>
+              <small id="statPayment">—</small>
+            </article>
+            <article class="stat-card">
+              <span>Units remaining</span>
+              <strong id="statRemaining">0</strong>
+              <small id="unitWarning" class="unit-warning"></small>
+              <small id="statAllocation">0 allocated</small>
+            </article>
+            <article class="stat-card">
+              <span>Total deliveries</span>
+              <strong id="statDeliveries">0</strong>
+              <small>All requests</small>
+            </article>
+            <article class="stat-card">
+              <span>Success rate</span>
+              <strong id="statSuccess">0%</strong>
+              <small>Based on completed deliveries</small>
+            </article>
+          </div>
+
+          <div class="dashboard-grid">
+            <article class="panel">
+              <div class="panel-head">
+                <div>
+                  <h3>Subscription usage</h3>
+                  <p class="muted">Your current monthly delivery allocation.</p>
+                </div>
+                <button class="link-btn" data-go="subscription" type="button">Manage</button>
+              </div>
+              <div class="usage-number"><strong id="usageUsed">0</strong><span>/ <span id="usageTotal">0</span> units used</span></div>
+              <div class="progress"><span id="usageBar"></span></div>
+              <div class="usage-meta">
+                <span id="usageRemaining">0 units remaining</span>
+                <span id="renewalShort">—</span>
+              </div>
+            </article>
+
+            <article class="panel">
+              <div class="panel-head">
+                <div>
+                  <h3>Delivery status</h3>
+                  <p class="muted">Your current request activity.</p>
+                </div>
+                <button class="link-btn" data-go="deliveries" type="button">View all</button>
+              </div>
+              <div class="status-list" id="statusList"></div>
+            </article>
+          </div>
+
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <h3>Recent deliveries</h3>
+                <p class="muted">Your latest delivery requests.</p>
+              </div>
+              <button class="link-btn" data-go="deliveries" type="button">All deliveries</button>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Order</th>
+                    <th>Pickup</th>
+                    <th>Destination</th>
+                    <th>Units</th>
+                    <th>Status</th>
+                    <th>Date</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="recentTable"></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+
+        <section class="view" id="view-deliveries">
+          <div class="section-title">
+            <div>
+              <div class="eyebrow">Operations</div>
+              <h2>My deliveries</h2>
+              <p class="muted">Track every delivery request from your account.</p>
+            </div>
+            <button class="btn primary" data-go="request" type="button">+ Request delivery</button>
+          </div>
+
+          <div class="toolbar">
+            <input id="deliverySearch" type="search" placeholder="Search order, pickup or destination">
+            <select id="deliveryFilter">
+              <option value="all">All statuses</option>
+              <option value="requested">Requested</option>
+              <option value="assigned">Assigned</option>
+              <option value="picked-up">Picked up</option>
+              <option value="in-transit">In transit</option>
+              <option value="delivered">Delivered</option>
+              <option value="failed">Failed</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </div>
+
+          <article class="panel">
+            <div class="table-wrap">
+              <table>
+                <thead>
+                    <tr>
+                        <th>Order</th>
+                        <th>Pickup</th>
+                        <th>Destination</th>
+                        <th>Units</th>
+                        <th>Status</th>
+                        <th>Date</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="deliveriesTable"></tbody>
+              </table>
+            </div>
+            <div class="empty-state hidden" id="deliveryEmpty">No deliveries match your search.</div>
+          </article>
+        </section>
+
+        <section class="view" id="view-request">
+          <div class="section-title">
+            <div>
+              <div class="eyebrow">New request</div>
+              <h2>Request a delivery</h2>
+              <p class="muted">Enter the route and package details. Your units are confirmed before the request is submitted.</p>
+            </div>
+          </div>
+
+          <div class="request-grid">
+            <form class="panel form-panel" id="deliveryForm">
+              <h3>Delivery details</h3>
+
+              <div class="form-grid">
+                <div>
+                  <label for="pickup">Pickup location</label>
+                  <select id="pickup" required></select>
+                </div>
+                <div>
+                  <label for="dropoff">Delivery location</label>
+                  <select id="dropoff" required></select>
+                </div>
+              </div>
+
+              <div class="route-preview" id="routePreview">
+                <span>Estimated route</span>
+                <strong id="routeUnits">Select locations</strong>
+                <small id="routeCost">—</small>
+              </div>
+
+              <div class="form-grid">
+                <div>
+                  <label for="pickupContactName">Pickup contact name</label>
+                  <input id="pickupContactName" required placeholder="Name at pickup">
+                </div>
+                <div>
+                  <label for="pickupPhone">Pickup phone</label>
+                  <input id="pickupPhone" type="tel" required placeholder="080...">
+                </div>
+                <div class="full-width">
+                    <label for="pickupAddress">Pickup address</label>
+                    <input
+                    id="pickupAddress"
+                    required
+                    placeholder="House number, street, estate, landmark"
+                    >
+                </div>
+                <div>
+                  <label for="recipientName">Recipient name</label>
+                  <input id="recipientName" required placeholder="Recipient's name">
+                </div>
+                <div>
+                  <label for="recipientPhone">Recipient phone</label>
+                  <input id="recipientPhone" type="tel" required placeholder="080...">
+                </div>
+              </div>
+              <div class="form-grid">
+                <div class="full-width">
+                    <label for="deliveryAddress">Delivery address</label>
+                    <input
+                    id="deliveryAddress"
+                    required
+                    placeholder="House number, street, estate, landmark"
+                    >
+                </div>
+              </div>
+
+              <div class="form-grid">
+                <div>
+                  <label for="packageType">Package type</label>
+                  <select id="packageType" required>
+                    <option>General</option>
+                    <option>Fashion</option>
+                    <option>Food</option>
+                    <option>Electronics</option>
+                    <option>Beauty</option>
+                    <option>Documents</option>
+                    <option>Fragile</option>
+                  </select>
+                </div>
+                <div>
+                  <label for="priority">Priority</label>
+                  <select id="priority">
+                    <option>Standard</option>
+                    <option>Express</option>
+                    <option>Urgent</option>
+                  </select>
+                </div>
+                <div>
+                  <label for="deliveryWindow">Delivery window</label>
+                  <select id="deliveryWindow" required>
+                    <option>Standard</option>
+                    <option>8:00 AM - 11:00 AM</option>
+                    <option>12:00 PM - 3:00 PM</option>
+                  </select>
+                </div>
+              </div>
+
+              <label for="packageDescription">Package description</label>
+              <textarea id="packageDescription" rows="3" placeholder="What is being delivered?"></textarea>
+
+              <div class="form-grid">
+                <div>
+                  <label for="pickupInstructions">Pickup instructions</label>
+                  <textarea id="pickupInstructions" rows="3" placeholder="Gate, contact or pickup notes"></textarea>
+                </div>
+                <div>
+                  <label for="deliveryInstructions">Delivery instructions</label>
+                  <textarea id="deliveryInstructions" rows="3" placeholder="Recipient or location notes"></textarea>
+                </div>
+              </div>
+
+              <button class="btn primary full" type="submit" id="requestBtn">Submit delivery request</button>
+            </form>
+
+            <aside class="side-card">
+              <div class="eyebrow">Your balance</div>
+              <strong class="big-number" id="requestBalance">0</strong>
+              <span>units remaining</span>
+              <hr>
+              <p class="muted">The server confirms the final route units and checks your available subscription balance before accepting a request.</p>
+              <div class="mini-rule"><b>1–7 units</b><span>per delivery depending on route</span></div>
+              <div class="mini-rule"><b>₦2,000</b><span>express estimate per unit</span></div>
+            </aside>
+          </div>
+        </section>
+
+        <section class="view" id="view-subscription">
+          <div class="section-title">
+            <div>
+              <div class="eyebrow">Subscription</div>
+              <h2>Your plan</h2>
+              <p class="muted">Manage your delivery capacity and payment status.</p>
+            </div>
+          </div>
+
+          <div class="subscription-current panel">
+            <div>
+              <span class="label">Current plan</span>
+              <h3 id="currentPlan">No plan</h3>
+              <p id="subscriptionStateText" class="muted">Choose a plan to activate your delivery account.</p>
+            </div>
+            <div class="subscription-price">
+              <strong id="currentPrice">₦0</strong>
+              <span>/ month</span>
+            </div>
+          </div>
+
+          <div class="plan-grid">
+            <article class="portal-plan" data-plan="Basic">
+              <span class="plan-label">Basic</span><h3>₦67,500</h3><p>45 delivery units</p>
+              <button class="btn outline choose-plan" data-plan="Basic" type="button">Choose Basic</button>
+            </article>
+            <article class="portal-plan featured" data-plan="Growth">
+              <span class="popular-label">MOST POPULAR</span><span class="plan-label">Growth</span><h3>₦105,000</h3><p>75 delivery units</p>
+              <button class="btn primary choose-plan" data-plan="Growth" type="button">Choose Growth</button>
+            </article>
+            <article class="portal-plan" data-plan="Business">
+              <span class="plan-label">Business</span><h3>₦143,000</h3><p>110 delivery units</p>
+              <button class="btn outline choose-plan" data-plan="Business" type="button">Choose Business</button>
+            </article>
+          </div>
+
+          <article class="panel payment-panel">
+            <div>
+              <h3>Payment status</h3>
+              <p id="paymentText" class="muted">No payment recorded.</p>
+            </div>
+            <button class="btn primary" id="paymentBtn" type="button">Record payment</button>
+          </article>
+        </section>
+
+        <section class="view" id="view-account">
+          <div class="section-title">
+            <div>
+              <div class="eyebrow">Profile</div>
+              <h2>Account</h2>
+              <p class="muted">Your Fiable vendor account information.</p>
+            </div>
+          </div>
+          <div class="account-grid">
+            <article class="panel profile-card">
+              <div class="profile-avatar" id="profileInitial">F</div>
+              <h3 id="profileName">Vendor</h3>
+              <p id="profileEmail" class="muted">—</p>
+              <span class="account-badge" id="profileState">—</span>
+            </article>
+            <article class="panel details-card">
+              <h3>Account details</h3>
+              <div class="detail-row"><span>Name</span><strong id="detailName">—</strong></div>
+              <div class="detail-row"><span>Email</span><strong id="detailEmail">—</strong></div>
+              <div class="detail-row"><span>Subscriber ID</span><strong id="detailSubscriberId">—</strong></div>
+              <div class="detail-row"><span>Plan</span><strong id="detailPlan">—</strong></div>
+              <div class="detail-row"><span>Units allocated</span><strong id="detailUnits">0</strong></div>
+              <div class="detail-row"><span>Renewal date</span><strong id="detailRenewal">—</strong></div>
+            </article>
+          </div>
+        </section>
+
+        <section class="view" id="view-settings">
+            <div class="section-title">
+                <div>
+                <div class="eyebrow">Preferences</div>
+                <h2>Settings</h2>
+                <p class="muted">Manage your Fiable vendor account and preferences.</p>
+                </div>
+            </div>
+
+            <div class="account-grid">
+                <!-- Profile & Account -->
+                <article class="panel details-card">
+                <h3>Profile & Account</h3>
+
+                <div class="detail-row">
+                    <span>Name</span>
+                    <strong id="settingsName">—</strong>
+                </div>
+
+                <div class="detail-row">
+                    <span>Email</span>
+                    <strong id="settingsEmail">—</strong>
+                </div>
+
+                <div class="detail-row">
+                    <span>Subscriber ID</span>
+                    <strong id="settingsSubscriberId">—</strong>
+                </div>
+
+                <div class="detail-row">
+                    <span>Current plan</span>
+                    <strong id="settingsPlan">—</strong>
+                </div>
+                </article>
+
+                <!-- Notifications -->
+                <article class="panel details-card">
+                <h3>Notifications</h3>
+
+                <div class="detail-row">
+                    <div>
+                    <strong>Delivery updates</strong>
+                    <p class="muted">Receive updates about your deliveries.</p>
+                    </div>
+
+                    <label class="toggle">
+                    <input type="checkbox" id="settingDeliveryUpdates" checked>
+                    <span></span>
+                    </label>
+                </div>
+
+                <div class="detail-row">
+                    <div>
+                    <strong>Low unit alerts</strong>
+                    <p class="muted">Get notified when your remaining units are running low.</p>
+                    </div>
+
+                    <label class="toggle">
+                    <input type="checkbox" id="settingLowUnitAlerts" checked>
+                    <span></span>
+                    </label>
+                </div>
+
+                <div class="detail-row">
+                    <div>
+                    <strong>Renewal reminders</strong>
+                    <p class="muted">Receive reminders about your subscription renewal.</p>
+                    </div>
+
+                    <label class="toggle">
+                    <input type="checkbox" id="settingRenewalReminders" checked>
+                    <span></span>
+                    </label>
+                </div>
+                </article>
+
+                <article class="panel details-card">
+                  <h3>Security</h3>
+
+                  <div class="detail-row">
+                    <div>
+                      <strong>Password</strong>
+                      <p class="muted">Update your password to keep your account secure.</p>
+                    </div>
+
+                    <div class="password-change">
+                      <button
+                        class="btn outline"
+                        type="button"
+                        id="changePasswordBtn"
+                      >
+                        Change password
+                      </button>
+
+                      <div id="changePasswordForm" class="password-change-form hidden">
+                        <label for="currentPassword">Current password</label>
+                        <input
+                          id="currentPassword"
+                          type="password"
+                          autocomplete="current-password"
+                          placeholder="Enter your current password"
+                        >
+
+                        <label for="newPassword">New password</label>
+                        <input
+                          id="newPassword"
+                          type="password"
+                          autocomplete="new-password"
+                          placeholder="At least 8 characters"
+                        >
+
+                        <label for="confirmNewPassword">Confirm new password</label>
+                        <input
+                          id="confirmNewPassword"
+                          type="password"
+                          autocomplete="new-password"
+                          placeholder="Enter the new password again"
+                        >
+
+                        <div class="password-change-actions">
+                          <button
+                            class="btn primary"
+                            type="button"
+                            id="savePasswordBtn"
+                          >
+                            Update password
+                          </button>
+
+                          <button
+                            class="btn outline"
+                            type="button"
+                            id="cancelPasswordBtn"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </article>
+
+            </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const LOCATIONS = [
+      ["agege","Agege"],["ajeromi-ifelodun","Ajeromi-Ifelodun"],["egbeda","Egbeda"],["shasha","Shasha"],
+      ["igando","Igando"],["ayobo","Ayobo"],["ipaja","Ipaja"],["abule-egba","Abule Egba"],["agbado","Agbado"],
+      ["alagbado","Alagbado"],["idimu","Idimu"],["ikotun","Ikotun"],["amuwo-odofin","Amuwo-Odofin"],
+      ["apapa","Apapa"],["badagry","Badagry"],["epe","Epe"],["ibeju-lekki","Ibeju-Lekki"],
+      ["ifako-ijaiye","Ifako-Ijaiye"],["ikeja","Ikeja"],["ikorodu","Ikorodu"],["kosofe","Kosofe"],
+      ["lagos-island","Lagos Island"],["lagos-mainland","Lagos Mainland"],["yaba","Yaba"],["mushin","Mushin"],
+      ["ojo","Ojo"],["oshodi-isolo","Oshodi-Isolo"],["shomolu","Shomolu"],["surulere","Surulere"],
+      ["ajegunle","Ajegunle"],["victoria-island-vi","Victoria Island (VI)"],["ikoyi","Ikoyi"],
+      ["lekki-phase-1","Lekki Phase 1"],["ikate-elegushi","Ikate Elegushi"],["ajah","Ajah"],["sangotedo","Sangotedo"],
+      ["oniru","Oniru"],["lekki-phase-2","Lekki Phase 2"],["chevron","Chevron"],["ikota","Ikota"],["vgc","VGC"],
+      ["osapa-london","Osapa London"],["jakande-lekki","Jakande (Lekki)"],["orchid-road","Orchid Road"],
+      ["abraham-adesanya","Abraham Adesanya"],["ilasan","Ilasan"]
+    ];
+
+    const PLAN_PRICES = { Basic: 67500, Growth: 105000, Business: 143000 };
+    const state = { account: null, deliveries: [] };
+
+    const $ = id => document.getElementById(id);
+    const toast = message => {
+      const el = $("toast");
+      el.textContent = message;
+      el.classList.add("show");
+      clearTimeout(window.__toastTimer);
+      window.__toastTimer = setTimeout(() => el.classList.remove("show"), 3600);
+    };
+
+    async function api(url, options = {}) {
+      const response = await fetch(url, {
+        headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+        ...options
+      });
+      const text = await response.text();
+      let data = {};
+      try { data = text ? JSON.parse(text) : {}; } catch { throw new Error("The server returned an invalid response."); }
+      if (!response.ok) throw new Error(data.error || "Something went wrong.");
+      return data;
+    }
+
+    function setLoggedIn(email) {
+      localStorage.setItem("fiableVendorEmail", email);
+    }
+
+    function clearSession() {
+      localStorage.removeItem("fiableVendorEmail");
+      state.account = null;
+      state.deliveries = [];
+    }
+
+    function showLogin() {
+        $("appShell").classList.remove("authenticated");
+        $("appShell").classList.add("hidden");
+        $("portalContent").classList.add("hidden");
+        $("authGate").classList.remove("hidden");
+
+        $("loginView").classList.remove("hidden");
+        $("forgotView").classList.add("hidden");
+        $("resetView").classList.add("hidden");
+    }
+
+    function showForgot() {
+      $("appShell").classList.remove("authenticated");
+      $("appShell").classList.add("hidden");
+      $("portalContent").classList.add("hidden");
+      $("authGate").classList.remove("hidden");
+      $("loginView").classList.add("hidden");
+      $("forgotView").classList.remove("hidden");
+      $("forgotEmail").value = $("loginEmail").value || "";
+    }
+
+    function showPortal() {
+        $("authGate").classList.add("hidden");
+        $("appShell").classList.remove("hidden");
+        $("appShell").classList.add("authenticated");
+        $("portalContent").classList.remove("hidden");
+    }
+
+    function initials(name) {
+      return (name || "F").trim().split(/\s+/).slice(0,2).map(x => x[0]).join("").toUpperCase();
+    }
+
+    function formatMoney(value) {
+      return "₦" + Number(value || 0).toLocaleString("en-NG");
+    }
+
+    function formatDate(value) {
+      if (!value) return "—";
+      const d = new Date(value);
+      if (Number.isNaN(d.getTime())) return "—";
+      return d.toLocaleDateString("en-NG", { day:"2-digit", month:"short", year:"numeric" });
+    }
+
+    function statusLabel(status) {
+      return String(status || "requested").replace("-", " ").replace(/\b\w/g, c => c.toUpperCase());
+    }
+
+    function statusClass(status) {
+
+      const value =
+        String(status || "requested").toLowerCase();
+
+      if (value === "in-transit") {
+        return "status-on-delivery";
+      }
+
+      return "status-" +
+        value.replace(/[^a-z-]/g, "");
+    }
+
+    function populateLocations() {
+      ["pickup","dropoff"].forEach(id => {
+        const select = $(id);
+        select.innerHTML = '<option value="">Select location</option>' +
+          LOCATIONS.map(([value,label]) => `<option value="${value}">${label}</option>`).join("");
+      });
+    }
+
+    function updateAccountUI() {
+      const a = state.account;
+      if (!a) return;
+      const initialsText = initials(a.name);
+      $("userInitial").textContent = initialsText;
+      $("profileInitial").textContent = initialsText;
+      $("topUserName").textContent = a.name || "Vendor";
+      $("topUserEmail").textContent = a.email;
+      $("topSubscriberId").textContent = a.subscriberId || "—";
+      $("welcomeName").textContent = (a.name || "Vendor").split(" ")[0];
+
+      $("statPlan").textContent = a.plan || "No plan";
+      $("statPayment").textContent = a.paymentStatus === "paid" ? "Payment active" : "Payment pending";
+      $("statRemaining").textContent = a.unitsRemaining;
+      const unitWarning = $("unitWarning");
+
+      unitWarning.className = "unit-warning";
+
+      if (a.unitsRemaining === 0) {
+      unitWarning.textContent = "Units exhausted — renew your subscription.";
+      unitWarning.classList.add("exhausted");
+      } else if (a.unitsRemaining <= 10) {
+      unitWarning.textContent = "Your units are very low — consider renewing soon.";
+      unitWarning.classList.add("urgent");
+      } else if (a.unitsRemaining <= 20) {
+      unitWarning.textContent = "Your units are running low.";
+      unitWarning.classList.add("low");
+      } else {
+      unitWarning.textContent = "";
+      }
+      $("statAllocation").textContent = `${a.unitsAllocated} allocated`;
+      $("statDeliveries").textContent = a.deliveryStats?.total || 0;
+      $("statSuccess").textContent = `${a.successRate || 0}%`;
+
+      $("usageUsed").textContent = a.unitsUsed;
+      $("usageTotal").textContent = a.unitsAllocated;
+      $("usageRemaining").textContent = `${a.unitsRemaining} units remaining`;
+      if (a.subscriptionState === "grace_period") {
+        $("renewalShort").textContent =
+            a.graceDaysRemaining != null
+            ? `Grace period — ${a.graceDaysRemaining} day${a.graceDaysRemaining === 1 ? "" : "s"} remaining`
+            : "Grace period active";
+        } else if (a.subscriptionState === "expired") {
+        $("renewalShort").textContent = "Subscription expired — renew now";
+        } else if (a.renewalDate) {
+        const days = a.daysUntilRenewal;
+
+        $("renewalShort").textContent =
+            days != null
+            ? `Renews ${formatDate(a.renewalDate)} — ${Math.max(days, 0)} day${Math.max(days, 0) === 1 ? "" : "s"} remaining`
+            : `Renews ${formatDate(a.renewalDate)}`;
+        } else {
+        $("renewalShort").textContent = "No renewal date";
+        }
+      $("usageBar").style.width = `${a.unitsAllocated ? Math.min((a.unitsUsed / a.unitsAllocated) * 100, 100) : 0}%`;
+
+      const stateText = {
+        active: "Active subscription",
+        pending_payment: "Payment required",
+        expired: "Subscription expired",
+        expiring_soon: "Renewal due soon",
+        grace_period: "Grace period",
+        no_plan: "No subscription plan"
+      }[a.subscriptionState] || a.subscriptionState;
+      $("subscriptionStateText").textContent = stateText;
+
+      $("currentPlan").textContent = a.plan || "No plan";
+      $("currentPrice").textContent = a.plan ? formatMoney(PLAN_PRICES[a.plan]) : "₦0";
+      if (a.paymentStatus === "paid") {
+        if (a.subscriptionState === "grace_period") {
+            $("paymentText").textContent =
+            a.graceDaysRemaining != null
+                ? `Payment recorded. Your 3-day grace period is active. ${a.graceDaysRemaining} day${a.graceDaysRemaining === 1 ? "" : "s"} remaining.`
+                : "Payment recorded. Your 3-day grace period is active.";
+
+        } else if (a.subscriptionState === "expired") {
+            $("paymentText").textContent =
+            "Your subscription has expired. Please renew to continue using Fiable.";
+
+        } else if (a.daysUntilRenewal != null) {
+            $("paymentText").textContent =
+            `Payment recorded. ${Math.max(a.daysUntilRenewal, 0)} day${Math.max(a.daysUntilRenewal, 0) === 1 ? "" : "s"} until renewal.`;
+
+        } else {
+            $("paymentText").textContent = "Payment recorded.";
+        }
+
+        } else {
+        $("paymentText").textContent =
+            "Payment has not been recorded for the current plan.";
+        }
+      $("paymentBtn").disabled = !a.plan || a.paymentStatus === "paid";
+      $("paymentBtn").textContent = a.paymentStatus === "paid" ? "Payment recorded" : "Record payment";
+
+      $("requestBalance").textContent = a.unitsRemaining;
+
+      $("profileName").textContent = a.name;
+      $("profileEmail").textContent = a.email;
+      $("profileState").textContent = stateText;
+      $("detailName").textContent = a.name;
+      $("detailEmail").textContent = a.email;
+      $("detailSubscriberId").textContent = a.subscriberId || "—";
+      $("detailPlan").textContent = a.plan || "No plan";
+      $("detailUnits").textContent = a.unitsAllocated;
+      $("detailRenewal").textContent = a.renewalDate ? formatDate(a.renewalDate) : "—";
+
+      $("settingsName").textContent = a.name || "—";
+      $("settingsEmail").textContent = a.email || "—";
+      $("settingsSubscriberId").textContent = a.subscriberId || "—";
+      $("settingsPlan").textContent = a.plan || "—";
+
+      document.querySelectorAll(".portal-plan").forEach(card => {
+        card.classList.toggle("selected", card.dataset.plan === a.plan);
+      });
+      updatePlanButtons();
+
+      renderStatusList();
+      loadNotificationSettings();
+    }
+
+    function loadNotificationSettings() {
+      const settings = JSON.parse(
+        localStorage.getItem("fiableNotificationSettings") || "{}"
+      );
+
+      $("settingDeliveryUpdates").checked =
+        settings.deliveryUpdates !== false;
+
+      $("settingLowUnitAlerts").checked =
+        settings.lowUnitAlerts !== false;
+
+      $("settingRenewalReminders").checked =
+        settings.renewalReminders !== false;
+    }
+
+    function saveNotificationSettings() {
+      const settings = {
+        deliveryUpdates: $("settingDeliveryUpdates").checked,
+        lowUnitAlerts: $("settingLowUnitAlerts").checked,
+        renewalReminders: $("settingRenewalReminders").checked
+      };
+
+      localStorage.setItem(
+        "fiableNotificationSettings",
+        JSON.stringify(settings)
+      );
+    }
+
+    [
+      "settingDeliveryUpdates",
+      "settingLowUnitAlerts",
+      "settingRenewalReminders"
+    ].forEach(id => {
+      $(id).addEventListener("change", saveNotificationSettings);
+    });
+
+    $("changePasswordBtn").addEventListener("click", () => {
+      $("changePasswordForm").classList.remove("hidden");
+      $("changePasswordBtn").classList.add("hidden");
+    });
+
+    $("cancelPasswordBtn").addEventListener("click", () => {
+      $("changePasswordForm").classList.add("hidden");
+      $("changePasswordBtn").classList.remove("hidden");
+
+      $("currentPassword").value = "";
+      $("newPassword").value = "";
+      $("confirmNewPassword").value = "";
+    });
+
+    $("savePasswordBtn").addEventListener("click", async () => {
+      const currentPassword = $("currentPassword").value;
+      const newPassword = $("newPassword").value;
+      const confirmNewPassword = $("confirmNewPassword").value;
+
+      if (!currentPassword || !newPassword || !confirmNewPassword) {
+        toast("Please complete all password fields.");
+        return;
+      }
+
+      if (newPassword.length < 8) {
+        toast("New password must be at least 8 characters.");
+        return;
+      }
+
+      if (newPassword !== confirmNewPassword) {
+        toast("New passwords do not match.");
+        return;
+      }
+
+      const btn = $("savePasswordBtn");
+      btn.disabled = true;
+      btn.textContent = "Updating…";
+
+      try {
+        await api("/api/change-password", {
+          method: "POST",
+          body: JSON.stringify({
+            email: state.account.email,
+            currentPassword,
+            newPassword
+          })
+        });
+
+        toast("Password changed successfully.");
+
+        $("currentPassword").value = "";
+        $("newPassword").value = "";
+        $("confirmNewPassword").value = "";
+
+        $("changePasswordForm").classList.add("hidden");
+        $("changePasswordBtn").classList.remove("hidden");
+
+      } catch (error) {
+        toast(error.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Update password";
+      }
+    });
+
+    function renderStatusList() {
+      const counts = state.account?.deliveryStats?.counts || {};
+      const rows = [
+        ["requested","Requested"],["assigned","Assigned"],["in-transit","In transit"],["delivered","Delivered"],["cancelled","Cancelled"]
+      ];
+      $("statusList").innerHTML = rows.map(([key,label]) =>
+        `<div class="status-row"><span><i class="${statusClass(key)}"></i>${label}</span><strong>${counts[key] || 0}</strong></div>`
+      ).join("");
+    }
+
+    function renderRecent() {
+      const items = state.deliveries.slice().sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0,6);
+      $("recentTable").innerHTML = items.length ? items.map(deliveryRow).join("") :
+        `<tr><td colspan="5" class="table-empty">No deliveries yet. <button class="inline-action" data-go="request">Request your first delivery</button></td></tr>`;
+    }
+
+    function deliveryRow(d) {
+        const address = d.details?.deliveryAddress || "Address not provided";
+        const pickupAddress = d.details?.pickupAddress || "Address not provided";
+        const pickupContact = d.details?.pickupContactName || "—";
+        const pickupPhone = d.details?.pickupPhone || "—";
+        const recipientName = d.details?.recipientName || "—";
+        const recipientPhone = d.details?.recipientPhone || "—";
+        const packageType = d.details?.packageType || "General";
+        const priority = d.details?.priority || "Standard";
+        const deliveryWindow = d.details?.deliveryWindow || "Standard";
+        const packageDescription = d.details?.packageDescription || "—";
+        const pickupInstructions = d.details?.pickupInstructions || "—";
+        const deliveryInstructions = d.details?.deliveryInstructions || "—";
+        return `
+            <tr>
+            <td><strong>${escapeHtml(d.orderRef || `FL-${d.id}`)}</strong></td>
+            <td>${escapeHtml(d.pickup)}</td>
+            <td>${escapeHtml(d.dropoff)}</td>
+            <td>${Number(d.units || 0)}</td>
+            <td>
+                <span class="status-pill ${statusClass(d.status)}">
+                ${statusLabel(d.status)}
+                </span>
+            </td>
+            <td>${formatDate(d.createdAt)}</td>
+            <td>
+                <button
+                  type="button"
+                  class="btn outline delivery-view-btn"
+                  data-delivery-id="${d.id}"
+                >
+                  View
+                </button>
+
+                ${
+                  d.status === "requested"
+                    ? `
+                      <button
+                        type="button"
+                        class="btn outline delivery-cancel-btn"
+                        data-delivery-id="${d.id}"
+                      >
+                        Cancel
+                      </button>
+                    `
+                    : ""
+                }
+            </td>
+            </tr>
+        `;
+    }
+
+    function openDeliveryModal(d) {
+
+      const modal =
+        $("deliveryModal");
+
+      const body =
+        $("deliveryModalBody");
+
+      const title =
+        $("deliveryModalTitle");
+
+      if (!modal || !body || !title) {
+        return;
+      }
+
+
+      const address =
+        d.details?.deliveryAddress ||
+        "Address not provided";
+
+      const pickupAddress =
+        d.details?.pickupAddress ||
+        "Address not provided";
+
+      const pickupContact =
+        d.details?.pickupContactName ||
+        "—";
+
+      const pickupPhone =
+        d.details?.pickupPhone ||
+        "—";
+
+      const recipientName =
+        d.details?.recipientName ||
+        "—";
+
+      const recipientPhone =
+        d.details?.recipientPhone ||
+        "—";
+
+      const packageType =
+        d.details?.packageType ||
+        "General";
+
+      const priority =
+        d.details?.priority ||
+        "Standard";
+
+      const deliveryWindow =
+        d.details?.deliveryWindow ||
+        "Standard";
+
+      const packageDescription =
+        d.details?.packageDescription ||
+        "—";
+
+      const pickupInstructions =
+        d.details?.pickupInstructions ||
+        "—";
+
+      const deliveryInstructions =
+        d.details?.deliveryInstructions ||
+        "—";
+
+
+      title.textContent =
+        d.orderRef ||
+        `FL-${d.id}`;
+
+
+      body.innerHTML = `
+
+        <div class="delivery-detail-sections">
+
+          <div class="delivery-detail-section">
+
+            <div class="delivery-detail-header">
+
+              <div>
+                <span class="detail-label">
+                  Order
+                </span>
+
+                <h4>
+                  ${escapeHtml(
+                    d.orderRef || `FL-${d.id}`
+                  )}
+                </h4>
+              </div>
+
+              <span class="status-pill ${statusClass(d.status)}">
+                ${statusLabel(d.status)}
+              </span>
+
+            </div>
+
+          </div>
+
+
+          <div class="delivery-detail-section">
+
+            <h5>Pickup details</h5>
+
+            <div class="delivery-detail-grid">
+
+              <div>
+                <span class="detail-label">
+                  Pickup location
+                </span>
+
+                <strong>
+                  ${escapeHtml(d.pickup || "—")}
+                </strong>
+              </div>
+
+
+              <div>
+                <span class="detail-label">
+                  Pickup contact
+                </span>
+
+                <strong>
+                  ${escapeHtml(pickupContact)}
+                </strong>
+              </div>
+
+
+              <div>
+                <span class="detail-label">
+                  Pickup phone
+                </span>
+
+                <strong>
+                  ${escapeHtml(pickupPhone)}
+                </strong>
+              </div>
+
+
+              <div class="delivery-detail-full">
+
+                <span class="detail-label">
+                  Pickup address
+                </span>
+
+                <strong>
+                  ${escapeHtml(pickupAddress)}
+                </strong>
+
+              </div>
+
+            </div>
+
+          </div>
+
+
+          <div class="delivery-detail-section">
+
+            <h5>Delivery details</h5>
+
+            <div class="delivery-detail-grid">
+
+              <div>
+                <span class="detail-label">
+                  Delivery location
+                </span>
+
+                <strong>
+                  ${escapeHtml(d.dropoff || "—")}
+                </strong>
+              </div>
+
+
+              <div>
+                <span class="detail-label">
+                  Recipient
+                </span>
+
+                <strong>
+                  ${escapeHtml(recipientName)}
+                </strong>
+              </div>
+
+
+              <div>
+                <span class="detail-label">
+                  Recipient phone
+                </span>
+
+                <strong>
+                  ${escapeHtml(recipientPhone)}
+                </strong>
+              </div>
+
+
+              <div class="delivery-detail-full">
+
+                <span class="detail-label">
+                  Delivery address
+                </span>
+
+                <strong>
+                  ${escapeHtml(address)}
+                </strong>
+
+              </div>
+
+            </div>
+
+          </div>
+
+
+          <div class="delivery-detail-section">
+
+            <h5>Package & delivery</h5>
+
+            <div class="delivery-detail-grid">
+
+              <div>
+                <span class="detail-label">
+                  Units
+                </span>
+
+                <strong>
+                  ${Number(d.units || 0)}
+                </strong>
+              </div>
+
+
+              <div>
+                <span class="detail-label">
+                  Package type
+                </span>
+
+                <strong>
+                  ${escapeHtml(packageType)}
+                </strong>
+              </div>
+
+
+              <div>
+                <span class="detail-label">
+                  Priority
+                </span>
+
+                <strong>
+                  ${escapeHtml(priority)}
+                </strong>
+              </div>
+
+
+              <div>
+                <span class="detail-label">
+                  Delivery window
+                </span>
+
+                <strong>
+                  ${escapeHtml(deliveryWindow)}
+                </strong>
+              </div>
+
+
+              <div class="delivery-detail-full">
+
+                <span class="detail-label">
+                  Package description
+                </span>
+
+                <strong>
+                  ${escapeHtml(packageDescription)}
+                </strong>
+
+              </div>
+
+
+              <div>
+                <span class="detail-label">
+                  Pickup instructions
+                </span>
+
+                <strong>
+                  ${escapeHtml(pickupInstructions)}
+                </strong>
+              </div>
+
+
+              <div>
+                <span class="detail-label">
+                  Delivery instructions
+                </span>
+
+                <strong>
+                  ${escapeHtml(deliveryInstructions)}
+                </strong>
+              </div>
+
+            </div>
+
+          </div>
+
+
+          <div class="delivery-detail-section">
+
+            <h5>Rider details</h5>
+
+            <div class="delivery-detail-grid">
+
+              <div>
+                <span class="detail-label">
+                  Rider
+                </span>
+
+                <strong>
+                  ${
+                    d.riderName
+                      ? escapeHtml(d.riderName)
+                      : "Not assigned"
+                  }
+                </strong>
+              </div>
+
+
+              <div>
+                <span class="detail-label">
+                  Rider ID
+                </span>
+
+                <strong>
+                  ${
+                    d.riderRef
+                      ? escapeHtml(d.riderRef)
+                      : "—"
+                  }
+                </strong>
+              </div>
+
+
+              <div>
+                <span class="detail-label">
+                  Rider phone
+                </span>
+
+                <strong>
+                  ${
+                    d.riderPhone
+                      ? escapeHtml(d.riderPhone)
+                      : "—"
+                  }
+                </strong>
+              </div>
+
+            </div>
+
+          </div>
+
+
+          ${
+            d.status === "requested"
+              ? `
+                <div
+                  style="
+                    margin-block-start: 20px;
+                    display: flex;
+                    justify-content: flex-end;
+                  "
+                >
+
+                  <button
+                    type="button"
+                    class="btn outline delivery-cancel-btn"
+                    data-delivery-id="${d.id}"
+                  >
+                    Cancel Order
+                  </button>
+
+                </div>
+              `
+              : ""
+          }
+
+        </div>
+
+      `;
+
+      $("deliveryModalClose").onclick = () => {
+
+        modal.classList.remove("show");
+
+        modal.setAttribute(
+          "aria-hidden",
+          "true"
+        );
+
+      };
+
+
+      modal.onclick = e => {
+
+        if (e.target === modal) {
+
+          modal.classList.remove("show");
+
+          modal.setAttribute(
+            "aria-hidden",
+            "true"
+          );
+
+        }
+
+      };
+
+
+      modal.classList.add("show");
+
+      modal.setAttribute(
+        "aria-hidden",
+        "false"
+      );
+
+    }
+
+    function renderDeliveries() {
+      const search = $("deliverySearch").value.toLowerCase().trim();
+      const filter = $("deliveryFilter").value;
+      const items = state.deliveries.filter(d => {
+        const haystack = `${d.orderRef || ""} ${d.pickup || ""} ${d.dropoff || ""}`.toLowerCase();
+        return (!search || haystack.includes(search)) && (filter === "all" || d.status === filter);
+      }).sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+      $("deliveriesTable").innerHTML = items.map(d => deliveryRow(d)).join("");
+      $("deliveryEmpty").classList.toggle("hidden", items.length !== 0);
+    }
+
+    ["deliveriesTable", "recentTable"].forEach(tableId => {
+
+      $(tableId).addEventListener("click", e => {
+
+        const btn =
+          e.target.closest(".delivery-view-btn");
+
+        if (!btn) return;
+
+
+        const deliveryId =
+          btn.dataset.deliveryId;
+
+        const delivery =
+          state.deliveries.find(
+            item =>
+              String(item.id) ===
+              String(deliveryId)
+          );
+
+
+        if (!delivery) {
+          console.error(
+            "Delivery not found:",
+            deliveryId
+          );
+          return;
+        }
+
+
+        openDeliveryModal(delivery);
+
+      });
+
+    });
+
+  document.addEventListener("click", async e => {
+
+    const btn =
+      e.target.closest(".delivery-cancel-btn");
+
+    if (!btn) return;
+
+    const deliveryId =
+      btn.dataset.deliveryId;
+
+    if (!deliveryId) return;
+
+
+    const confirmed =
+      await showCancelConfirmation();
+
+    if (!confirmed) {
+      return;
+    }
+
+
+    try {
+
+      btn.disabled = true;
+      btn.textContent = "Cancelling...";
+
+
+      const response = await fetch(
+        "/api/delivery/status",
+        {
+          method: "POST",
+
+          headers: {
+            "Content-Type": "application/json"
+          },
+
+          body: JSON.stringify({
+            id: deliveryId,
+            status: "cancelled"
+          })
+        }
+      );
+
+
+      const data =
+        await response.json();
+
+
+      if (!response.ok) {
+        throw new Error(
+          data.error ||
+          "Unable to cancel delivery."
+        );
+      }
+
+
+      toast(
+        "Delivery cancelled successfully."
+      );
+
+
+      const email =
+        localStorage.getItem("fiableVendorEmail");
+
+      if (email) {
+
+        state.account =
+          await api(
+            `/api/account/summary?email=${encodeURIComponent(email)}`
+          );
+
+        state.deliveries =
+          (
+            await api(
+              `/api/account/deliveries?email=${encodeURIComponent(email)}`
+            )
+          ).deliveries || [];
+
+        updateAccountUI();
+
+        renderRecent();
+        renderDeliveries();
+
+      }
+
+
+    } catch (error) {
+
+      console.error(
+        "CANCEL DELIVERY ERROR:",
+        error
+      );
+
+      toast(
+        error.message ||
+        "Unable to cancel delivery."
+      );
+
+      btn.disabled = false;
+      btn.textContent = "Cancel";
+
+    }
+
+  });
+
+  function showCancelConfirmation() {
+
+    return new Promise(resolve => {
+
+      const existing =
+        document.getElementById(
+          "cancelConfirmToast"
+        );
+
+      if (existing) {
+        existing.remove();
+      }
+
+
+      const toast =
+        document.createElement("div");
+
+      toast.id =
+        "cancelConfirmToast";
+
+      toast.className =
+        "cancel-confirm-toast";
+
+
+      toast.innerHTML = `
+
+        <div class="cancel-confirm-content">
+
+          <div class="cancel-confirm-message">
+
+            <strong>
+              Cancel delivery?
+            </strong>
+
+            <span>
+              This action will restore the
+              delivery units to your account.
+            </span>
+
+          </div>
+
+
+          <div class="cancel-confirm-actions">
+
+            <button
+              type="button"
+              class="cancel-confirm-no"
+            >
+              Keep Order
+            </button>
+
+            <button
+              type="button"
+              class="cancel-confirm-yes"
+            >
+              Cancel Order
+            </button>
+
+          </div>
+
+        </div>
+
+      `;
+
+
+      document.body.appendChild(toast);
+
+
+      const close =
+        result => {
+
+          toast.classList.remove("show");
+
+          setTimeout(() => {
+            toast.remove();
+          }, 200);
+
+          resolve(result);
+
+        };
+
+
+      toast
+        .querySelector(".cancel-confirm-no")
+        .addEventListener(
+          "click",
+          () => close(false)
+        );
+
+
+      toast
+        .querySelector(".cancel-confirm-yes")
+        .addEventListener(
+          "click",
+          () => close(true)
+        );
+
+
+      requestAnimationFrame(() => {
+
+        toast.classList.add("show");
+
+      });
+
+    });
+
+  }
+
+    async function refreshAccount() {
+    const email = localStorage.getItem("fiableVendorEmail");
+
+    if (!email) {
+        if (resetToken) {
+            showResetPassword();
+            return;
+        }
+
+        showLogin();
+        return;
+    }
+      try {
+        state.account = await api(`/api/account/summary?email=${encodeURIComponent(email)}`);
+        state.deliveries = (await api(`/api/account/deliveries?email=${encodeURIComponent(email)}`)).deliveries || [];
+        startSessionTimer();
+        showPortal();
+        updateAccountUI();
+        renderRecent();
+        renderDeliveries();
+      } catch (error) {
+        clearSession();
+        showLogin();
+        toast(error.message);
+      }
+    }
+
+    function switchView(view) {
+      document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
+      const target = $(`view-${view}`);
+      if (target) target.classList.add("active");
+      document.querySelectorAll(".nav-item").forEach(btn => btn.classList.toggle("active", btn.dataset.view === view));
+      const titles = { 
+        dashboard:"Dashboard", 
+        deliveries:"My Deliveries", 
+        request:"Request Delivery", 
+        subscription:"Subscription", 
+        account:"Account",
+        settings:"Settings"
+    };
+      $("pageTitle").textContent = titles[view] || "Dashboard";
+      $("sidebar").classList.remove("open");
+      $("mobileOverlay").classList.remove("show");
+      window.scrollTo({ top:0, behavior:"smooth" });
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;" }[c]));
+    }
+
+    const SESSION_TIMEOUT = 30 * 60 * 1000; // 30 minutes
+    let sessionTimer = null;
+    let lastActivity = Date.now();
+
+    async function login(email, password) {
+      const account = await api("/api/login", {
+        method:"POST",
+        body:JSON.stringify({ email, password })
+      });
+      if (!account || account.error || !account.email) {
+        throw new Error("Enter a valid email or password");
+    }
+      setLoggedIn(account.email);
+      state.account = account;
+      startSessionTimer();
+      state.deliveries = (await api(`/api/account/deliveries?email=${encodeURIComponent(account.email)}`)).deliveries || [];
+      showPortal();
+      updateAccountUI();
+      renderRecent();
+      renderDeliveries();
+      switchView("dashboard");
+    }
+
+    function startSessionTimer() {
+        clearInterval(sessionTimer);
+        lastActivity = Date.now();
+        sessionTimer = setInterval(() => {
+            const inactiveTime = Date.now() - lastActivity;
+            if (inactiveTime >= SESSION_TIMEOUT) {
+            expireSession();
+            }
+        }, 10000);
+    }
+
+    function expireSession() {
+        clearInterval(sessionTimer);
+        sessionTimer = null;
+        localStorage.removeItem("fiableVendorEmail");
+        state.account = null;
+        state.deliveries = [];
+        window.history.replaceState({}, document.title, "/portal.html");
+        showLogin();
+        setTimeout(() => {
+        toast("Your session expired due to inactivity. Please log in again.");
+        }, 100);
+    }
+
+    function resetSessionActivity() {
+        if (!state.account) return;
+        lastActivity = Date.now();
+    }
+
+    ["click", "keydown", "mousemove", "scroll", "touchstart"].forEach(eventName => {
+        document.addEventListener(eventName, resetSessionActivity, { passive: true });
+    });
+
+    $("loginForm").addEventListener("submit", async e => {
+      e.preventDefault();
+      $("loginError").style.display = "none";
+      const btn = $("loginBtn");
+      btn.disabled = true;
+      btn.textContent = "Logging in…";
+      try {
+        await login($("loginEmail").value.trim(), $("loginPassword").value);
+        toast("Welcome back to Fiable.");
+      } catch (error) {
+        const loginError = $("loginError");
+
+        loginError.textContent = "Invalid email, Subscriber ID, or password";
+        loginError.style.display = "block";
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Log in";
+      }
+    });
+
+    $("forgotForm").addEventListener("submit", async e => {
+        e.preventDefault();
+        try {
+            const result = await api("/api/forgot-password", {
+            method: "POST",
+            body: JSON.stringify({
+                email: $("forgotEmail").value.trim()
+            })
+            });
+            if (result.resetLink) {
+            toast("Password reset link created.");
+            setTimeout(() => {
+                window.location.href = result.resetLink;
+            }, 800);
+            return;
+            }
+            toast(result.message);
+        } catch (error) {
+            toast(error.message);
+        }
+    });
+
+    const resetParams = new URLSearchParams(window.location.search);
+const resetToken = resetParams.get("reset");
+
+if (resetToken) {
+  showResetPassword();
+}
+
+
+function showResetPassword() {
+  document.querySelectorAll(".auth-screen").forEach(screen => {
+    screen.classList.add("hidden");
+  });
+
+  $("resetView").classList.remove("hidden");
+}
+
+
+const resetForm = $("resetForm");
+
+const resetButton = $("resetSubmitBtn");
+
+if (resetForm) {
+  resetForm.addEventListener("submit", async function(e) {
+    e.preventDefault();
+
+    const password = $("resetPassword").value;
+    const confirmPassword = $("resetConfirmPassword").value;
+
+    if (password.length < 8) {
+      toast("Your password must be at least 8 characters.");
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      toast("Passwords do not match.");
+      return;
+    }
+
+    try {
+      console.log("Sending reset request...");
+
+      const result = await api("/api/reset-password", {
+        method: "POST",
+        body: JSON.stringify({
+          token: resetToken,
+          password: password,
+          confirmPassword: confirmPassword
+        })
+      });
+
+      console.log("Reset response:", result);
+
+      toast(result.message);
+
+      setTimeout(() => {
+        window.location.href = "/portal.html";
+      }, 1500);
+
+    } catch (error) {
+      console.error("Reset error:", error);
+      toast(error.message);
+    }
+  });
+}
+
+
+$("resetBackLoginBtn").addEventListener("click", () => {
+  window.history.replaceState({}, document.title, "/portal.html");
+  showLogin();
+});
+
+    $("forgotBtn").addEventListener("click", showForgot);
+    $("backLoginBtn").addEventListener("click", showLogin);
+
+    document.querySelectorAll(".password-toggle").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const input = $(btn.dataset.target);
+        const visible = input.type === "text";
+        input.type = visible ? "password" : "text";
+        btn.textContent = visible ? "Show" : "Hide";
+      });
+    });
+
+    document.querySelectorAll("[data-view]").forEach(btn => btn.addEventListener("click", () => switchView(btn.dataset.view)));
+    document.addEventListener("click", e => {
+      const go = e.target.closest("[data-go]");
+      if (go) switchView(go.dataset.go);
+    });
+
+    $("menuBtn").addEventListener("click", () => {
+      $("sidebar").classList.add("open");
+      $("mobileOverlay").classList.add("show");
+    });
+    $("closeSidebar").addEventListener("click", () => {
+      $("sidebar").classList.remove("open");
+      $("mobileOverlay").classList.remove("show");
+    });
+    $("mobileOverlay").addEventListener("click", () => {
+      $("sidebar").classList.remove("open");
+      $("mobileOverlay").classList.remove("show");
+    });
+
+    $("logoutBtn").addEventListener("click", () => {
+      clearSession();
+      window.location.replace("portal.html");
+    });
+
+    $("deliverySearch").addEventListener("input", renderDeliveries);
+    $("deliveryFilter").addEventListener("change", renderDeliveries);
+
+    async function calculateRoute() {
+      const pickup = $("pickup").value, dropoff = $("dropoff").value;
+      if (!pickup || !dropoff) {
+        $("routeUnits").textContent = "Select both locations";
+        $("routeCost").textContent = "—";
+        return;
+      }
+      try {
+        const result = await api("/api/calculate", {
+          method:"POST",
+          body:JSON.stringify({ pickup, dropoff })
+        });
+        $("routeUnits").textContent = `${result.units} unit${result.units === 1 ? "" : "s"}`;
+        $("routeCost").textContent = `${formatMoney(result.cost)} estimated`;
+        $("routePreview").classList.add("ready");
+      } catch (error) {
+        $("routeUnits").textContent = "Unable to calculate";
+        $("routeCost").textContent = error.message;
+      }
+    }
+    $("pickup").addEventListener("change", calculateRoute);
+    $("dropoff").addEventListener("change", calculateRoute);
+
+    $("deliveryForm").addEventListener("submit", async e => {
+      e.preventDefault();
+      const btn = $("requestBtn");
+      if (!state.account) return;
+      btn.disabled = true;
+      btn.textContent = "Submitting…";
+      const payload = {
+        email: state.account.email,
+        pickup: $("pickup").value,
+        dropoff: $("dropoff").value,
+        pickupContactName: $("pickupContactName").value.trim(),
+        pickupPhone: $("pickupPhone").value.trim(),
+        pickupAddress: $("pickupAddress").value.trim(),
+        recipientName: $("recipientName").value.trim(),
+        recipientPhone: $("recipientPhone").value.trim(),
+        deliveryAddress: $("deliveryAddress").value.trim(),
+        packageType: $("packageType").value,
+        priority: $("priority").value,
+        deliveryWindow: $("deliveryWindow").value,
+        packageDescription: $("packageDescription").value.trim(),
+        pickupInstructions: $("pickupInstructions").value.trim(),
+        deliveryInstructions: $("deliveryInstructions").value.trim()
+      };
+      try {
+        const result = await api("/api/delivery-request", { method:"POST", body:JSON.stringify(payload) });
+        state.account = result.summary;
+        state.deliveries.unshift(result.delivery);
+        updateAccountUI();
+        renderRecent();
+        renderDeliveries();
+        e.target.reset();
+        $("routeUnits").textContent = "Select locations";
+        $("routeCost").textContent = "—";
+        $("routePreview").classList.remove("ready");
+        toast(`Delivery ${result.delivery.orderRef} has been requested.`);
+        switchView("deliveries");
+      } catch (error) {
+        toast(error.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Submit delivery request";
+      }
+    });
+
+    document.querySelectorAll(".choose-plan").forEach(btn => {
+        btn.addEventListener("click", async () => {
+            const plan = btn.dataset.plan;
+            if (!state.account) return;
+            const account = state.account;
+            // Prevent changing an active paid subscription
+            if (
+            account.paymentStatus === "paid" &&
+            account.unitsRemaining > 0 &&
+            account.subscriptionState !== "expired"
+            ) {
+            toast(
+                `Your ${account.plan} subscription is still active. You can choose another plan after it expires.`
+            );
+            return;
+            }
+            btn.disabled = true;
+            try {
+            const updatedAccount = await api("/api/account/plan", {
+                method: "POST",
+                body: JSON.stringify({
+                email: account.email,
+                plan: plan
+                })
+            });
+            state.account = updatedAccount;
+            updateAccountUI();
+            toast(
+                `${plan} selected. Complete payment to activate the subscription.`
+            );
+            } catch (error) {
+            toast(error.message);
+            } finally {
+            updatePlanButtons();
+            }
+        });
+    });
+
+    function updatePlanButtons() {
+        const account = state.account;
+        if (!account) return;
+        const subscriptionLocked =
+            account.paymentStatus === "paid" &&
+            account.unitsRemaining > 0 &&
+            account.subscriptionState !== "expired";
+        document.querySelectorAll(".choose-plan").forEach(btn => {
+            const plan = btn.dataset.plan;
+            if (subscriptionLocked) {
+                btn.disabled = true;
+                if (plan === account.plan) {
+                    btn.textContent = "Current plan";
+                } else {
+                    btn.textContent = "Locked";
+                }
+            } else {
+                btn.disabled = false;
+                if (account.paymentStatus === "paid" && account.unitsRemaining === 0) {
+                    btn.textContent = `Renew ${plan}`;
+                } else if (plan === "Basic") {
+                    btn.textContent = "Choose Basic";
+                } else if (plan === "Growth") {
+                    btn.textContent = "Choose Growth";
+                } else if (plan === "Business") {
+                    btn.textContent = "Choose Business";
+                }
+            }
+        });
+    }
+
+    $("paymentBtn").addEventListener("click", async () => {
+      if (!state.account?.plan) return;
+      const btn = $("paymentBtn");
+      btn.disabled = true;
+      try {
+        state.account = await api("/api/account/payment", {
+          method:"POST",
+          body:JSON.stringify({ email:state.account.email })
+        }).then(async () => api(`/api/account/summary?email=${encodeURIComponent(state.account.email)}`));
+        updateAccountUI();
+        toast("Payment recorded and subscription activated.");
+      } catch (error) {
+        toast(error.message);
+        btn.disabled = false;
+      }
+    });
+
+    populateLocations();
+    refreshAccount();
+  </script>
+  <div
+    id="deliveryModal"
+    class="delivery-modal"
+    aria-hidden="true"
+  >
+    <div class="modal-content">
+
+      <div class="modal-header">
+
+        <div>
+          <span class="detail-label">Delivery details</span>
+
+          <h3 id="deliveryModalTitle">
+            Delivery
+          </h3>
+        </div>
+
+        <button
+          type="button"
+          class="modal-close"
+          id="deliveryModalClose"
+          aria-label="Close"
+        >
+          ×
+        </button>
+
+      </div>
+
+
+      <div
+        id="deliveryModalBody"
+        class="modal-body"
+      >
+      </div>
+
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,93 @@
+[
+  {
+    "id": 1,
+    "riderRef": "FL-RID-0001",
+    "name": "Kayode",
+    "phone": "08000000000",
+    "email": "testrider@example.com",
+    "vehicle": "Bike",
+    "status": "available",
+    "totalDeliveries": 3,
+    "completedDeliveries": 2,
+    "failedDeliveries": 0,
+    "createdAt": "2026-08-16T08:04:43.962078+00:00"
+  },
+  {
+    "id": 2,
+    "riderRef": "FL-RID-0002",
+    "name": "Leke",
+    "phone": "08103694860",
+    "email": "leke@gmail.com",
+    "vehicle": "Bike",
+    "status": "available",
+    "totalDeliveries": 3,
+    "completedDeliveries": 1,
+    "failedDeliveries": 0,
+    "createdAt": "2026-08-16T09:11:08.659212+00:00"
+  },
+  {
+    "id": 3,
+    "riderRef": "FL-RID-0003",
+    "name": "Sunday",
+    "phone": "07015414492",
+    "email": "sunday@gmail.com",
+    "vehicle": "Motorcycle",
+    "status": "available",
+    "totalDeliveries": 1,
+    "completedDeliveries": 1,
+    "failedDeliveries": 1,
+    "createdAt": "2026-08-16T09:35:34.579980+00:00"
+  },
+  {
+    "id": 4,
+    "riderRef": "FL-RID-0004",
+    "name": "Emmanuel",
+    "phone": "09032445679",
+    "email": "emanuel@gmail.com",
+    "vehicle": "Motorcycle",
+    "status": "available",
+    "totalDeliveries": 0,
+    "completedDeliveries": 0,
+    "failedDeliveries": 1,
+    "createdAt": "2026-08-16T15:00:00.042008+00:00"
+  },
+  {
+    "id": 5,
+    "riderRef": "FL-RID-0005",
+    "name": "James",
+    "phone": "08103694860",
+    "email": "toluwaloseoyinloye@gmail.com",
+    "vehicle": "Motorcycle",
+    "status": "available",
+    "totalDeliveries": 2,
+    "completedDeliveries": 1,
+    "failedDeliveries": 1,
+    "createdAt": "2026-08-16T15:01:10.287932+00:00"
+  },
+  {
+    "id": 6,
+    "riderRef": "FL-RID-0006",
+    "name": "Francis",
+    "phone": "08103694860",
+    "email": "toluwaloseoyinloye@gmail.com",
+    "vehicle": "Motorcycle",
+    "status": "available",
+    "totalDeliveries": 4,
+    "completedDeliveries": 2,
+    "failedDeliveries": 0,
+    "createdAt": "2026-08-16T15:01:25.389743+00:00"
+  },
+  {
+    "id": 7,
+    "riderRef": "FL-RID-0007",
+    "name": "Yinka",
+    "phone": "08103694860",
+    "email": "toluwaloseoyinloye@gmail.com",
+    "vehicle": "Motorcycle",
+    "status": "available",
+    "totalDeliveries": 1,
+    "completedDeliveries": 1,
+    "failedDeliveries": 0,
+    "createdAt": "2026-08-16T15:15:22.307657+00:00"
+  }
+]

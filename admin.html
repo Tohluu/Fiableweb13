@@ -1,0 +1,1660 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>Fiable Admin Portal</title>
+
+  <link rel="stylesheet" href="portal.css">
+  <link rel="stylesheet" href="admin.css">
+  <style>
+    body.admin-page-loading {
+      visibility: hidden;
+    }
+  </style>
+</head>
+
+<body class="admin-page-loading">
+
+  <div class="portal-shell">
+
+    <!-- =========================
+         ADMIN SIDEBAR
+    ========================== -->
+    <aside class="sidebar" id="adminSidebar">
+
+      <div class="sidebar-top">
+
+        <a class="brand" href="index.html">
+          <img src="images/Logo2.png" alt="Fiable Logistics">
+        </a>
+
+        <button
+          class="close-sidebar"
+          id="closeAdminSidebar"
+          type="button"
+          aria-label="Close navigation"
+        >
+          ×
+        </button>
+
+      </div>
+
+      <div class="admin-label">
+        ADMIN PORTAL
+      </div>
+
+      <nav class="side-nav" aria-label="Admin navigation">
+
+        <button
+          class="nav-item active"
+          data-admin-view="admin-dashboard"
+          type="button"
+        >
+          <span>⌂</span>
+          Dashboard
+        </button>
+
+        <button
+          class="nav-item"
+          data-admin-view="admin-vendors"
+          type="button"
+        >
+          <span>◉</span>
+          Vendors
+        </button>
+
+        <button
+          class="nav-item"
+          data-admin-view="admin-orders"
+          type="button"
+        >
+          <span>▣</span>
+          Orders
+        </button>
+
+        <button
+          class="nav-item"
+          data-admin-view="admin-subscriptions"
+          type="button"
+        >
+          <span>◈</span>
+          Subscriptions
+        </button>
+
+        <button
+          class="nav-item"
+          data-admin-view="admin-riders"
+          type="button"
+        >
+          <span>🚚</span>
+          Riders
+        </button>
+
+        <button
+          class="nav-item"
+          data-admin-view="admin-settings"
+          type="button"
+        >
+          <span>⚙</span>
+          Settings
+        </button>
+
+      </nav>
+
+      <div class="sidebar-bottom">
+
+        <a href="index.html">
+          ← Back to website
+        </a>
+
+        <button
+          id="adminLogoutBtn"
+          class="logout-btn"
+          type="button"
+        >
+          Log out
+        </button>
+
+      </div>
+
+    </aside>
+
+
+    <!-- =========================
+         MAIN CONTENT
+    ========================== -->
+    <main class="main-content">
+
+      <!-- Header -->
+      <header class="topbar">
+
+        <button
+          class="menu-toggle"
+          id="adminMenuToggle"
+          type="button"
+          aria-label="Open navigation"
+        >
+          ☰
+        </button>
+
+        <div class="topbar-title">
+          <span class="eyebrow">Fiable Logistics</span>
+          <strong>Admin Portal</strong>
+        </div>
+
+        <div class="topbar-user">
+          <span class="admin-avatar">A</span>
+
+          <div>
+            <strong>Administrator</strong>
+            <small>Admin</small>
+          </div>
+        </div>
+
+      </header>
+
+
+      <!-- =========================
+           ADMIN VIEWS
+      ========================== -->
+      <div class="views">
+
+
+        <!-- =========================
+             ADMIN DASHBOARD
+        ========================== -->
+        <section
+          class="view active"
+          id="view-admin-dashboard"
+        >
+
+          <div class="section-title">
+
+            <div>
+              <div class="eyebrow">Overview</div>
+
+              <h1>Admin Dashboard</h1>
+
+              <p class="muted">
+                Monitor Fiable operations, vendors, deliveries and subscriptions.
+              </p>
+            </div>
+
+          </div>
+
+
+          <!-- Dashboard cards will be added next -->
+
+          <div class="admin-stats-grid">
+
+            <article class="panel admin-stat-card">
+              <span>Total Vendors</span>
+              <strong id="adminTotalVendors">0</strong>
+            </article>
+
+            <article class="panel admin-stat-card">
+              <span>Active Subscribers</span>
+              <strong id="adminActiveSubscribers">0</strong>
+            </article>
+
+            <article class="panel admin-stat-card">
+              <span>Total Orders</span>
+              <strong id="adminTotalOrders">0</strong>
+            </article>
+
+            <article class="panel admin-stat-card">
+              <span>Pending Deliveries</span>
+              <strong id="adminPendingDeliveries">0</strong>
+            </article>
+
+            <article class="panel admin-stat-card">
+              <span>On Delivery</span>
+              <strong id="adminOnDelivery">0</strong>
+            </article>
+
+            <article class="panel admin-stat-card">
+              <span>Completed Deliveries</span>
+              <strong id="adminCompletedDeliveries">0</strong>
+            </article>
+
+            <article class="panel admin-stat-card">
+              <span>Failed Deliveries</span>
+              <strong id="adminFailedDeliveries">0</strong>
+            </article>
+
+            <article class="panel admin-stat-card">
+              <span>Cancelled Deliveries</span>
+              <strong id="adminCancelledDeliveries">0</strong>
+            </article>
+
+          </div>
+
+
+          <!-- Recent Orders -->
+
+          <article class="panel admin-recent-orders">
+
+            <div class="panel-heading">
+
+              <div>
+                <h3>Recent Orders</h3>
+
+                <p class="muted">
+                  Latest delivery activity across Fiable.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                class="btn outline"
+                data-admin-view-target="admin-orders"
+              >
+                View all orders
+              </button>
+
+            </div>
+
+            <div class="admin-table-wrap">
+
+              <table class="admin-table">
+
+                <thead>
+                  <tr>
+                    <th>Vendor</th>
+                    <th>Pickup</th>
+                    <th>Destination</th>
+                    <th>Units</th>
+                    <th>Status</th>
+                    <th>Date</th>
+                  </tr>
+                </thead>
+
+                <tbody id="adminRecentOrdersBody">
+
+                  <tr>
+                    <td colspan="6" class="empty-state">
+                      No orders yet.
+                    </td>
+                  </tr>
+
+                </tbody>
+
+              </table>
+
+            </div>
+
+          </article>
+
+        </section>
+
+
+        <!-- =========================
+            VENDORS
+        ========================== -->
+        <section
+          class="view"
+          id="view-admin-vendors"
+        >
+
+          <div class="section-title">
+
+            <div>
+              <div class="eyebrow">Management</div>
+
+              <h1>Vendors</h1>
+
+              <p class="muted">
+                View and manage Fiable vendors.
+              </p>
+            </div>
+
+          </div>
+
+
+          <!-- =========================
+              VENDORS TABLE
+          ========================== -->
+          <article class="panel admin-vendors-panel">
+
+            <div class="panel-heading">
+
+              <div>
+                <h3>All Vendors</h3>
+
+                <p class="muted">
+                  Overview of registered Fiable vendors and their subscriptions.
+                </p>
+              </div>
+
+            </div>
+
+
+            <div class="admin-table-wrap">
+
+              <table class="admin-table admin-vendors-table">
+
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Vendor</th>
+                    <th>Subscriber ID</th>
+                    <th>Plan</th>
+                    <th>Units</th>
+                    <th>Subscription</th>
+                    <th>Orders</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+
+                <tbody id="adminVendorsBody">
+
+                  <tr>
+                    <td colspan="8" class="empty-state">
+                      Loading vendors...
+                    </td>
+                  </tr>
+
+                </tbody>
+
+              </table>
+
+            </div>
+
+          </article>
+
+        </section>
+
+
+        <!-- =========================
+             ORDERS
+        ========================== -->
+        <section
+          class="view"
+          id="view-admin-orders"
+        >
+
+          <div class="section-title">
+
+            <div>
+              <div class="eyebrow">Operations</div>
+
+              <h1>Orders</h1>
+
+              <p class="muted">
+                Monitor all Fiable deliveries.
+              </p>
+            </div>
+
+          </div>
+
+          <!-- =========================
+              ORDERS TABLE
+          ========================== -->
+          <article class="panel admin-orders-panel">
+
+            <div class="panel-heading">
+
+              <div>
+                <h3>All Orders</h3>
+
+                <p class="muted">
+                  Monitor all Fiable delivery orders.
+                </p>
+              </div>
+
+            </div>
+
+
+            <div class="admin-table-wrap">
+
+              <table class="admin-table admin-orders-table">
+
+                <thead>
+                  <tr>
+                    <th>Order</th>
+                    <th>Vendor</th>
+                    <th>Pickup</th>
+                    <th>Destination</th>
+                    <th>Units</th>
+                    <th>Status</th>
+                    <th>Date</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+
+                <tbody id="adminOrdersBody">
+
+                  <tr>
+                    <td colspan="8" class="empty-state">
+                      Loading orders...
+                    </td>
+                  </tr>
+
+                </tbody>
+
+              </table>
+
+            </div>
+
+          </article>
+
+        </section>
+
+
+        <!-- =========================
+             SUBSCRIPTIONS
+        ========================== -->
+        <section
+          class="view"
+          id="view-admin-subscriptions"
+        >
+
+          <div class="section-title">
+
+            <div>
+              <div class="eyebrow">Billing</div>
+
+              <h1>Subscriptions</h1>
+
+              <p class="muted">
+                Monitor vendor subscriptions and payments.
+              </p>
+            </div>
+
+          </div>
+
+          <!-- Subscription Summary -->
+          <div class="stats-grid subscription-stats">
+
+            <article class="stat-card">
+              <span class="stat-label">Total Subscriptions</span>
+              <strong id="subscriptionTotal">0</strong>
+            </article>
+
+            <article class="stat-card">
+              <span class="stat-label">Active</span>
+              <strong id="subscriptionActive">0</strong>
+            </article>
+
+            <article class="stat-card">
+              <span class="stat-label">Pending Payment</span>
+              <strong id="subscriptionPending">0</strong>
+            </article>
+
+            <article class="stat-card">
+              <span class="stat-label">Expiring Soon</span>
+              <strong id="subscriptionExpiring">0</strong>
+            </article>
+
+            <article class="stat-card">
+              <span class="stat-label">Monthly Revenue</span>
+              <strong id="subscriptionRevenue">₦0</strong>
+            </article>
+
+          </div>
+
+          <article class="panel">
+
+            <div class="table-wrap">
+
+              <table class="admin-table">
+
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Vendor</th>
+                    <th>Plan</th>
+                    <th>Amount</th>
+                    <th>Payment Date</th>
+                    <th>Renewal Date</th>
+                    <th>Payment Status</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+
+                <tbody id="adminSubscriptionsBody">
+                  <tr>
+                    <td colspan="8" class="empty-state">
+                      Loading subscriptions...
+                    </td>
+                  </tr>
+                </tbody>
+
+              </table>
+
+            </div>
+
+          </article>
+
+        </section>
+
+
+        <!-- =========================
+            RIDERS
+        ========================== -->
+
+        <section
+          class="view"
+          id="view-admin-riders"
+        >
+
+          <div class="section-title">
+
+            <div>
+              <div class="eyebrow">
+                Delivery Operations
+              </div>
+
+              <h1>Riders</h1>
+
+              <p class="muted">
+                Manage Fiable riders and delivery assignments.
+              </p>
+            </div>
+
+          </div>
+
+
+          <article class="panel">
+
+            <!-- =========================
+                RIDER SUMMARY
+            ========================== -->
+
+            <div class="stats-grid rider-stats-grid">
+
+              <div class="stat-card">
+                <span class="stat-label">Total Riders</span>
+                <strong id="totalRiders">0</strong>
+              </div>
+
+              <div class="stat-card">
+                <span class="stat-label">Active</span>
+                <strong id="activeRiders">0</strong>
+              </div>
+
+              <div class="stat-card">
+                <span class="stat-label">Available</span>
+                <strong id="availableRiders">0</strong>
+              </div>
+
+              <div class="stat-card">
+                <span class="stat-label">Assigned</span>
+                <strong id="assignedRiders">0</strong>
+              </div>
+
+              <div class="stat-card">
+                <span class="stat-label">On Delivery</span>
+                <strong id="onDeliveryRiders">0</strong>
+              </div>
+
+              <div class="stat-card">
+                <span class="stat-label">Inactive</span>
+                <strong id="inactiveRiders">0</strong>
+              </div>
+
+            </div>
+
+
+            <!-- =========================
+                RIDERS HEADER
+            ========================== -->
+
+            <div class="panel-header rider-panel-header">
+
+              <div>
+
+                <h2>Riders</h2>
+
+                <p class="muted">
+                  View and manage Fiable riders.
+                </p>
+
+              </div>
+
+
+              <button
+                type="button"
+                class="btn primary"
+                id="addRiderBtn"
+              >
+                + Add Rider
+              </button>
+
+            </div>
+
+
+            <!-- =========================
+                RIDERS TABLE
+            ========================== -->
+
+            <div class="table-wrap">
+
+              <table class="admin-table">
+
+                <thead>
+
+                  <tr>
+                    <th>#</th>
+                    <th>Rider</th>
+                    <th>Rider ID</th>
+                    <th>Phone</th>
+                    <th>Vehicle</th>
+                    <th>Deliveries</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                  </tr>
+
+                </thead>
+
+
+                <tbody id="adminRidersBody">
+
+                  <tr>
+
+                    <td
+                      colspan="8"
+                      class="empty-state"
+                    >
+                      Loading riders...
+                    </td>
+
+                  </tr>
+
+                </tbody>
+
+              </table>
+
+            </div>
+
+          </article>
+
+        </section>
+
+        <!-- =========================
+            ADD RIDER MODAL
+        ========================== -->
+
+        <div
+          class="modal"
+          id="addRiderModal"
+          aria-hidden="true"
+        >
+
+          <div
+            class="modal-backdrop"
+            id="addRiderBackdrop"
+          ></div>
+
+
+          <div
+            class="modal-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="addRiderTitle"
+          >
+
+            <div class="modal-header">
+
+              <div>
+
+                <div class="eyebrow">
+                  Delivery Operations
+                </div>
+
+                <h2 id="addRiderTitle">
+                  Add Rider
+                </h2>
+
+              </div>
+
+
+              <button
+                type="button"
+                class="modal-close"
+                id="closeAddRider"
+                aria-label="Close add rider"
+              >
+                ×
+              </button>
+
+            </div>
+
+
+            <div class="modal-body">
+
+              <form id="addRiderForm">
+
+                <div class="vendor-detail-grid">
+
+                  <!-- Rider Name -->
+
+                  <div class="vendor-detail-item">
+
+                    <label for="riderName">
+                      Rider Name
+                    </label>
+
+                    <input
+                      type="text"
+                      id="riderName"
+                      name="name"
+                      placeholder="Enter rider name"
+                      required
+                    >
+
+                  </div>
+
+
+                  <!-- Phone -->
+
+                  <div class="vendor-detail-item">
+
+                    <label for="riderPhone">
+                      Phone Number
+                    </label>
+
+                    <input
+                      type="tel"
+                      id="riderPhone"
+                      name="phone"
+                      placeholder="08012345678"
+                      required
+                    >
+
+                  </div>
+
+
+                  <!-- Email -->
+
+                  <div class="vendor-detail-item">
+
+                    <label for="riderEmail">
+                      Email
+                    </label>
+
+                    <input
+                      type="email"
+                      id="riderEmail"
+                      name="email"
+                      placeholder="rider@example.com"
+                    >
+
+                  </div>
+
+
+                  <!-- Vehicle -->
+
+                  <div class="vendor-detail-item">
+
+                    <label for="riderVehicle">
+                      Vehicle
+                    </label>
+
+                    <select
+                      id="riderVehicle"
+                      name="vehicle"
+                      required
+                    >
+
+                      <option value="">
+                        Select vehicle
+                      </option>
+
+                      <option value="Motorcycle">
+                        Motorcycle
+                      </option>
+
+                      <option value="Car">
+                        Car
+                      </option>
+
+                      <option value="Van">
+                        Van
+                      </option>
+
+                    </select>
+
+                  </div>
+
+                </div>
+
+
+                <div class="modal-actions">
+
+                  <button
+                    type="button"
+                    class="btn outline"
+                    id="cancelAddRider"
+                  >
+                    Cancel
+                  </button>
+
+
+                  <button
+                    type="submit"
+                    class="btn primary"
+                    id="saveRiderBtn"
+                  >
+                    Add Rider
+                  </button>
+
+                </div>
+
+              </form>
+
+            </div>
+
+          </div>
+
+        </div>
+        
+        <!-- =====================================================
+            RIDER DETAILS MODAL
+        ===================================================== -->
+
+        <div
+          class="modal"
+          id="riderDetailsModal"
+          aria-hidden="true"
+        >
+
+          <!-- Backdrop -->
+
+          <div
+            class="modal-backdrop"
+            id="riderDetailsBackdrop"
+          ></div>
+
+
+          <!-- Modal -->
+
+          <div
+            class="modal-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="riderDetailsTitle"
+          >
+
+            <!-- Header -->
+
+            <div class="modal-header">
+
+              <div>
+                <div class="eyebrow">
+                  Delivery Operations
+                </div>
+
+                <h2 id="riderDetailsTitle">
+                  Rider Details
+                </h2>
+              </div>
+
+
+              <button
+                type="button"
+                class="modal-close"
+                id="closeRiderDetails"
+                aria-label="Close rider details"
+              >
+                ×
+              </button>
+
+            </div>
+
+
+            <!-- Body -->
+
+            <div
+              class="modal-body"
+              id="riderDetailsBody"
+            >
+
+              Loading rider details...
+
+            </div>
+
+          </div>
+
+        </div>
+
+        <!-- =====================================================
+            EDIT RIDER MODAL
+        ===================================================== -->
+
+        <div
+          class="modal"
+          id="editRiderModal"
+          aria-hidden="true"
+        >
+
+          <!-- Backdrop -->
+
+          <div
+            class="modal-backdrop"
+            id="editRiderBackdrop"
+          ></div>
+
+
+          <!-- Modal -->
+
+          <div
+            class="modal-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="editRiderTitle"
+          >
+
+            <!-- Header -->
+
+            <div class="modal-header">
+
+              <div>
+
+                <div class="eyebrow">
+                  Delivery Operations
+                </div>
+
+                <h2 id="editRiderTitle">
+                  Edit Rider
+                </h2>
+
+              </div>
+
+
+              <button
+                type="button"
+                class="modal-close"
+                id="closeEditRider"
+                aria-label="Close edit rider"
+              >
+                ×
+              </button>
+
+            </div>
+
+
+            <!-- Body -->
+
+            <div class="modal-body">
+
+              <form id="editRiderForm">
+
+                <input
+                  type="hidden"
+                  id="editRiderId"
+                >
+
+
+                <div class="form-grid">
+
+
+                  <!-- Name -->
+
+                  <div class="form-group">
+
+                    <label for="editRiderName">
+                      Rider Name
+                    </label>
+
+                    <input
+                      type="text"
+                      id="editRiderName"
+                      name="name"
+                      required
+                    >
+
+                  </div>
+
+
+                  <!-- Phone -->
+
+                  <div class="form-group">
+
+                    <label for="editRiderPhone">
+                      Phone
+                    </label>
+
+                    <input
+                      type="tel"
+                      id="editRiderPhone"
+                      name="phone"
+                      required
+                    >
+
+                  </div>
+
+
+                  <!-- Email -->
+
+                  <div class="form-group">
+
+                    <label for="editRiderEmail">
+                      Email
+                    </label>
+
+                    <input
+                      type="email"
+                      id="editRiderEmail"
+                      name="email"
+                    >
+
+                  </div>
+
+
+                  <!-- Vehicle -->
+
+                  <div class="form-group">
+
+                    <label for="editRiderVehicle">
+                      Vehicle
+                    </label>
+
+                    <input
+                      type="text"
+                      id="editRiderVehicle"
+                      name="vehicle"
+                      required
+                    >
+
+                  </div>
+
+
+                  <!-- Status -->
+
+                  <div class="form-group">
+
+                    <label for="editRiderStatus">
+                      Status
+                    </label>
+
+                    <select
+                      id="editRiderStatus"
+                      name="status"
+                      required
+                    >
+
+                      <option value="available">
+                        Available
+                      </option>
+
+                      <option value="active">
+                        Active
+                      </option>
+
+                      <option value="on_delivery">
+                        On Delivery
+                      </option>
+
+                      <option value="inactive">
+                        Inactive
+                      </option>
+
+                    </select>
+
+                  </div>
+
+
+                </div>
+
+
+                <!-- Actions -->
+
+                <div class="modal-actions">
+
+                  <button
+                    type="button"
+                    class="btn outline"
+                    id="cancelEditRider"
+                  >
+                    Cancel
+                  </button>
+
+
+                  <button
+                    type="submit"
+                    class="btn primary"
+                    id="saveEditRider"
+                  >
+                    Save Changes
+                  </button>
+
+                </div>
+
+              </form>
+
+            </div>
+
+          </div>
+
+        </div>
+
+
+        <!-- =========================
+            ADMIN SETTINGS
+        ========================== -->
+        <section
+          class="view"
+          id="view-admin-settings"
+        >
+
+          <div class="section-title">
+
+            <div>
+              <div class="eyebrow">Preferences</div>
+
+              <h1>Admin Settings</h1>
+
+              <p class="muted">
+                Manage administrator preferences and security.
+              </p>
+            </div>
+
+          </div>
+
+
+          <!-- =========================
+              ACCOUNT INFORMATION
+          ========================== -->
+          <article class="panel settings-panel">
+
+            <div class="settings-section-header">
+
+              <div>
+                <h2>Account Information</h2>
+
+                <p class="muted">
+                  Your administrator account details.
+                </p>
+              </div>
+
+            </div>
+
+
+            <div class="settings-info-grid">
+
+              <div class="settings-info-item">
+
+                <span class="settings-label">
+                  Name
+                </span>
+
+                <strong id="settingsName">
+                  —
+                </strong>
+
+              </div>
+
+
+              <div class="settings-info-item">
+
+                <span class="settings-label">
+                  Email
+                </span>
+
+                <strong id="settingsEmail">
+                  —
+                </strong>
+
+              </div>
+
+
+              <div class="settings-info-item">
+
+                <span class="settings-label">
+                  Subscriber ID
+                </span>
+
+                <strong id="settingsSubscriberId">
+                  —
+                </strong>
+
+              </div>
+
+
+              <div class="settings-info-item">
+
+                <span class="settings-label">
+                  Current Plan
+                </span>
+
+                <strong id="settingsPlan">
+                  —
+                </strong>
+
+              </div>
+
+            </div>
+
+          </article>
+
+
+          <!-- =========================
+              SECURITY
+          ========================== -->
+          <article class="panel settings-panel">
+
+            <div class="settings-section-header">
+
+              <div>
+                <h2>Security</h2>
+
+                <p class="muted">
+                  Manage your administrator password.
+                </p>
+              </div>
+
+            </div>
+
+
+            <button
+              type="button"
+              class="btn outline"
+              id="changePasswordBtn"
+            >
+              Change Password
+            </button>
+
+
+            <div
+              id="changePasswordForm"
+              class="settings-form hidden"             
+            >
+
+              <div class="form-group">
+
+                <label for="currentPassword">
+                  Current Password
+                </label>
+
+                <input
+                  type="password"
+                  id="currentPassword"
+                  autocomplete="current-password"
+                >
+
+              </div>
+
+
+              <div class="form-group">
+
+                <label for="newPassword">
+                  New Password
+                </label>
+
+                <input
+                  type="password"
+                  id="newPassword"
+                  autocomplete="new-password"
+                >
+
+              </div>
+
+
+              <div class="form-group">
+
+                <label for="confirmNewPassword">
+                  Confirm New Password
+                </label>
+
+                <input
+                  type="password"
+                  id="confirmNewPassword"
+                  autocomplete="new-password"
+                >
+
+              </div>
+
+
+              <div class="settings-actions">
+
+                <button
+                  type="button"
+                  class="btn primary"
+                  id="savePasswordBtn"
+                >
+                  Update Password
+                </button>
+
+
+                <button
+                  type="button"
+                  class="btn outline"
+                  id="cancelPasswordBtn"
+                >
+                  Cancel
+                </button>
+
+              </div>
+
+            </div>
+
+          </article>
+
+
+          <!-- =========================
+              NOTIFICATIONS
+          ========================== -->
+          <article class="panel settings-panel">
+
+            <div class="settings-section-header">
+
+              <div>
+                <h2>Notifications</h2>
+
+                <p class="muted">
+                  Choose which administrator notifications you want to receive.
+                </p>
+              </div>
+
+            </div>
+
+
+            <div class="settings-options">
+
+
+              <!-- Delivery Updates -->
+              <label class="settings-option">
+
+                <span>
+
+                  <strong>
+                    Delivery Updates
+                  </strong>
+
+                  <small>
+                    Receive updates when delivery statuses change.
+                  </small>
+
+                </span>
+
+                <input
+                  type="checkbox"
+                  id="settingDeliveryUpdates"
+                >
+
+              </label>
+
+
+              <!-- Low Units -->
+              <label class="settings-option">
+
+                <span>
+
+                  <strong>
+                    Low Unit Alerts
+                  </strong>
+
+                  <small>
+                    Receive alerts when a subscriber is running low on units.
+                  </small>
+
+                </span>
+
+                <input
+                  type="checkbox"
+                  id="settingLowUnitAlerts"
+                >
+
+              </label>
+
+
+              <!-- Renewal Reminders -->
+              <label class="settings-option">
+
+                <span>
+
+                  <strong>
+                    Renewal Reminders
+                  </strong>
+
+                  <small>
+                    Receive reminders about upcoming subscription renewals.
+                  </small>
+
+                </span>
+
+                <input
+                  type="checkbox"
+                  id="settingRenewalReminders"
+                >
+
+              </label>
+
+            </div>
+
+
+            <div class="settings-actions">
+
+              <button
+                type="button"
+                class="btn primary"
+                id="saveNotificationSettingsBtn"
+              >
+                Save Preferences
+              </button>
+
+            </div>
+
+          </article>
+
+
+          <!-- =========================
+              SESSION
+          ========================== -->
+          <article class="panel settings-panel">
+
+            <div class="settings-section-header">
+
+              <div>
+                <h2>Session</h2>
+
+                <p class="muted">
+                  Your administrator session is automatically protected against inactivity.
+                </p>
+              </div>
+
+            </div>
+
+
+            <div class="settings-session-info">
+
+              <span>
+                Automatic session expiration
+              </span>
+
+              <strong>
+                Enabled
+              </strong>
+
+            </div>
+
+          </article>
+
+        </section>
+
+      </div>
+
+    </main>
+
+  </div>
+
+
+  <!-- =========================
+     VENDOR DETAILS MODAL
+  ========================== -->
+  <div
+    class="admin-modal"
+    id="vendorDetailsModal"
+    aria-hidden="true"
+  >
+
+    <div
+      class="admin-modal-backdrop"
+      id="vendorDetailsBackdrop"
+    ></div>
+
+    <div
+      class="admin-modal-content"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="vendorDetailsTitle"
+    >
+
+      <div class="admin-modal-header">
+
+        <div>
+          <div class="eyebrow">Vendor Details</div>
+          <h2 id="vendorDetailsTitle">Vendor</h2>
+        </div>
+
+        <button
+          type="button"
+          class="admin-modal-close"
+          id="closeVendorDetails"
+          aria-label="Close vendor details"
+        >
+          ×
+        </button>
+
+      </div>
+
+
+      <div
+        class="admin-modal-body"
+        id="vendorDetailsBody"
+      >
+        <!-- Vendor details will be inserted here -->
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- =========================
+      ORDER DETAILS MODAL
+  ========================== -->
+  <div
+    class="modal"
+    id="orderDetailsModal"
+    aria-hidden="true"
+  >
+
+    <div
+      class="modal-backdrop"
+      id="orderDetailsBackdrop"
+    ></div>
+
+    <div
+      class="modal-dialog"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="orderDetailsTitle"
+    >
+
+      <div class="modal-header">
+
+        <div>
+          <div class="eyebrow">Order Details</div>
+
+          <h2 id="orderDetailsTitle">
+            Order
+          </h2>
+        </div>
+
+        <button
+          type="button"
+          class="modal-close"
+          id="closeOrderDetails"
+          aria-label="Close order details"
+        >
+          ×
+        </button>
+
+      </div>
+
+
+      <div
+        class="modal-body"
+        id="orderDetailsBody"
+      >
+        <!-- Order details will be inserted here -->
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- =========================
+      SUBSCRIPTION DETAILS MODAL
+  ========================== -->
+  <div
+    class="modal"
+    id="subscriptionDetailsModal"
+    aria-hidden="true"
+  >
+
+    <div
+      class="modal-backdrop"
+      id="subscriptionDetailsBackdrop"
+    ></div>
+
+    <div
+      class="modal-dialog"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="subscriptionDetailsTitle"
+    >
+
+      <div class="modal-header">
+
+        <div>
+          <div class="eyebrow">Subscription Details</div>
+
+          <h2 id="subscriptionDetailsTitle">
+            Subscription
+          </h2>
+        </div>
+
+        <button
+          type="button"
+          class="modal-close"
+          id="closeSubscriptionDetails"
+          aria-label="Close subscription details"
+        >
+          ×
+        </button>
+
+      </div>
+
+
+      <div
+        class="modal-body"
+        id="subscriptionDetailsBody"
+      >
+        <!-- Subscription details will be inserted here -->
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- Admin JavaScript -->
+  <script src="admin.js"></script>
+
+  <!-- =====================================================
+      ADMIN TOAST
+  ===================================================== -->
+
+  <div
+    id="adminToast"
+    class="admin-toast"
+    role="status"
+    aria-live="polite"
+  ></div>
+
+</body>
+</html>
