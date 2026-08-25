@@ -3729,18 +3729,58 @@ if (logoutBtn) {
 
   if (savePasswordBtn) {
 
-    savePasswordBtn.addEventListener("click", async () => {
+  savePasswordBtn.addEventListener("click", async () => {
 
-      console.log("ADMIN PASSWORD BUTTON CLICKED");
+    console.log("ADMIN PASSWORD BUTTON CLICKED");
 
-      const currentPassword =
-        document.getElementById("currentPassword").value;
 
-      const newPassword =
-        document.getElementById("newPassword").value;
+    const currentPasswordInput =
+      document.getElementById("currentPassword");
 
-      const confirmPassword =
-        document.getElementById("confirmPassword").value;
+    const newPasswordInput =
+      document.getElementById("newPassword");
+
+    const confirmPasswordInput =
+      document.getElementById("confirmPassword");
+
+
+    console.log(
+      "PASSWORD INPUTS:",
+      {
+        current: currentPasswordInput,
+        newPassword: newPasswordInput,
+        confirm: confirmPasswordInput
+      }
+    );
+
+
+    if (
+      !currentPasswordInput ||
+      !newPasswordInput ||
+      !confirmPasswordInput
+    ) {
+
+      console.error(
+        "One or more password inputs are missing."
+      );
+
+      toast(
+        "Password form fields could not be found."
+      );
+
+      return;
+
+    }
+
+
+    const currentPassword =
+      currentPasswordInput.value;
+
+    const newPassword =
+      newPasswordInput.value;
+
+    const confirmPassword =
+      confirmPasswordInput.value;
 
 
       if (

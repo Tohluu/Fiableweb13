@@ -18,9 +18,6 @@ PORT = 8000
 # ADMIN AUTHENTICATION
 # =========================================================
 
-ADMIN_EMAIL = "admin@fiablelogistics.com"
-ADMIN_PASSWORD = "FiableAdmin123!"
-
 ADMIN_SESSION_EXPIRY_HOURS = 8
 
 # Active admin sessions:
@@ -211,24 +208,7 @@ def password_hash(password, salt):
 def load_admin_credentials():
 
     if not ADMIN_CREDENTIALS_FILE.exists():
-
-        salt = secrets.token_hex(16)
-
-        credentials = {
-            "email": ADMIN_EMAIL,
-            "passwordHash": password_hash(
-                ADMIN_PASSWORD,
-                salt
-            ),
-            "salt": salt
-        }
-
-        ADMIN_CREDENTIALS_FILE.write_text(
-            json.dumps(credentials, indent=2),
-            encoding="utf-8"
-        )
-
-        return credentials
+        return None
 
     try:
 
@@ -237,26 +217,14 @@ def load_admin_credentials():
         ).strip()
 
         if not content:
+            return None
 
-            salt = secrets.token_hex(16)
+        credentials = json.loads(content)
 
-            credentials = {
-                "email": ADMIN_EMAIL,
-                "passwordHash": password_hash(
-                    ADMIN_PASSWORD,
-                    salt
-                ),
-                "salt": salt
-            }
+        if not isinstance(credentials, dict):
+            return None
 
-            ADMIN_CREDENTIALS_FILE.write_text(
-                json.dumps(credentials, indent=2),
-                encoding="utf-8"
-            )
-
-            return credentials
-
-        return json.loads(content)
+        return credentials
 
     except (json.JSONDecodeError, OSError):
 
