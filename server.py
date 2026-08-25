@@ -1054,6 +1054,140 @@ class FiableHandler(SimpleHTTPRequestHandler):
                 return
 
             # =====================================================
+            # ADMIN CHANGE PASSWORD
+            # =====================================================
+
+            if path == "/api/admin/change-password":
+
+                current_admin_email = get_admin_email(self)
+
+                if not current_admin_email:
+
+                    self._json_response(
+                        401,
+                        {
+                            "error": "Admin authentication required."
+                        }
+                    )
+
+                    return
+
+
+                currentPassword = clean(
+                    payload.get("currentPassword"),
+                    128
+                )
+
+                newPassword = clean(
+                    payload.get("newPassword"),
+                    128
+                )
+
+
+                if not currentPassword or not newPassword:
+
+                    self._json_response(
+                        400,
+                        {
+                            "error": "Current and new passwords are required."
+                        }
+                    )
+
+                    return
+
+
+                if len(newPassword) < 8:
+
+                    self._json_response(
+                        400,
+                        {
+                            "error": "New password must be at least 8 characters."
+                        }
+                    )
+
+                    return
+
+
+                credentials = load_admin_credentials()
+
+                if not credentials:
+
+                    self._json_response(
+                        500,
+                        {
+                            "error": "Unable to load admin credentials."
+                        }
+                    )
+
+                    return
+
+
+                stored_hash = credentials.get("passwordHash")
+                stored_salt = credentials.get("salt")
+
+
+                if not stored_hash or not stored_salt:
+
+                    self._json_response(
+                        500,
+                        {
+                            "error": "Admin credentials are incomplete."
+                        }
+                    )
+
+                    return
+
+
+                valid = hmac.compare_digest(
+                    stored_hash,
+                    password_hash(
+                        currentPassword,
+                        stored_salt
+                    )
+                )
+
+
+                if not valid:
+
+                    self._json_response(
+                        401,
+                        {
+                            "error": "Current password is incorrect."
+                        }
+                    )
+
+                    return
+
+
+                new_salt = secrets.token_hex(16)
+
+                credentials["passwordHash"] = password_hash(
+                    newPassword,
+                    new_salt
+                )
+
+                credentials["salt"] = new_salt
+
+
+                ADMIN_CREDENTIALS_FILE.write_text(
+                    json.dumps(
+                        credentials,
+                        indent=2
+                    ),
+                    encoding="utf-8"
+                )
+
+
+                self._json_response(
+                    200,
+                    {
+                        "message": "Admin password changed successfully."
+                    }
+                )
+
+                return
+
+            # =====================================================
             # ADMIN UPDATE RIDER
             # =====================================================
 

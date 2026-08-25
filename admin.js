@@ -3686,6 +3686,193 @@ if (logoutBtn) {
     closeVendorDetailsModal
   );
 
+  const changePasswordBtn =
+    document.getElementById("changePasswordBtn");
+
+  const changePasswordForm =
+    document.getElementById("changePasswordForm");
+
+  const cancelPasswordBtn =
+    document.getElementById("cancelPasswordBtn");
+
+  if (changePasswordBtn) {
+
+    changePasswordBtn.addEventListener("click", () => {
+
+      changePasswordForm.classList.remove("hidden");
+
+      changePasswordBtn.classList.add("hidden");
+
+    });
+
+  }
+
+
+  if (cancelPasswordBtn) {
+
+    cancelPasswordBtn.addEventListener("click", () => {
+
+      changePasswordForm.classList.add("hidden");
+
+      changePasswordBtn.classList.remove("hidden");
+
+      document.getElementById("currentPassword").value = "";
+      document.getElementById("newPassword").value = "";
+      document.getElementById("confirmPassword").value = "";
+
+    });
+
+  }
+
+  const savePasswordBtn =
+    document.getElementById("savePasswordBtn");
+
+  if (savePasswordBtn) {
+
+    savePasswordBtn.addEventListener("click", async () => {
+
+      console.log("ADMIN PASSWORD BUTTON CLICKED");
+
+      const currentPassword =
+        document.getElementById("currentPassword").value;
+
+      const newPassword =
+        document.getElementById("newPassword").value;
+
+      const confirmPassword =
+        document.getElementById("confirmPassword").value;
+
+
+      if (
+        !currentPassword ||
+        !newPassword ||
+        !confirmPassword
+      ) {
+
+        toast(
+          "Please complete all password fields."
+        );
+
+        return;
+
+      }
+
+
+      if (newPassword.length < 8) {
+
+        toast(
+          "New password must be at least 8 characters."
+        );
+
+        return;
+
+      }
+
+
+      if (newPassword !== confirmPassword) {
+
+        toast(
+          "New passwords do not match."
+        );
+
+        return;
+
+      }
+
+
+      savePasswordBtn.disabled = true;
+
+      savePasswordBtn.textContent =
+        "Updating…";
+
+
+      try {
+
+        const response = await fetch(
+          "/api/admin/change-password",
+          {
+            method: "POST",
+
+            headers: {
+              "Content-Type": "application/json"
+            },
+
+            credentials: "same-origin",
+
+            body: JSON.stringify({
+              currentPassword: currentPassword,
+              newPassword: newPassword
+            })
+          }
+        );
+
+
+        const data =
+          await response.json();
+
+
+        if (!response.ok) {
+
+          throw new Error(
+            data.error ||
+            "Unable to change password."
+          );
+
+        }
+
+
+        toast(
+          "Admin password changed successfully."
+        );
+
+
+        document.getElementById(
+          "currentPassword"
+        ).value = "";
+
+        document.getElementById(
+          "newPassword"
+        ).value = "";
+
+        document.getElementById(
+          "confirmPassword"
+        ).value = "";
+
+
+        changePasswordForm.classList.add(
+          "hidden"
+        );
+
+        changePasswordBtn.classList.remove(
+          "hidden"
+        );
+
+
+      } catch (error) {
+
+        console.error(
+          "ADMIN CHANGE PASSWORD ERROR:",
+          error
+        );
+
+        toast(
+          error.message ||
+          "Unable to change password."
+        );
+
+      } finally {
+
+        savePasswordBtn.disabled = false;
+
+        savePasswordBtn.textContent =
+          "Update Password";
+
+      }
+
+    });
+
+  }
+
 
 
   /* =======================================================
