@@ -6,7 +6,7 @@
     "phone": "08000000000",
     "email": "testrider@example.com",
     "vehicle": "Bike",
-    "status": "assigned",
+    "status": "on_delivery",
     "totalDeliveries": 4,
     "completedDeliveries": 3,
     "failedDeliveries": 0,
@@ -32,7 +32,7 @@
     "phone": "07015414492",
     "email": "sunday@gmail.com",
     "vehicle": "Motorcycle",
-    "status": "available",
+    "status": "on_delivery",
     "totalDeliveries": 1,
     "completedDeliveries": 1,
     "failedDeliveries": 1,
@@ -89,5 +89,20 @@
     "completedDeliveries": 1,
     "failedDeliveries": 0,
     "createdAt": "2026-08-16T15:15:22.307657+00:00"
+  },
+  {
+    "id": 8,
+    "riderRef": "FL-RID-0008",
+    "name": "Isreal Attah",
+    "phone": "09023434675",
+    "email": "isrealattah@gmail.com",
+    "passwordHash": "1bd658c530b0ca2a5e582f420d30c1c5a5b37c674fb5d22c9c92e4955946e6a5",
+    "salt": "9b866b7a7703eabbdd80286ad47526aa",
+    "vehicle": "Car",
+    "status": "available",
+    "totalDeliveries": 0,
+    "completedDeliveries": 0,
+    "failedDeliveries": 0,
+    "createdAt": "2026-08-26T20:32:08.744195+00:00"
   }
 ]

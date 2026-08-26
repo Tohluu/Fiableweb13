@@ -1022,9 +1022,9 @@
     "packageType": "General",
     "packageDescription": "",
     "recipient": null,
-    "status": "assigned",
+    "status": "on_delivery",
     "createdAt": "2026-08-26T09:42:23.235738+00:00",
-    "updatedAt": "2026-08-26T09:42:36.314311+00:00",
+    "updatedAt": "2026-08-26T12:49:21.051987+00:00",
     "details": {
       "pickupContactName": "Toluwalose Emmanuel Oyinloye",
       "pickupPhone": "08103694860",
@@ -1043,5 +1043,39 @@
     "riderRef": "FL-RID-0001",
     "riderName": "Kayode",
     "riderPhone": "08000000000"
+  },
+  {
+    "id": 34,
+    "orderRef": "FL-0034",
+    "accountEmail": "aurellehaven@gmail.com",
+    "pickup": "yaba",
+    "dropoff": "ipaja",
+    "units": 2,
+    "priority": "Standard",
+    "window": null,
+    "packageType": "General",
+    "packageDescription": "",
+    "recipient": null,
+    "status": "on_delivery",
+    "createdAt": "2026-08-26T12:50:45.840566+00:00",
+    "updatedAt": "2026-08-26T12:51:28.726616+00:00",
+    "details": {
+      "pickupContactName": "Toluwalose Emmanuel Oyinloye",
+      "pickupPhone": "08103694860",
+      "pickupAddress": "41 Solomon Okonkwo Street",
+      "recipientName": "Biodun",
+      "recipientPhone": "08103694860",
+      "deliveryAddress": "41 Solomon Okonkwo Street",
+      "packageType": "General",
+      "priority": "Standard",
+      "deliveryWindow": "Standard",
+      "packageDescription": "",
+      "pickupInstructions": "",
+      "deliveryInstructions": ""
+    },
+    "riderId": 3,
+    "riderRef": "FL-RID-0003",
+    "riderName": "Sunday",
+    "riderPhone": "07015414492"
   }
 ]

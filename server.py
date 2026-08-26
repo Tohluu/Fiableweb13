@@ -1838,11 +1838,25 @@ class FiableHandler(SimpleHTTPRequestHandler):
                     80
                 )
 
-                if not name or not phone or not vehicle:
+                password = clean(
+                    payload.get("password"),
+                    128
+                )
+
+                if not name or not phone or not vehicle or not password:
                     self._json_response(
                         400,
                         {
-                            "error": "Rider name, phone, and vehicle are required."
+                            "error": "Rider name, phone, vehicle and password are required."
+                        }
+                    )
+                    return
+
+                if len(password) < 8:
+                    self._json_response(
+                        400,
+                        {
+                            "error": "Rider password must be at least 8 characters."
                         }
                     )
                     return
@@ -1861,12 +1875,19 @@ class FiableHandler(SimpleHTTPRequestHandler):
                     ) + 1
                 )
 
+                rider_salt = secrets.token_hex(16)
+
                 rider = {
                     "id": new_id,
                     "riderRef": f"FL-RID-{new_id:04d}",
                     "name": name,
                     "phone": phone,
                     "email": email,
+                    "passwordHash": password_hash(
+                        password,
+                        rider_salt
+                    ),
+                    "salt": rider_salt,
                     "vehicle": vehicle,
                     "status": "available",
                     "totalDeliveries": 0,

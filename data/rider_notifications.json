@@ -8,5 +8,15 @@
     "orderId": 33,
     "read": false,
     "createdAt": "2026-08-26T09:42:36.318489+00:00"
+  },
+  {
+    "id": "NK9j4aFKV5lMzkHW",
+    "riderId": 3,
+    "type": "order_assigned",
+    "title": "New Delivery Assigned",
+    "message": "Order #34 has been assigned to you.",
+    "orderId": 34,
+    "read": false,
+    "createdAt": "2026-08-26T12:50:57.742062+00:00"
   }
 ]

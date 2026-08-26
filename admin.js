@@ -2812,14 +2812,26 @@ if (logoutBtn) {
       const email =
         document.getElementById("riderEmail")?.value.trim();
 
+      const password =
+        document.getElementById("riderPassword")?.value;
+
       const vehicle =
         document.getElementById("riderVehicle")?.value;
 
 
-      if (!name || !phone || !vehicle) {
+      if (!name || !phone || !vehicle || !password) {
 
         toast(
-          "Rider name, phone, and vehicle are required."
+          "Rider name, phone, vehicle, and password are required."
+        );
+
+        return;
+      }
+
+      if (password.length < 8) {
+
+        toast(
+          "Rider password must be at least 8 characters."
         );
 
         return;
@@ -2857,6 +2869,7 @@ if (logoutBtn) {
               name,
               phone,
               email,
+              password,
               vehicle
             })
           }
