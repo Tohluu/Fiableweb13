@@ -463,21 +463,78 @@ if (logoutBtn) {
         }
       );
 
-      const data = await response.json();
+      const data =
+        await response.json();
 
       if (!response.ok) {
+
         throw new Error(
-          data.error || "Unable to load admin account."
+          data.error ||
+          "Unable to load admin account."
         );
+
       }
+
+
+      /* ---------------------------------------------
+        ADMIN NAME
+      --------------------------------------------- */
+
+      const settingsName =
+        document.getElementById("settingsName");
+
+      if (settingsName) {
+
+        settingsName.textContent =
+          data.name || "Administrator";
+
+      }
+
+
+      /* ---------------------------------------------
+        ADMIN EMAIL
+      --------------------------------------------- */
 
       const settingsEmail =
         document.getElementById("settingsEmail");
 
       if (settingsEmail) {
+
         settingsEmail.textContent =
           data.email || "—";
+
       }
+
+
+      /* ---------------------------------------------
+        ADMIN ROLE
+      --------------------------------------------- */
+
+      const settingsRole =
+        document.getElementById("settingsRole");
+
+      if (settingsRole) {
+
+        settingsRole.textContent =
+          "Administrator";
+
+      }
+
+
+      /* ---------------------------------------------
+        ACCOUNT STATUS
+      --------------------------------------------- */
+
+      const settingsStatus =
+        document.getElementById("settingsStatus");
+
+      if (settingsStatus) {
+
+        settingsStatus.textContent =
+          "Active";
+
+      }
+
 
     } catch (error) {
 
@@ -1381,7 +1438,7 @@ if (logoutBtn) {
       loadAdminOrders();
       loadAdminRecentOrders();
       loadAdminRiders();
-      loadAdminSummary();
+      // loadAdminSummary();
 
 
     } catch (error) {
@@ -1457,7 +1514,7 @@ if (logoutBtn) {
       await loadAdminOrders();
       await loadAdminRecentOrders();
       await loadAdminRiders();
-      await loadAdminSummary();
+      // await loadAdminSummary();
 
     } catch (error) {
 
@@ -1528,7 +1585,7 @@ if (logoutBtn) {
       await loadAdminOrders();
       await loadAdminRecentOrders();
       await loadAdminRiders();
-      await loadAdminSummary();
+      // await loadAdminSummary();
 
     } catch (error) {
 
@@ -3913,6 +3970,114 @@ if (logoutBtn) {
 
   }
 
+  /* =======================================================
+    ADMIN NOTIFICATION SETTINGS
+  ======================================================= */
+
+  function saveAdminNotificationSettings() {
+
+    const settings = {
+
+      deliveryUpdates:
+        document.getElementById(
+          "settingDeliveryUpdates"
+        ).checked,
+
+      lowUnitAlerts:
+        document.getElementById(
+          "settingLowUnitAlerts"
+        ).checked,
+
+      renewalReminders:
+        document.getElementById(
+          "settingRenewalReminders"
+        ).checked
+
+    };
+
+
+    localStorage.setItem(
+      "fiableAdminNotificationSettings",
+      JSON.stringify(settings)
+    );
+
+
+    toast(
+      "Notification preferences saved."
+    );
+
+  }
+
+
+  function loadAdminNotificationSettings() {
+
+    const settings = JSON.parse(
+      localStorage.getItem(
+        "fiableAdminNotificationSettings"
+      ) || "{}"
+    );
+
+
+    const deliveryUpdates =
+      document.getElementById(
+        "settingDeliveryUpdates"
+      );
+
+    const lowUnitAlerts =
+      document.getElementById(
+        "settingLowUnitAlerts"
+      );
+
+    const renewalReminders =
+      document.getElementById(
+        "settingRenewalReminders"
+      );
+
+
+    if (deliveryUpdates) {
+
+      deliveryUpdates.checked =
+        settings.deliveryUpdates !== false;
+
+    }
+
+
+    if (lowUnitAlerts) {
+
+      lowUnitAlerts.checked =
+        settings.lowUnitAlerts !== false;
+
+    }
+
+
+    if (renewalReminders) {
+
+      renewalReminders.checked =
+        settings.renewalReminders !== false;
+
+    }
+
+  }
+
+  const saveNotificationSettingsBtn =
+    document.getElementById(
+      "saveNotificationSettingsBtn"
+    );
+
+
+  if (saveNotificationSettingsBtn) {
+
+    saveNotificationSettingsBtn.addEventListener(
+      "click",
+      () => {
+
+        saveAdminNotificationSettings();
+
+      }
+    );
+
+  }
+
 
 
   /* =======================================================
@@ -3927,6 +4092,7 @@ if (logoutBtn) {
   loadAdminSubscriptions();
   loadAdminRiders();
   loadAdminSettings();
+  loadAdminNotificationSettings();
 
 });
 

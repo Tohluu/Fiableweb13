@@ -1,0 +1,12 @@
+[
+  {
+    "id": "Yo4ZxnGEFNB3cQ3q",
+    "riderId": 1,
+    "type": "order_assigned",
+    "title": "New Delivery Assigned",
+    "message": "Order #33 has been assigned to you.",
+    "orderId": 33,
+    "read": false,
+    "createdAt": "2026-08-26T09:42:36.318489+00:00"
+  }
+]

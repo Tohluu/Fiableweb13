@@ -42,6 +42,9 @@ PLANS = {
 
 DELIVERIES_FILE = ROOT / "data" / "deliveries.json"
 RIDERS_FILE = ROOT / "data" / "riders.json"
+RIDER_NOTIFICATIONS_FILE = (
+    ROOT / "data" / "rider_notifications.json"
+)
 ADMIN_CREDENTIALS_FILE = ROOT / "data" / "admin_credentials.json"
 RESET_TOKENS_FILE = ROOT / "data" / "reset_tokens.json"
 RESET_TOKEN_EXPIRY_MINUTES = 60
@@ -515,6 +518,72 @@ def save_riders(riders):
         ),
         encoding="utf-8"
     )
+
+def load_rider_notifications():
+
+    if not RIDER_NOTIFICATIONS_FILE.exists():
+        return []
+
+    try:
+
+        content = RIDER_NOTIFICATIONS_FILE.read_text(
+            encoding="utf-8"
+        ).strip()
+
+        if not content:
+            return []
+
+        notifications = json.loads(content)
+
+        if not isinstance(notifications, list):
+            return []
+
+        return notifications
+
+    except (json.JSONDecodeError, OSError):
+
+        return []
+
+
+def save_rider_notifications(notifications):
+
+    RIDER_NOTIFICATIONS_FILE.write_text(
+        json.dumps(
+            notifications,
+            indent=2
+        ),
+        encoding="utf-8"
+    )
+
+
+def create_rider_notification(
+    rider_id,
+    notification_type,
+    title,
+    message,
+    order_id=None
+):
+
+    notifications = load_rider_notifications()
+
+    notification = {
+        "id": secrets.token_urlsafe(12),
+        "riderId": rider_id,
+        "type": notification_type,
+        "title": title,
+        "message": message,
+        "orderId": order_id,
+        "read": False,
+        "createdAt": datetime.now(
+            timezone.utc
+        ).isoformat()
+    }
+
+    notifications.append(notification)
+
+    save_rider_notifications(notifications)
+
+    return notification
 
 # =========================================================
 # ADMIN SESSION FUNCTIONS
@@ -1384,6 +1453,23 @@ class FiableHandler(SimpleHTTPRequestHandler):
 
                 save_deliveries(deliveries)
                 save_riders(riders)
+
+
+                # -------------------------------------------------
+                # CREATE RIDER NOTIFICATION
+                # -------------------------------------------------
+
+                create_rider_notification(
+                    rider_id=rider["id"],
+                    notification_type="order_assigned",
+                    title="New Delivery Assigned",
+                    message=(
+                        f"Order #{order.get('id')} "
+                        "has been assigned to you."
+                    ),
+                    order_id=order.get("id")
+                )
+
 
                 self._json_response(
                     200,

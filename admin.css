@@ -1235,6 +1235,11 @@
     text-align: center;
   }
 
+  .settings-info-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
 }
 
 /* =====================================================
@@ -1296,4 +1301,23 @@
 .order-status.status-cancelled {
   background: #e5e7eb !important;
   color: #000000 !important;
+}
+
+.settings-info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px 40px;
+}
+
+.settings-info-item {
+  padding: 8px 0;
+}
+
+.settings-label {
+  display: block;
+  margin-block-end: 6px;
+}
+
+.settings-info-item strong {
+  display: block;
 }
