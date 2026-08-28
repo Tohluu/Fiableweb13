@@ -1022,9 +1022,9 @@
     "packageType": "General",
     "packageDescription": "",
     "recipient": null,
-    "status": "on_delivery",
+    "status": "delivered",
     "createdAt": "2026-08-26T09:42:23.235738+00:00",
-    "updatedAt": "2026-08-26T12:49:21.051987+00:00",
+    "updatedAt": "2026-08-27T22:44:54.754602+00:00",
     "details": {
       "pickupContactName": "Toluwalose Emmanuel Oyinloye",
       "pickupPhone": "08103694860",
@@ -1056,9 +1056,9 @@
     "packageType": "General",
     "packageDescription": "",
     "recipient": null,
-    "status": "on_delivery",
+    "status": "delivered",
     "createdAt": "2026-08-26T12:50:45.840566+00:00",
-    "updatedAt": "2026-08-26T12:51:28.726616+00:00",
+    "updatedAt": "2026-08-27T22:44:52.223569+00:00",
     "details": {
       "pickupContactName": "Toluwalose Emmanuel Oyinloye",
       "pickupPhone": "08103694860",

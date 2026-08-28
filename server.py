@@ -26,6 +26,21 @@ ADMIN_SESSION_EXPIRY_HOURS = 8
 # }
 ADMIN_SESSIONS = {}
 
+# =========================================================
+# RIDER AUTHENTICATION
+# =========================================================
+
+RIDER_SESSION_EXPIRY_HOURS = 8
+
+# Active rider sessions
+# {
+#     "session_token": {
+#         "riderId": 1,
+#         "expiresAt": datetime
+#     }
+# }
+RIDER_SESSIONS = {}
+
 PLAN_UNIT_PRICES = {
     "Basic": 1500,
     "Growth": 1400,
@@ -680,6 +695,112 @@ def parse_iso_date(value):
     except Exception:
         return None
 
+def create_rider_session(rider_id):
+    token = secrets.token_urlsafe(48)
+
+    expires_at = (
+        datetime.now(timezone.utc)
+        + timedelta(hours=RIDER_SESSION_EXPIRY_HOURS)
+    )
+
+    RIDER_SESSIONS[token] = {
+        "riderId": rider_id,
+        "expiresAt": expires_at
+    }
+
+    return token
+
+
+def get_rider_session(handler):
+    cookie_header = handler.headers.get("Cookie", "")
+
+    if not cookie_header:
+        return None
+
+    cookies = {}
+
+    for part in cookie_header.split(";"):
+        if "=" in part:
+            key, value = part.strip().split("=", 1)
+            cookies[key] = value
+
+    token = cookies.get("fiable_rider_session")
+
+    if not token:
+        return None
+
+    session = RIDER_SESSIONS.get(token)
+
+    if not session:
+        return None
+
+    expires_at = session.get("expiresAt")
+
+    if not expires_at:
+        RIDER_SESSIONS.pop(token, None)
+        return None
+
+    now = datetime.now(timezone.utc)
+
+    if expires_at <= now:
+        RIDER_SESSIONS.pop(token, None)
+        return None
+
+    return session
+
+
+def clear_rider_session(handler):
+    session = get_rider_session(handler)
+
+    if not session:
+        return
+
+    cookie_header = handler.headers.get("Cookie", "")
+
+    cookies = {}
+
+    for part in cookie_header.split(";"):
+        if "=" in part:
+            key, value = part.strip().split("=", 1)
+            cookies[key] = value
+
+    token = cookies.get("fiable_rider_session")
+
+    if token:
+        RIDER_SESSIONS.pop(token, None)
+
+
+def get_logged_in_rider(handler):
+
+    session = get_rider_session(
+        handler
+    )
+
+    if not session:
+        return None
+
+    rider_id = session.get(
+        "riderId"
+    )
+
+    if rider_id is None:
+        return None
+
+    riders = load_riders()
+
+    rider = next(
+        (
+            item
+            for item in riders
+            if str(
+                item.get("id", "")
+            ) == str(rider_id)
+        ),
+        None
+    )
+
+    return rider
+
 
 def summary_for_account(account):
     plan = account.get("plan") if account.get("plan") in PLANS else None
@@ -895,6 +1016,177 @@ class FiableHandler(SimpleHTTPRequestHandler):
             payload = self._read_json()
             if not isinstance(payload, dict):
                 raise ValueError("Request body must be an object")
+            # =====================================================
+            # RIDER LOGIN
+            # =====================================================
+            if path == "/api/rider/login":
+
+                email = clean(
+                    payload.get("email"),
+                    160
+                ).lower()
+
+                password = clean(
+                    payload.get("password"),
+                    128
+                )
+
+                if not email or not password:
+
+                    self._json_response(
+                        400,
+                        {
+                            "error": "Rider email and password are required."
+                        }
+                    )
+
+                    return
+
+
+                riders = load_riders()
+
+                rider = next(
+                    (
+                        item
+                        for item in riders
+                        if clean(
+                            item.get("email"),
+                            160
+                        ).lower() == email
+                    ),
+                    None
+                )
+
+
+                if not rider:
+
+                    self._json_response(
+                        401,
+                        {
+                            "error": "Invalid rider email or password."
+                        }
+                    )
+
+                    return
+
+
+                stored_hash = rider.get("passwordHash")
+                stored_salt = rider.get("salt")
+
+
+                if not stored_hash or not stored_salt:
+
+                    self._json_response(
+                        500,
+                        {
+                            "error": "Rider credentials are incomplete."
+                        }
+                    )
+
+                    return
+
+
+                valid_password = hmac.compare_digest(
+                    stored_hash,
+                    password_hash(
+                        password,
+                        stored_salt
+                    )
+                )
+
+
+                if not valid_password:
+
+                    self._json_response(
+                        401,
+                        {
+                            "error": "Invalid rider email or password."
+                        }
+                    )
+
+                    return
+
+
+                session_token = create_rider_session(
+                    rider["id"]
+                )
+
+
+                body = json.dumps({
+                    "message": "Rider login successful.",
+                    "rider": {
+                        "id": rider["id"],
+                        "riderRef": rider.get("riderRef", ""),
+                        "name": rider.get("name", ""),
+                        "email": rider.get("email", ""),
+                        "phone": rider.get("phone", ""),
+                        "vehicle": rider.get("vehicle", ""),
+                        "status": rider.get("status", "available")
+                    }
+                }).encode("utf-8")
+
+
+                self.send_response(200)
+
+                self.send_header(
+                    "Content-Type",
+                    "application/json; charset=utf-8"
+                )
+
+                self.send_header(
+                    "Set-Cookie",
+                    f"fiable_rider_session={session_token}; "
+                    f"Path=/; HttpOnly; SameSite=Lax; "
+                    f"Max-Age={RIDER_SESSION_EXPIRY_HOURS * 60 * 60}"
+                )
+
+                self.send_header(
+                    "Content-Length",
+                    str(len(body))
+                )
+
+                self.end_headers()
+
+                self.wfile.write(body)
+
+                return
+
+            # =====================================================
+            # RIDER LOGOUT
+            # =====================================================
+
+            if path == "/api/rider/logout":
+
+                clear_rider_session(self)
+
+                body = json.dumps({
+                    "message":
+                        "Rider logged out successfully."
+                }).encode("utf-8")
+
+                self.send_response(200)
+
+                self.send_header(
+                    "Content-Type",
+                    "application/json; charset=utf-8"
+                )
+
+                self.send_header(
+                    "Set-Cookie",
+                    "fiable_rider_session=; "
+                    "Path=/; HttpOnly; SameSite=Lax; Max-Age=0"
+                )
+
+                self.send_header(
+                    "Content-Length",
+                    str(len(body))
+                )
+
+                self.end_headers()
+
+                self.wfile.write(body)
+
+                return
             if path == "/api/calculate":
                 result = estimate_delivery(clean(payload.get("pickup"), 80), clean(payload.get("dropoff"), 80))
                 self._json_response(200, result)
@@ -1863,6 +2155,13 @@ class FiableHandler(SimpleHTTPRequestHandler):
 
                 riders = load_riders()
 
+                salt = secrets.token_hex(16)
+
+                password_hash_value = password_hash(
+                    password,
+                    salt
+                )
+
                 # Generate the next rider ID
                 new_id = (
                     max(
@@ -2428,6 +2727,128 @@ class FiableHandler(SimpleHTTPRequestHandler):
                 self._json_response(404, {"error": "Account not found"})
                 return
             self._json_response(200, summary_for_account(account))
+            return
+
+        # =====================================================
+        # RIDER ACCOUNT
+        # =====================================================
+
+        if self.path == "/api/rider/account":
+
+            rider = get_logged_in_rider(self)
+
+            if not rider:
+
+                self._json_response(
+                    401,
+                    {
+                        "error":
+                            "Rider authentication required."
+                    }
+                )
+
+                return
+
+            self._json_response(
+                200,
+                {
+                    "rider": {
+                        "id": rider.get("id"),
+                        "riderRef": rider.get(
+                            "riderRef",
+                            ""
+                        ),
+                        "name": rider.get(
+                            "name",
+                            ""
+                        ),
+                        "email": rider.get(
+                            "email",
+                            ""
+                        ),
+                        "phone": rider.get(
+                            "phone",
+                            ""
+                        ),
+                        "vehicle": rider.get(
+                            "vehicle",
+                            ""
+                        ),
+                        "status": rider.get(
+                            "status",
+                            "available"
+                        ),
+                        "totalDeliveries": rider.get(
+                            "totalDeliveries",
+                            0
+                        ),
+                        "completedDeliveries": rider.get(
+                            "completedDeliveries",
+                            0
+                        ),
+                        "failedDeliveries": rider.get(
+                            "failedDeliveries",
+                            0
+                        )
+                    }
+                }
+            )
+
+            return
+
+        # =====================================================
+        # RIDER CURRENT DELIVERY
+        # =====================================================
+
+        if self.path == "/api/rider/delivery":
+
+            rider = get_logged_in_rider(self)
+
+            if not rider:
+                self._json_response(
+                    401,
+                    {
+                        "error": "Rider authentication required."
+                    }
+                )
+                return
+
+            rider_id = str(
+                rider.get("id", "")
+            )
+
+            deliveries = load_deliveries()
+
+            current_delivery = None
+
+            for order in deliveries:
+
+                order_rider_id = str(
+                    order.get("riderId", "")
+                )
+
+                status = str(
+                    order.get("status", "")
+                ).strip().lower()
+
+                if order_rider_id != rider_id:
+                    continue
+
+                if status in {
+                    "assigned",
+                    "on_delivery"
+                }:
+
+                    current_delivery = order
+                    break
+
+            self._json_response(
+                200,
+                {
+                    "delivery": current_delivery
+                }
+            )
+
             return
         # =====================================================
         # ADMIN ORDERS

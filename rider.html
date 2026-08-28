@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+  <meta charset="UTF-8">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
+
+  <title>Fiable Rider Portal</title>
+
+  <link
+    rel="stylesheet"
+    href="rider.css"
+  >
+
+</head>
+
+
+<body>
+
+  <main class="rider-auth">
+
+    <section class="rider-login-card">
+
+      <div class="rider-brand">
+
+        <div class="eyebrow">
+          FIABLE LOGISTICS
+        </div>
+
+        <h1>
+          Rider Portal
+        </h1>
+
+        <p>
+          Sign in to manage your deliveries.
+        </p>
+
+      </div>
+
+
+      <form id="riderLoginForm">
+
+        <div class="form-group">
+
+          <label for="riderLoginEmail">
+            Email
+          </label>
+
+          <input
+            type="email"
+            id="riderLoginEmail"
+            name="email"
+            placeholder="rider@example.com"
+            autocomplete="email"
+            required
+          >
+
+        </div>
+
+
+        <div class="form-group">
+
+          <label for="riderLoginPassword">
+            Password
+          </label>
+
+          <div class="password-field">
+
+            <input
+              type="password"
+              id="riderLoginPassword"
+              name="password"
+              placeholder="Enter your password"
+              autocomplete="current-password"
+              required
+            >
+
+            <button
+              type="button"
+              id="toggleRiderPassword"
+              class="password-toggle"
+              aria-label="Show password"
+            >
+              Show
+            </button>
+
+          </div>
+
+        </div>
+
+
+        <button
+          type="submit"
+          id="riderLoginBtn"
+          class="rider-login-btn"
+        >
+          Sign In
+        </button>
+
+
+        <div
+          id="riderLoginMessage"
+          class="rider-login-message"
+          aria-live="polite"
+        ></div>
+
+      </form>
+
+    </section>
+
+    <section
+        class="rider-dashboard-card"
+        id="riderDashboardView"
+        style="display: none;"
+        >
+
+        <div class="rider-dashboard-header">
+
+            <div>
+            <div class="eyebrow">
+                FIABLE LOGISTICS
+            </div>
+
+            <h1>
+                Rider Dashboard
+            </h1>
+
+            <p id="riderWelcome">
+                Welcome back.
+            </p>
+            </div>
+
+            <button
+            type="button"
+            id="riderLogoutBtn"
+            class="rider-logout-btn"
+            >
+            Logout
+            </button>
+
+        </div>
+
+
+        <!-- RIDER INFORMATION -->
+
+        <div class="rider-dashboard-section">
+
+            <h2>
+            Rider Information
+            </h2>
+
+            <div class="rider-info-grid">
+
+            <div class="rider-info-item">
+                <span>Rider ID</span>
+                <strong id="riderDashboardRef">—</strong>
+            </div>
+
+            <div class="rider-info-item">
+                <span>Name</span>
+                <strong id="riderDashboardName">—</strong>
+            </div>
+
+            <div class="rider-info-item">
+                <span>Phone</span>
+                <strong id="riderDashboardPhone">—</strong>
+            </div>
+
+            <div class="rider-info-item">
+                <span>Vehicle</span>
+                <strong id="riderDashboardVehicle">—</strong>
+            </div>
+
+            <div class="rider-info-item">
+                <span>Status</span>
+                <strong id="riderDashboardStatus">—</strong>
+            </div>
+
+            </div>
+
+        </div>
+
+
+        <!-- CURRENT DELIVERY -->
+
+        <div class="rider-dashboard-section">
+
+            <div class="rider-section-heading">
+
+            <div>
+                <h2>
+                Current Delivery
+                </h2>
+
+                <p>
+                Your assigned delivery will appear here.
+                </p>
+            </div>
+
+            </div>
+
+
+            <div
+            id="riderCurrentDelivery"
+            class="rider-current-delivery"
+            >
+
+            <div class="rider-empty-state">
+
+                <h3>
+                No delivery assigned
+                </h3>
+
+                <p>
+                You currently have no active delivery.
+                </p>
+
+            </div>
+
+            </div>
+
+        </div>
+
+
+        <!-- NOTIFICATIONS -->
+
+        <div class="rider-dashboard-section">
+
+            <div class="rider-section-heading">
+
+            <div>
+                <h2>
+                Notifications
+                </h2>
+
+                <p>
+                Updates about your deliveries.
+                </p>
+            </div>
+
+            </div>
+
+
+            <div
+            id="riderNotifications"
+            class="rider-notifications"
+            >
+
+            <div class="rider-empty-state">
+
+                <p>
+                No notifications yet.
+                </p>
+
+            </div>
+
+            </div>
+
+        </div>
+
+        </section>
+
+  </main>
+
+
+  <script src="rider.js"></script>
+
+</body>
+
+</html>
