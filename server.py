@@ -725,6 +725,15 @@ def get_rider_session(handler):
             cookies[key] = value
 
     token = cookies.get("fiable_rider_session")
+    print(
+        "RIDER SESSION COOKIE:",
+        token
+    )
+
+    print(
+        "RIDER SESSIONS:",
+        RIDER_SESSIONS
+    )
 
     if not token:
         return None
@@ -1185,6 +1194,259 @@ class FiableHandler(SimpleHTTPRequestHandler):
                 self.end_headers()
 
                 self.wfile.write(body)
+
+                return
+            # =====================================================
+            # RIDER UPDATE DELIVERY STATUS
+            # =====================================================
+
+            if path == "/api/rider/delivery/status":
+
+                rider = get_logged_in_rider(self)
+
+                if not rider:
+                    self._json_response(
+                        401,
+                        {
+                            "error": "Rider authentication required."
+                        }
+                    )
+                    return
+
+                order_id = payload.get("orderId")
+
+                new_status = clean(
+                    payload.get("status"),
+                    40
+                ).strip().lower()
+
+
+                # -------------------------------------------------
+                # VALIDATE ORDER ID
+                # -------------------------------------------------
+
+                try:
+
+                    order_id = int(order_id)
+
+                except (TypeError, ValueError):
+
+                    self._json_response(
+                        400,
+                        {
+                            "error": "A valid order ID is required."
+                        }
+                    )
+
+                    return
+
+
+                # -------------------------------------------------
+                # ONLY ALLOW RIDER ACTIONS
+                # -------------------------------------------------
+
+                allowed_statuses = {
+                    "on_delivery",
+                    "delivered"
+                }
+
+                if new_status not in allowed_statuses:
+
+                    self._json_response(
+                        400,
+                        {
+                            "error": "Invalid delivery status."
+                        }
+                    )
+
+                    return
+
+
+                deliveries = load_deliveries()
+                riders = load_riders()
+
+                rider_id = str(
+                    rider.get("id", "")
+                )
+
+                rider = next(
+                    (
+                        item
+                        for item in riders
+                        if str(item.get("id", "")) == rider_id
+                    ),
+                    None
+                )
+
+                if not rider:
+                    self._json_response(
+                        404,
+                        {
+                            "error": "Rider account not found."
+                        }
+                    )
+                    return
+
+
+                # -------------------------------------------------
+                # FIND ORDER
+                # -------------------------------------------------
+
+                order = next(
+                    (
+                        item
+                        for item in deliveries
+                        if str(
+                            item.get("id", "")
+                        ) == str(order_id)
+                    ),
+                    None
+                )
+
+
+                if not order:
+
+                    self._json_response(
+                        404,
+                        {
+                            "error": "Order not found."
+                        }
+                    )
+
+                    return
+
+
+                # -------------------------------------------------
+                # VERIFY RIDER OWNS THIS ORDER
+                # -------------------------------------------------
+
+                rider_id = str(
+                    rider.get("id", "")
+                )
+
+                order_rider_id = str(
+                    order.get("riderId", "")
+                )
+
+
+                if order_rider_id != rider_id:
+
+                    self._json_response(
+                        403,
+                        {
+                            "error":
+                            "You are not assigned to this delivery."
+                        }
+                    )
+
+                    return
+
+
+                # -------------------------------------------------
+                # CURRENT STATUS
+                # -------------------------------------------------
+
+                current_status = str(
+                    order.get("status", "")
+                ).strip().lower()
+
+
+                # -------------------------------------------------
+                # ASSIGNED → ON DELIVERY
+                # -------------------------------------------------
+
+                if new_status == "on_delivery":
+
+                    if current_status != "assigned":
+
+                        self._json_response(
+                            400,
+                            {
+                                "error":
+                                "This delivery cannot be started in its current status."
+                            }
+                        )
+
+                        return
+
+
+                    order["status"] = "on_delivery"
+
+                    rider["status"] = "on_delivery"
+
+
+                # -------------------------------------------------
+                # ON DELIVERY → DELIVERED
+                # -------------------------------------------------
+
+                elif new_status == "delivered":
+
+                    if current_status != "on_delivery":
+
+                        self._json_response(
+                            400,
+                            {
+                                "error":
+                                "This delivery cannot be completed in its current status."
+                            }
+                        )
+
+                        return
+
+
+                    order["status"] = "delivered"
+
+                    rider["status"] = "available"
+
+
+                    rider["totalDeliveries"] = (
+                        int(
+                            rider.get(
+                                "totalDeliveries",
+                                0
+                            ) or 0
+                        ) + 1
+                    )
+
+
+                    rider["completedDeliveries"] = (
+                        int(
+                            rider.get(
+                                "completedDeliveries",
+                                0
+                            ) or 0
+                        ) + 1
+                    )
+
+
+                # -------------------------------------------------
+                # UPDATE TIMESTAMP
+                # -------------------------------------------------
+
+                order["updatedAt"] = datetime.now(
+                    timezone.utc
+                ).isoformat()
+
+
+                # -------------------------------------------------
+                # SAVE BOTH
+                # -------------------------------------------------
+
+                save_deliveries(deliveries)
+                save_riders(riders)
+
+
+                self._json_response(
+                    200,
+                    {
+                        "message":
+                            "Delivery status updated successfully.",
+
+                        "order": order,
+
+                        "rider": rider
+                    }
+                )
 
                 return
             if path == "/api/calculate":
@@ -2813,13 +3075,18 @@ class FiableHandler(SimpleHTTPRequestHandler):
                 )
                 return
 
+
             rider_id = str(
                 rider.get("id", "")
             )
 
+
             deliveries = load_deliveries()
 
-            current_delivery = None
+
+            assigned_delivery = None
+            on_delivery = None
+
 
             for order in deliveries:
 
@@ -2827,20 +3094,33 @@ class FiableHandler(SimpleHTTPRequestHandler):
                     order.get("riderId", "")
                 )
 
-                status = str(
-                    order.get("status", "")
-                ).strip().lower()
 
                 if order_rider_id != rider_id:
                     continue
 
-                if status in {
-                    "assigned",
-                    "on_delivery"
-                }:
 
-                    current_delivery = order
+                status = str(
+                    order.get("status", "")
+                ).strip().lower()
+
+
+                if status == "on_delivery":
+
+                    on_delivery = order
                     break
+
+
+                if status == "assigned":
+
+                    assigned_delivery = order
+
+
+            # Prefer an order already being delivered
+            current_delivery = (
+                on_delivery
+                or assigned_delivery
+            )
+
 
             self._json_response(
                 200,
@@ -2848,6 +3128,7 @@ class FiableHandler(SimpleHTTPRequestHandler):
                     "delivery": current_delivery
                 }
             )
+
 
             return
         # =====================================================

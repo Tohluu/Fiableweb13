@@ -22,7 +22,7 @@
 
 <body>
 
-  <main class="rider-auth">
+  <main class="rider-auth" id="riderAuthShell">
 
     <section class="rider-login-card">
 
@@ -264,6 +264,46 @@
         </div>
 
         </section>
+
+
+        <!-- ORDER DETAILS MODAL -->
+
+        <div
+            class="rider-order-modal"
+            id="riderOrderModal"
+            hidden
+        >
+
+            <div class="rider-modal-backdrop"></div>
+
+            <div class="rider-modal-content">
+
+                <div class="rider-modal-header">
+
+                    <h2>Order Details</h2>
+
+                    <button
+                        type="button"
+                        class="rider-modal-close"
+                        id="riderModalCloseBtn"
+                        aria-label="Close modal"
+                    >
+                        ✕
+                    </button>
+
+                </div>
+
+                <div class="rider-modal-body" id="riderModalBody">
+
+                </div>
+
+                <div class="rider-modal-footer" id="riderModalFooter">
+
+                </div>
+
+            </div>
+
+        </div>
 
   </main>
 

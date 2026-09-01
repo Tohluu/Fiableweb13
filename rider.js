@@ -93,7 +93,14 @@ toggleRiderPassword?.addEventListener(
    RIDER PAGE INITIALIZATION
 ===================================================== */
 
-if (isDashboard) {
+async function initializeRiderPage() {
+
+  const riderAuthShell =
+    document.getElementById(
+      "riderAuthShell"
+    ) || document.querySelector(
+      ".rider-auth"
+    );
 
   const riderLoginCard =
     document.querySelector(
@@ -105,27 +112,164 @@ if (isDashboard) {
       "riderDashboardView"
     );
 
+  if (!riderLoginCard || !riderDashboardView) {
+    return;
+  }
 
-  /* Hide login */
+  try {
 
-  if (riderLoginCard) {
+    const response =
+      await fetch(
+        "/api/rider/account",
+        {
+          method: "GET",
+
+          credentials:
+            "same-origin",
+
+          cache: "no-store"
+        }
+      );
+
+    if (response.ok) {
+
+      /* Authenticated rider */
+
+      riderLoginCard.style.display =
+        "none";
+
+      riderDashboardView.style.display =
+        "block";
+
+      if (riderAuthShell) {
+        riderAuthShell.classList.add(
+          "rider-dashboard-mode"
+        );
+      }
+
+      await loadRiderAccount();
+      await loadRiderDelivery();
+
+      startRiderAutoRefresh();
+
+      return;
+    }
+
+    /* Not authenticated */
 
     riderLoginCard.style.display =
+      "block";
+
+    riderDashboardView.style.display =
+      "none";
+
+    if (isDashboard) {
+      window.location.replace("rider.html");
+    }
+
+  } catch (error) {
+
+    console.error(
+      "RIDER PAGE INIT ERROR:",
+      error
+    );
+
+    riderLoginCard.style.display =
+      "block";
+
+    riderDashboardView.style.display =
       "none";
 
   }
 
+}
 
-  /* Show dashboard */
+initializeRiderPage();
 
-  if (riderDashboardView) {
 
-    riderDashboardView.style.display =
-      "block";
+/* =====================================================
+   AUTOMATIC REFRESH MECHANISM
+===================================================== */
+
+let riderRefreshInterval = null;
+
+function startRiderAutoRefresh() {
+
+  /* Prevent duplicate intervals */
+
+  if (riderRefreshInterval) {
+    return;
+  }
+
+
+  /* Refresh every 5 seconds when page is visible */
+
+  riderRefreshInterval =
+    setInterval(
+      async () => {
+
+        if (
+          document.visibilityState ===
+          "visible"
+        ) {
+
+          try {
+
+            await loadRiderDelivery();
+            await loadRiderAccount();
+
+          } catch (error) {
+
+            console.error(
+              "Auto-refresh error:",
+              error
+            );
+
+          }
+
+        }
+
+      },
+      5000
+    );
+
+}
+
+function stopRiderAutoRefresh() {
+
+  if (riderRefreshInterval) {
+
+    clearInterval(riderRefreshInterval);
+    riderRefreshInterval = null;
 
   }
 
 }
+
+/* Start refresh when dashboard loads */
+
+document.addEventListener(
+  "visibilitychange",
+  () => {
+
+    if (
+      document.visibilityState ===
+      "visible"
+    ) {
+
+      startRiderAutoRefresh();
+
+    } else if (
+      document.visibilityState ===
+      "hidden"
+    ) {
+
+      stopRiderAutoRefresh();
+
+    }
+
+  }
+);
 
 
 /* =====================================================
@@ -393,6 +537,128 @@ async function loadRiderAccount() {
 }
 
 /* =====================================================
+   UPDATE RIDER DELIVERY STATUS
+===================================================== */
+
+async function updateRiderDeliveryStatus(
+  orderId,
+  newStatus,
+  buttonElement
+) {
+
+  try {
+
+    const response =
+      await fetch(
+        "/api/rider/delivery/status",
+        {
+          method: "POST",
+
+          credentials:
+            "same-origin",
+
+          headers: {
+            "Content-Type":
+              "application/json"
+          },
+
+          body: JSON.stringify({
+            orderId,
+            status: newStatus
+          })
+        }
+      );
+
+
+    const data =
+      await response.json();
+
+
+    if (!response.ok) {
+
+      /* Handle specific error cases */
+
+      if (response.status === 401) {
+        throw new Error(
+          "Your session has expired. Please log in again."
+        );
+      }
+
+      if (response.status === 403) {
+        throw new Error(
+          "You are not assigned to this delivery."
+        );
+      }
+
+      if (response.status === 404) {
+        throw new Error(
+          "Order not found."
+        );
+      }
+
+      if (response.status === 400) {
+        throw new Error(
+          data.error ||
+          "Invalid status transition."
+        );
+      }
+
+      throw new Error(
+        data.error ||
+        "Unable to update delivery status."
+      );
+
+    }
+
+    console.log(
+      "UPDATED ORDER:",
+      data.order
+    );
+
+    console.log(
+      "UPDATED RIDER:",
+      data.rider
+    );
+
+    /* Success - reload UI */
+
+    await loadRiderDelivery();
+    await loadRiderAccount();
+
+    return true;
+
+
+  } catch (error) {
+
+    console.error(
+      "RIDER STATUS UPDATE ERROR:",
+      error
+    );
+
+    /* Reset button state on error */
+
+    if (buttonElement) {
+
+      buttonElement.disabled = false;
+
+      if (newStatus === "on_delivery") {
+        buttonElement.textContent =
+          "Start Delivery";
+      } else if (newStatus === "delivered") {
+        buttonElement.textContent =
+          "Mark Delivered";
+      }
+
+    }
+
+    throw error;
+
+  }
+
+}
+
+
+/* =====================================================
    LOAD CURRENT DELIVERY
 ===================================================== */
 
@@ -443,23 +709,14 @@ async function loadRiderDelivery() {
       data.delivery;
 
 
-    /* ---------------------------------------------
-       NO ACTIVE DELIVERY
-    --------------------------------------------- */
+    /* NO ACTIVE DELIVERY */
 
     if (!delivery) {
 
       deliveryContainer.innerHTML = `
         <div class="rider-empty-state">
-
-          <h3>
-            No delivery assigned
-          </h3>
-
-          <p>
-            You currently have no active delivery.
-          </p>
-
+          <h3>No delivery assigned</h3>
+          <p>You currently have no active delivery.</p>
         </div>
       `;
 
@@ -467,33 +724,106 @@ async function loadRiderDelivery() {
     }
 
 
-    /* ---------------------------------------------
-       DELIVERY DETAILS
-    --------------------------------------------- */
+    /* EXTRACT DELIVERY FIELDS */
 
-    const orderNumber =
-      delivery.orderNumber ||
+    const orderRef =
       delivery.orderRef ||
       delivery.id ||
       "—";
+
+    const status =
+      String(
+        delivery.status || "assigned"
+      ).toLowerCase();
 
     const pickup =
       delivery.pickup ||
       "—";
 
-    const destination =
+    const dropoff =
       delivery.dropoff ||
-      delivery.destination ||
       "—";
-
-    const status =
-      delivery.status ||
-      "assigned";
 
     const units =
-      delivery.units ??
+      delivery.units ?? "—";
+
+    const details =
+      delivery.details || {};
+
+    const pickupContactName =
+      details.pickupContactName || "—";
+
+    const pickupPhone =
+      details.pickupPhone || "—";
+
+    const recipientName =
+      details.recipientName || "—";
+
+    const recipientPhone =
+      details.recipientPhone || "—";
+
+    const packageType =
+      details.packageType ||
+      delivery.packageType ||
       "—";
 
+    const priority =
+      details.priority ||
+      delivery.priority ||
+      "—";
+
+    const deliveryWindow =
+      details.deliveryWindow ||
+      "—";
+
+    const packageDescription =
+      details.packageDescription ||
+      delivery.packageDescription ||
+      "—";
+
+
+    /* ACTION BUTTON */
+
+    let actionButton = "";
+
+    if (status === "assigned") {
+
+      actionButton = `
+        <button
+          type="button"
+          class="rider-delivery-action-btn"
+          data-order-id="${delivery.id}"
+          data-status="on_delivery"
+        >
+          Start Delivery
+        </button>
+      `;
+
+    } else if (status === "on_delivery") {
+
+      actionButton = `
+        <button
+          type="button"
+          class="rider-delivery-action-btn"
+          data-order-id="${delivery.id}"
+          data-status="delivered"
+        >
+          Mark Delivered
+        </button>
+      `;
+
+    } else if (status === "delivered") {
+
+      actionButton = `
+        <div class="rider-delivery-completed">
+          Delivery Completed
+        </div>
+      `;
+
+    }
+
+
+    /* DISPLAY DELIVERY CARD */
 
     deliveryContainer.innerHTML = `
 
@@ -502,15 +832,10 @@ async function loadRiderDelivery() {
         <div class="rider-delivery-header">
 
           <div>
-
             <span class="rider-delivery-label">
               Order
             </span>
-
-            <h3>
-              ${orderNumber}
-            </h3>
-
+            <h3>${orderRef}</h3>
           </div>
 
           <span class="rider-delivery-status">
@@ -523,48 +848,87 @@ async function loadRiderDelivery() {
         <div class="rider-delivery-details">
 
           <div class="rider-delivery-item">
-
-            <span>
-              Pickup
-            </span>
-
-            <strong>
-              ${pickup}
-            </strong>
-
+            <span>Pickup</span>
+            <strong>${pickup}</strong>
           </div>
-
 
           <div class="rider-delivery-item">
-
-            <span>
-              Destination
-            </span>
-
-            <strong>
-              ${destination}
-            </strong>
-
+            <span>Destination</span>
+            <strong>${dropoff}</strong>
           </div>
-
 
           <div class="rider-delivery-item">
-
-            <span>
-              Units
-            </span>
-
-            <strong>
-              ${units}
-            </strong>
-
+            <span>Recipient</span>
+            <strong>${recipientName}</strong>
           </div>
+
+          <div class="rider-delivery-item">
+            <span>Package Type</span>
+            <strong>${packageType}</strong>
+          </div>
+
+          <div class="rider-delivery-item">
+            <span>Units</span>
+            <strong>${units}</strong>
+          </div>
+
+          <div class="rider-delivery-item">
+            <span>Priority</span>
+            <strong>${priority}</strong>
+          </div>
+
+        </div>
+
+
+        <div class="rider-delivery-actions">
+
+          <button
+            type="button"
+            class="rider-view-order-btn"
+            data-order-id="${delivery.id}"
+            data-order-ref="${orderRef}"
+            data-pickup="${pickup}"
+            data-dropoff="${dropoff}"
+            data-pickup-contact="${pickupContactName}"
+            data-pickup-phone="${pickupPhone}"
+            data-recipient="${recipientName}"
+            data-recipient-phone="${recipientPhone}"
+            data-package-type="${packageType}"
+            data-description="${packageDescription}"
+            data-units="${units}"
+            data-priority="${priority}"
+            data-window="${deliveryWindow}"
+            data-status="${status}"
+          >
+            View Order
+          </button>
+
+          ${actionButton}
 
         </div>
 
       </div>
 
     `;
+
+
+    /* ATTACH VIEW ORDER HANDLER */
+
+    const viewOrderBtn =
+      deliveryContainer.querySelector(
+        ".rider-view-order-btn"
+      );
+
+    if (viewOrderBtn) {
+
+      viewOrderBtn.addEventListener(
+        "click",
+        () => {
+          openOrderDetailsModal(delivery);
+        }
+      );
+
+    }
 
 
   } catch (error) {
@@ -596,17 +960,479 @@ async function loadRiderDelivery() {
 
 
 /* =====================================================
-   LOAD ACCOUNT WHEN DASHBOARD OPENS
+   OPEN ORDER DETAILS MODAL
 ===================================================== */
 
-if (isDashboard) {
+function openOrderDetailsModal(delivery) {
 
-  loadRiderAccount();
+  const modal =
+    document.getElementById(
+      "riderOrderModal"
+    );
 
-  loadRiderDelivery();
+  const modalBody =
+    document.getElementById(
+      "riderModalBody"
+    );
+
+  if (!modal || !modalBody) {
+    return;
+  }
+
+  const details =
+    delivery.details || {};
+
+  const orderRef =
+    delivery.orderRef ||
+    delivery.id ||
+    "Order";
+
+  const status =
+    String(
+      delivery.status || "assigned"
+    ).toLowerCase();
+
+  const pickup =
+    delivery.pickup || "—";
+
+  const dropoff =
+    delivery.dropoff || "—";
+
+  const units =
+    delivery.units ?? "—";
+
+  const pickupContactName =
+    details.pickupContactName || "—";
+
+  const pickupPhone =
+    details.pickupPhone || "—";
+
+  const recipientName =
+    details.recipientName || "—";
+
+  const recipientPhone =
+    details.recipientPhone || "—";
+
+  const packageType =
+    details.packageType ||
+    delivery.packageType ||
+    "—";
+
+  const priority =
+    details.priority ||
+    delivery.priority ||
+    "—";
+
+  const deliveryWindow =
+    details.deliveryWindow || "—";
+
+  const packageDescription =
+    details.packageDescription ||
+    delivery.packageDescription ||
+    "—";
+
+  modalBody.innerHTML = `
+
+    <div class="rider-order-detail-section">
+
+      <h3>Order Information</h3>
+
+      <div class="rider-order-detail-grid">
+
+        <div class="rider-order-detail-item">
+          <span>Order Reference</span>
+          <strong>${orderRef}</strong>
+        </div>
+
+        <div class="rider-order-detail-item">
+          <span>Status</span>
+          <strong>${status.replace("_", " ").toUpperCase()}</strong>
+        </div>
+
+        <div class="rider-order-detail-item">
+          <span>Units</span>
+          <strong>${units}</strong>
+        </div>
+
+        <div class="rider-order-detail-item">
+          <span>Priority</span>
+          <strong>${priority}</strong>
+        </div>
+
+      </div>
+
+    </div>
+
+
+    <div class="rider-order-detail-section">
+
+      <h3>Pickup Details</h3>
+
+      <div class="rider-order-detail-grid">
+
+        <div class="rider-order-detail-item">
+          <span>Location</span>
+          <strong>${pickup}</strong>
+        </div>
+
+        <div class="rider-order-detail-item">
+          <span>Contact Name</span>
+          <strong>${pickupContactName}</strong>
+        </div>
+
+        <div class="rider-order-detail-item">
+          <span>Contact Phone</span>
+          <strong>${pickupPhone}</strong>
+        </div>
+
+      </div>
+
+    </div>
+
+
+    <div class="rider-order-detail-section">
+
+      <h3>Delivery Details</h3>
+
+      <div class="rider-order-detail-grid">
+
+        <div class="rider-order-detail-item">
+          <span>Destination</span>
+          <strong>${dropoff}</strong>
+        </div>
+
+        <div class="rider-order-detail-item">
+          <span>Recipient Name</span>
+          <strong>${recipientName}</strong>
+        </div>
+
+        <div class="rider-order-detail-item">
+          <span>Recipient Phone</span>
+          <strong>${recipientPhone}</strong>
+        </div>
+
+      </div>
+
+    </div>
+
+
+    <div class="rider-order-detail-section">
+
+      <h3>Package Information</h3>
+
+      <div class="rider-order-detail-grid">
+
+        <div class="rider-order-detail-item">
+          <span>Package Type</span>
+          <strong>${packageType}</strong>
+        </div>
+
+        <div class="rider-order-detail-item">
+          <span>Delivery Window</span>
+          <strong>${deliveryWindow}</strong>
+        </div>
+
+      </div>
+
+      ${packageDescription && packageDescription !== "—" ? `
+
+        <div class="rider-order-detail-item" style="margin-block-start: 16px;">
+          <span>Description</span>
+          <strong>${packageDescription}</strong>
+        </div>
+
+      ` : ""}
+
+    </div>
+
+  `;
+
+  /* Add action buttons to modal footer */
+
+  const modalFooter =
+    document.getElementById(
+      "riderModalFooter"
+    );
+
+  if (modalFooter) {
+
+    let actionButtons = `
+      <button
+        type="button"
+        class="rider-modal-close-btn"
+        onclick="closeOrderDetailsModal()"
+      >
+        Close
+      </button>
+    `;
+
+    if (status === "assigned") {
+
+      actionButtons = `
+        <button
+          type="button"
+          class="rider-modal-close-btn"
+          onclick="closeOrderDetailsModal()"
+        >
+          Close
+        </button>
+
+        <button
+          type="button"
+          class="rider-modal-action-btn"
+          data-order-id="${delivery.id}"
+          data-status="on_delivery"
+          onclick="handleModalActionClick(event)"
+        >
+          Start Delivery
+        </button>
+      `;
+
+    } else if (status === "on_delivery") {
+
+      actionButtons = `
+        <button
+          type="button"
+          class="rider-modal-close-btn"
+          onclick="closeOrderDetailsModal()"
+        >
+          Close
+        </button>
+
+        <button
+          type="button"
+          class="rider-modal-action-btn"
+          data-order-id="${delivery.id}"
+          data-status="delivered"
+          onclick="handleModalActionClick(event)"
+        >
+          Mark as Delivered
+        </button>
+      `;
+
+    } else if (status === "delivered") {
+
+      actionButtons = `
+        <button
+          type="button"
+          class="rider-modal-close-btn"
+          onclick="closeOrderDetailsModal()"
+        >
+          Close
+        </button>
+      `;
+
+    }
+
+    modalFooter.innerHTML = actionButtons;
+
+  }
+
+  modal.hidden = false;
 
 }
 
+/* =====================================================
+   HANDLE MODAL ACTION CLICK
+===================================================== */
+
+async function handleModalActionClick(event) {
+
+  const button = event.target;
+
+  const orderId =
+    button.dataset.orderId;
+
+  const newStatus =
+    button.dataset.status;
+
+  if (!orderId || !newStatus) {
+    return;
+  }
+
+  button.disabled = true;
+
+  const originalText =
+    button.textContent;
+
+  button.textContent =
+    newStatus === "on_delivery"
+      ? "Starting..."
+      : "Completing...";
+
+  try {
+
+    await updateRiderDeliveryStatus(
+      orderId,
+      newStatus,
+      button
+    );
+
+    closeOrderDetailsModal();
+
+
+  } catch (error) {
+
+    console.error(
+      "Failed to update status:",
+      error
+    );
+
+    alert(
+      error.message ||
+      "Failed to update delivery status."
+    );
+
+  }
+
+}
+
+/* =====================================================
+   CLOSE ORDER DETAILS MODAL
+===================================================== */
+
+function closeOrderDetailsModal() {
+
+  const modal =
+    document.getElementById(
+      "riderOrderModal"
+    );
+
+  if (modal) {
+    modal.hidden = true;
+  }
+
+}
+
+/* =====================================================
+   MODAL EVENT HANDLERS
+===================================================== */
+
+document.addEventListener("DOMContentLoaded", () => {
+
+  const closeBtn =
+    document.getElementById(
+      "riderModalCloseBtn"
+    );
+
+  const backdrop =
+    document.querySelector(
+      ".rider-modal-backdrop"
+    );
+
+  const modal =
+    document.getElementById(
+      "riderOrderModal"
+    );
+
+  if (closeBtn) {
+    closeBtn.addEventListener(
+      "click",
+      closeOrderDetailsModal
+    );
+  }
+
+  if (backdrop) {
+    backdrop.addEventListener(
+      "click",
+      closeOrderDetailsModal
+    );
+  }
+
+  if (modal) {
+    modal.addEventListener(
+      "keydown",
+      (event) => {
+        if (event.key === "Escape") {
+          closeOrderDetailsModal();
+        }
+      }
+    );
+  }
+
+});
+
+
+/* =====================================================
+   RIDER DELIVERY ACTION BUTTON
+===================================================== */
+
+document.addEventListener(
+  "click",
+  async (event) => {
+
+    const button =
+      event.target.closest(
+        ".rider-delivery-action-btn"
+      );
+
+
+    if (!button) {
+      return;
+    }
+
+
+    const orderId =
+      button.dataset.orderId;
+
+    const newStatus =
+      button.dataset.status;
+
+
+    if (!orderId || !newStatus) {
+      console.error(
+        "Missing order ID or status"
+      );
+      return;
+    }
+
+
+    /* Disable button and show loading state */
+
+    button.disabled = true;
+
+    const originalText =
+      button.textContent;
+
+    button.textContent =
+      newStatus === "on_delivery"
+        ? "Starting..."
+        : "Completing...";
+
+
+    try {
+
+      await updateRiderDeliveryStatus(
+        orderId,
+        newStatus,
+        button
+      );
+
+      /* Success - UI refreshed by updateRiderDeliveryStatus */
+
+      console.log(
+        "Delivery status updated successfully"
+      );
+
+
+    } catch (error) {
+
+      console.error(
+        "Failed to update status:",
+        error
+      );
+
+      /* Show error message to user */
+
+      alert(
+        error.message ||
+        "Failed to update delivery status."
+      );
+
+    }
+
+  }
+);
 
 /* =====================================================
    RIDER LOGOUT
@@ -679,6 +1505,7 @@ document.addEventListener(
 
       }
 
+      stopRiderAutoRefresh();
 
       window.location.href =
         "rider.html";
