@@ -62,6 +62,7 @@ RIDER_NOTIFICATIONS_FILE = (
 )
 ADMIN_CREDENTIALS_FILE = ROOT / "data" / "admin_credentials.json"
 RESET_TOKENS_FILE = ROOT / "data" / "reset_tokens.json"
+SUBSCRIPTIONS_FILE = ROOT / "data" / "subscriptions.json"
 RESET_TOKEN_EXPIRY_MINUTES = 60
 
 LOCATION_ZONES = {
@@ -127,7 +128,7 @@ ZONE_UNIT_MATRIX = {
 EXTENDED_UNITS = 7  # default for any route touching "extended", unless overridden above
 
 
-def estimate_delivery(pickup, dropoff):
+def estimate_delivery(pickup, dropoff, plan=None):
     pickup_zone = LOCATION_ZONES.get(pickup)
     dropoff_zone = LOCATION_ZONES.get(dropoff)
     if not pickup_zone or not dropoff_zone:
@@ -140,11 +141,13 @@ def estimate_delivery(pickup, dropoff):
         units = ZONE_UNIT_MATRIX.get(pair, EXTENDED_UNITS if "extended" in pair else 3)
 
     recommended = "Basic" if units <= 2 else "Growth" if units <= 4 else "Business"
-    unit_price = PLAN_UNIT_PRICES[recommended]
+    billed_plan = plan if plan in PLAN_UNIT_PRICES else recommended
+    unit_price = PLAN_UNIT_PRICES[billed_plan]
     return {
         "units": units,
         "cost": units * unit_price,
         "unitPrice": unit_price,
+        "plan": billed_plan,
         "recommendedPlan": recommended,
     }
 
@@ -390,11 +393,132 @@ def mark_payment_complete(email):
     accounts = load_accounts()
     for account in accounts:
         if account["email"] == email.lower():
+            subscriptions = load_subscriptions()
+            previous_paid_at = parse_iso_date(account.get("paidAt"))
+            previous_period_start = (
+                previous_paid_at.isoformat()
+                if previous_paid_at else None
+            )
+
+            if previous_paid_at and not any(
+                record.get("email", "").lower() == account["email"].lower()
+                and record.get("periodStart") == previous_period_start
+                for record in subscriptions
+            ):
+                subscriptions.append({
+                    "id": f"SUB-{len(subscriptions) + 1:05d}",
+                    "email": account["email"],
+                    "subscriberId": account.get("subscriberId"),
+                    "plan": account.get("plan"),
+                    "amount": plan_price(account.get("plan")),
+                    "unitsAllocated": PLANS.get(account.get("plan"), {}).get("units", 0),
+                    "paymentStatus": "paid",
+                    "paidAt": previous_period_start,
+                    "periodStart": previous_period_start,
+                    "periodEnd": (previous_paid_at + timedelta(days=30)).isoformat(),
+                })
+
+            paid_at = datetime.now(timezone.utc)
             account["paymentStatus"] = "paid"
-            account["paidAt"] = datetime.now(timezone.utc).isoformat()
+            account["paidAt"] = paid_at.isoformat()
             ACCOUNTS_FILE.write_text(json.dumps(accounts, indent=2), encoding="utf-8")
+            subscriptions.append({
+                "id": f"SUB-{len(subscriptions) + 1:05d}",
+                "email": account["email"],
+                "subscriberId": account.get("subscriberId"),
+                "plan": account.get("plan"),
+                "amount": plan_price(account.get("plan")),
+                "unitsAllocated": PLANS.get(account.get("plan"), {}).get("units", 0),
+                "paymentStatus": "paid",
+                "paidAt": paid_at.isoformat(),
+                "periodStart": paid_at.isoformat(),
+                "periodEnd": (paid_at + timedelta(days=30)).isoformat(),
+            })
+            save_subscriptions(subscriptions)
             return account
     raise ValueError("Account not found")
+
+
+def plan_price(plan):
+    return {"Basic": 67500, "Growth": 105000, "Business": 143000}.get(plan, 0)
+
+
+def load_subscriptions():
+    if not SUBSCRIPTIONS_FILE.exists():
+        return []
+    try:
+        value = json.loads(SUBSCRIPTIONS_FILE.read_text(encoding="utf-8"))
+        return value if isinstance(value, list) else []
+    except (json.JSONDecodeError, OSError):
+        return []
+
+
+def save_subscriptions(subscriptions):
+    SUBSCRIPTIONS_FILE.parent.mkdir(exist_ok=True)
+    SUBSCRIPTIONS_FILE.write_text(
+        json.dumps(subscriptions, indent=2),
+        encoding="utf-8"
+    )
+
+
+def subscription_history_for_account(account):
+    records = [
+        record for record in load_subscriptions()
+        if record.get("email", "").lower() == account["email"].lower()
+    ]
+    if records:
+        records = sorted(
+            records,
+            key=lambda record: record.get("periodStart", ""),
+            reverse=True
+        )
+        return add_subscription_usage(account["email"], records)
+
+    if account.get("plan") and account.get("paidAt"):
+        paid_at = parse_iso_date(account["paidAt"])
+        if paid_at:
+            return add_subscription_usage(account["email"], [{
+                "id": f"LEGACY-{account.get('subscriberId', account['email'])}",
+                "email": account["email"],
+                "subscriberId": account.get("subscriberId"),
+                "plan": account.get("plan"),
+                "amount": plan_price(account.get("plan")),
+                "unitsAllocated": PLANS.get(account.get("plan"), {}).get("units", 0),
+                "paymentStatus": account.get("paymentStatus", "pending"),
+                "paidAt": account.get("paidAt"),
+                "periodStart": paid_at.isoformat(),
+                "periodEnd": (paid_at + timedelta(days=30)).isoformat(),
+            }])
+    return []
+
+
+def add_subscription_usage(email, subscriptions):
+    for subscription in subscriptions:
+        deliveries = deliveries_for_subscription(email, subscription)
+        units_used = sum(
+            int(delivery.get("units", 0) or 0)
+            for delivery in deliveries
+            if delivery.get("status") != "cancelled"
+        )
+        subscription["unitsUsed"] = units_used
+        subscription["subscriptionStatus"] = (
+            "exhausted"
+            if units_used >= int(subscription.get("unitsAllocated", 0) or 0)
+            else subscription.get("paymentStatus", "pending")
+        )
+    return subscriptions
+
+
+def deliveries_for_subscription(email, subscription):
+    start = parse_iso_date(subscription.get("periodStart"))
+    end = parse_iso_date(subscription.get("periodEnd"))
+    if not start or not end:
+        return []
+    return [
+        delivery for delivery in deliveries_for_account(email)
+        if (created_at := parse_iso_date(delivery.get("createdAt")))
+        and start <= created_at < end
+    ]
 
 
 def save_submission(kind, payload):
@@ -429,7 +553,7 @@ def save_deliveries(deliveries):
     DELIVERIES_FILE.write_text(json.dumps(deliveries, indent=2), encoding="utf-8")
 
 
-def create_delivery(account_email, pickup, dropoff, units, details=None, order_ref=None):
+def create_delivery(account_email, pickup, dropoff, units, details=None, order_ref=None, unit_price=None, plan=None):
     deliveries = load_deliveries()
     new_id = (deliveries[-1]["id"] + 1) if deliveries else 1
     record = {
@@ -439,6 +563,9 @@ def create_delivery(account_email, pickup, dropoff, units, details=None, order_r
         "pickup": pickup,
         "dropoff": dropoff,
         "units": int(units),
+        "unitPrice": int(unit_price or 0),
+        "cost": int(units) * int(unit_price or 0),
+        "subscriptionPlan": plan or "",
         "priority": details.get("priority") if details else "Standard",
         "window": details.get("window") if details else "Standard",
         "packageType": details.get("packageType") if details else "General",
@@ -474,7 +601,9 @@ def dashboard_stats_for_account(email):
     items = deliveries_for_account(email)
     counts = {"requested": 0, "assigned": 0, "picked-up": 0, "in-transit": 0, "delivered": 0, "failed": 0, "cancelled": 0}
     for d in items:
-        s = d.get("status") or "requested"
+        s = str(d.get("status") or "requested").strip().lower()
+        if s in {"on_delivery", "on-delivery", "in_transit"}:
+            s = "in-transit"
         counts[s] = counts.get(s, 0) + 1
     return {"counts": counts, "total": len(items)}
 
@@ -1450,7 +1579,16 @@ class FiableHandler(SimpleHTTPRequestHandler):
 
                 return
             if path == "/api/calculate":
-                result = estimate_delivery(clean(payload.get("pickup"), 80), clean(payload.get("dropoff"), 80))
+                email = clean(payload.get("email"), 160).lower()
+                account = next(
+                    (item for item in load_accounts() if item["email"] == email),
+                    None
+                ) if email else None
+                result = estimate_delivery(
+                    clean(payload.get("pickup"), 80),
+                    clean(payload.get("dropoff"), 80),
+                    account.get("plan") if account else None
+                )
                 self._json_response(200, result)
                 return
             if path in ("/api/vendor", "/api/contact"):
@@ -2601,7 +2739,7 @@ class FiableHandler(SimpleHTTPRequestHandler):
                 if summary["subscriptionState"] not in ("active", "expiring_soon", "grace_period"):
                     self._json_response(402, {"error": "Complete payment and activate your subscription before requesting deliveries."})
                     return
-                est = estimate_delivery(pickup, dropoff)
+                est = estimate_delivery(pickup, dropoff, summary.get("plan"))
                 if summary["unitsRemaining"] < est["units"]:
                     self._json_response(409, {"error": "Insufficient units for this delivery. Please renew or choose a smaller route."})
                     return
@@ -2619,7 +2757,15 @@ class FiableHandler(SimpleHTTPRequestHandler):
                     "pickupInstructions": clean(payload.get("pickupInstructions"), 300),
                     "deliveryInstructions": clean(payload.get("deliveryInstructions"), 300),
                 }
-                delivery = create_delivery(email, pickup, dropoff, est.get("units", 1), details)
+                delivery = create_delivery(
+                    email,
+                    pickup,
+                    dropoff,
+                    est.get("units", 1),
+                    details,
+                    unit_price=est.get("unitPrice"),
+                    plan=summary.get("plan")
+                )
                 self._json_response(201, {"message": "Delivery request received", "delivery": delivery, "summary": summary_for_account(account)})
                 return
             if path == "/api/delivery/status":
@@ -2835,6 +2981,68 @@ class FiableHandler(SimpleHTTPRequestHandler):
         if self.path == "/api/health":
             self._json_response(200, {"status": "ok"})
             return
+        if self.path.startswith("/api/account/subscriptions"):
+            query = urlparse(self.path).query
+            params = parse_qs(query)
+            email = params.get("email", [None])[0]
+            if not email:
+                self._json_response(400, {"error": "email query required"})
+                return
+            account = next(
+                (item for item in load_accounts() if item["email"] == email.lower()),
+                None
+            )
+            if not account:
+                self._json_response(404, {"error": "Account not found"})
+                return
+            subscriptions = subscription_history_for_account(account)
+            selected_id = params.get("subscriptionId", [None])[0]
+            selected = next(
+                (item for item in subscriptions if item.get("id") == selected_id),
+                None
+            ) if selected_id else None
+            self._json_response(200, {
+                "subscriptions": subscriptions,
+                "deliveries": deliveries_for_subscription(email, selected) if selected else []
+            })
+            return
+        if self.path == "/api/admin/subscriptions":
+            if not require_admin(self):
+                self._json_response(401, {"error": "Admin authentication required."})
+                return
+            records = []
+            for account in load_accounts():
+                for record in subscription_history_for_account(account):
+                    record["name"] = account.get("name", "")
+                    record["deliveryCount"] = len(
+                        deliveries_for_subscription(account["email"], record)
+                    )
+                    records.append(record)
+            records.sort(key=lambda record: record.get("periodStart", ""), reverse=True)
+            self._json_response(200, {"subscriptions": records})
+            return
+        if self.path.startswith("/api/admin/subscriptions/details"):
+            if not require_admin(self):
+                self._json_response(401, {"error": "Admin authentication required."})
+                return
+            query = urlparse(self.path).query
+            subscription_id = parse_qs(query).get("subscriptionId", [None])[0]
+            for account in load_accounts():
+                record = next(
+                    (
+                        item for item in subscription_history_for_account(account)
+                        if item.get("id") == subscription_id
+                    ),
+                    None
+                )
+                if record:
+                    self._json_response(200, {
+                        "subscription": record,
+                        "deliveries": deliveries_for_subscription(account["email"], record)
+                    })
+                    return
+            self._json_response(404, {"error": "Subscription record not found."})
+            return
         # dashboard and delivery listing endpoints
         if self.path.startswith("/api/account/deliveries"):
             query = urlparse(self.path).query
@@ -2904,6 +3112,7 @@ class FiableHandler(SimpleHTTPRequestHandler):
 
             riders = load_riders()
             deliveries = load_deliveries()
+            accounts = load_accounts()
 
             # Calculate delivery history from actual orders
             for rider in riders:
@@ -2914,6 +3123,8 @@ class FiableHandler(SimpleHTTPRequestHandler):
 
                 completed_count = 0
                 failed_count = 0
+                total_count = 0
+                rider_deliveries = []
 
                 for order in deliveries:
 
@@ -2928,15 +3139,32 @@ class FiableHandler(SimpleHTTPRequestHandler):
                     if order_rider_id != rider_id:
                         continue
 
+                    total_count += 1
+                    delivery_record = dict(order)
+                    vendor = next(
+                        (
+                            account
+                            for account in accounts
+                            if account.get("email", "").lower() ==
+                            str(order.get("accountEmail", "")).lower()
+                        ),
+                        None
+                    )
+                    delivery_record["vendorName"] = (
+                        vendor.get("name", "") if vendor else ""
+                    )
+                    rider_deliveries.append(delivery_record)
+
                     if order_status == "delivered":
                         completed_count += 1
 
                     elif order_status == "failed":
                         failed_count += 1
 
-                rider["totalDeliveries"] = completed_count
+                rider["totalDeliveries"] = total_count
                 rider["completedDeliveries"] = completed_count
                 rider["failedDeliveries"] = failed_count
+                rider["deliveries"] = rider_deliveries
 
             self._json_response(
                 200,
@@ -3010,6 +3238,30 @@ class FiableHandler(SimpleHTTPRequestHandler):
                 )
 
                 return
+
+            deliveries = load_deliveries()
+            has_active_delivery = any(
+                str(delivery.get("riderId", "")) == str(rider.get("id", ""))
+                and str(delivery.get("status", "")).strip().lower()
+                in {"assigned", "on_delivery"}
+                for delivery in deliveries
+            )
+
+            if not has_active_delivery and rider.get("status") != "available":
+                riders = load_riders()
+                stored_rider = next(
+                    (
+                        item
+                        for item in riders
+                        if str(item.get("id", "")) == str(rider.get("id", ""))
+                    ),
+                    None
+                )
+
+                if stored_rider and stored_rider.get("status") != "available":
+                    stored_rider["status"] = "available"
+                    save_riders(riders)
+                    rider = stored_rider
 
             self._json_response(
                 200,
@@ -3129,6 +3381,36 @@ class FiableHandler(SimpleHTTPRequestHandler):
                 }
             )
 
+
+            return
+
+        if self.path == "/api/rider/deliveries":
+
+            rider = get_logged_in_rider(self)
+
+            if not rider:
+                self._json_response(
+                    401,
+                    {"error": "Rider authentication required."}
+                )
+                return
+
+            rider_id = str(rider.get("id", ""))
+            deliveries = [
+                order for order in load_deliveries()
+                if str(order.get("riderId", "")) == rider_id
+                and str(order.get("status", "")).strip().lower()
+                in {"delivered", "failed", "cancelled"}
+            ]
+            deliveries.sort(
+                key=lambda order: order.get("updatedAt", order.get("createdAt", "")),
+                reverse=True
+            )
+
+            self._json_response(
+                200,
+                {"deliveries": deliveries}
+            )
 
             return
         # =====================================================

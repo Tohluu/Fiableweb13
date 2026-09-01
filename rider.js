@@ -149,6 +149,7 @@ async function initializeRiderPage() {
 
       await loadRiderAccount();
       await loadRiderDelivery();
+      await loadRiderPreviousDeliveries();
 
       startRiderAutoRefresh();
 
@@ -195,6 +196,25 @@ let riderRefreshInterval = null;
 
 function startRiderAutoRefresh() {
 
+  const riderDashboardView =
+    document.getElementById(
+      "riderDashboardView"
+    );
+
+  const riderLoginCard =
+    document.querySelector(
+      ".rider-login-card"
+    );
+
+  if (
+    !isDashboard ||
+    !riderDashboardView ||
+    !riderLoginCard ||
+    riderLoginCard.style.display !== "none"
+  ) {
+    return;
+  }
+
   /* Prevent duplicate intervals */
 
   if (riderRefreshInterval) {
@@ -217,6 +237,7 @@ function startRiderAutoRefresh() {
 
             await loadRiderDelivery();
             await loadRiderAccount();
+            await loadRiderPreviousDeliveries();
 
           } catch (error) {
 
@@ -960,6 +981,115 @@ async function loadRiderDelivery() {
 
 
 /* =====================================================
+   LOAD PREVIOUS DELIVERIES
+===================================================== */
+
+async function loadRiderPreviousDeliveries() {
+
+  const historyContainer =
+    document.getElementById(
+      "riderPreviousDeliveries"
+    );
+
+  if (!historyContainer) {
+    return;
+  }
+
+  try {
+
+    const response = await fetch(
+      "/api/rider/deliveries",
+      {
+        method: "GET",
+        credentials: "same-origin",
+        cache: "no-store"
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data.error ||
+        "Unable to load delivery history."
+      );
+    }
+
+    const deliveries = data.deliveries || [];
+
+    if (!deliveries.length) {
+      historyContainer.innerHTML = `
+        <div class="rider-empty-state">
+          <p>No previous deliveries yet.</p>
+        </div>
+      `;
+      return;
+    }
+
+    historyContainer.innerHTML = `
+      <div class="rider-history-table-wrap">
+        <table class="rider-history-table">
+          <thead>
+            <tr>
+              <th>Order</th>
+              <th>Route</th>
+              <th>Units</th>
+              <th>Status</th>
+              <th>Date</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${deliveries.map(delivery => `
+              <tr>
+                <td>${delivery.orderRef || `#${delivery.id}`}</td>
+                <td>${delivery.pickup || "—"} → ${delivery.dropoff || "—"}</td>
+                <td>${delivery.units ?? "—"}</td>
+                <td><span class="rider-history-status rider-history-status-${delivery.status}">${String(delivery.status || "—").replace("_", " ")}</span></td>
+                <td>${delivery.updatedAt ? new Date(delivery.updatedAt).toLocaleDateString("en-GB") : "—"}</td>
+                <td><button type="button" class="rider-history-view-btn" data-order-id="${delivery.id}">View</button></td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      </div>
+    `;
+
+    historyContainer
+      .querySelectorAll(".rider-history-view-btn")
+      .forEach(button => {
+        button.addEventListener(
+          "click",
+          () => {
+            const delivery = deliveries.find(
+              item => String(item.id) === button.dataset.orderId
+            );
+            if (delivery) {
+              openOrderDetailsModal(delivery);
+            }
+          }
+        );
+      });
+
+  } catch (error) {
+
+    console.error(
+      "RIDER DELIVERY HISTORY ERROR:",
+      error
+    );
+
+    historyContainer.innerHTML = `
+      <div class="rider-empty-state">
+        <p>Unable to load delivery history.</p>
+      </div>
+    `;
+
+  }
+
+}
+
+
+/* =====================================================
    OPEN ORDER DETAILS MODAL
 ===================================================== */
 
@@ -1007,11 +1137,17 @@ function openOrderDetailsModal(delivery) {
   const pickupPhone =
     details.pickupPhone || "—";
 
+  const pickupAddress =
+    details.pickupAddress || "—";
+
   const recipientName =
     details.recipientName || "—";
 
   const recipientPhone =
     details.recipientPhone || "—";
+
+  const deliveryAddress =
+    details.deliveryAddress || "—";
 
   const packageType =
     details.packageType ||
@@ -1085,6 +1221,11 @@ function openOrderDetailsModal(delivery) {
           <strong>${pickupPhone}</strong>
         </div>
 
+        <div class="rider-order-detail-item">
+          <span>Pickup Address</span>
+          <strong>${pickupAddress}</strong>
+        </div>
+
       </div>
 
     </div>
@@ -1109,6 +1250,11 @@ function openOrderDetailsModal(delivery) {
         <div class="rider-order-detail-item">
           <span>Recipient Phone</span>
           <strong>${recipientPhone}</strong>
+        </div>
+
+        <div class="rider-order-detail-item">
+          <span>Delivery Address</span>
+          <strong>${deliveryAddress}</strong>
         </div>
 
       </div>

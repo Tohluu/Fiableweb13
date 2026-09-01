@@ -357,6 +357,27 @@
   margin-block-end: 28px;
 }
 
+.subscription-month-filter {
+  display: grid;
+  gap: 6px;
+  min-inline-size: 170px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.subscription-month-filter select {
+  min-block-size: 38px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: inherit;
+  font: inherit;
+  text-transform: none;
+}
+
 
 /* =========================================================
    ADMIN MOBILE SPACING
@@ -370,6 +391,10 @@
 
   .topbar {
     padding-inline: 18px;
+  }
+
+  .subscription-month-filter {
+    inline-size: 100%;
   }
 
 }
@@ -1114,6 +1139,18 @@
 /* Mobile */
 
 @media (max-width: 700px) {
+
+  .rider-delivery-history {
+    margin-block-start: 24px;
+  }
+
+  .rider-delivery-history .table-wrap {
+    overflow-x: auto;
+  }
+
+  .rider-delivery-history .admin-table {
+    min-inline-size: 680px;
+  }
 
   #editRiderModal {
     padding: 12px;

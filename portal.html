@@ -465,6 +465,19 @@
             </div>
             <button class="btn primary" id="paymentBtn" type="button">Record payment</button>
           </article>
+
+          <article class="panel subscription-history-panel">
+            <div class="section-title compact">
+              <div>
+                <h3>Previous subscriptions</h3>
+                <p class="muted">Open a month to view the deliveries covered by that plan.</p>
+              </div>
+            </div>
+            <div id="subscriptionHistory" class="subscription-history-list">
+              <p class="muted">Loading subscription history...</p>
+            </div>
+            <div id="subscriptionDeliveries" class="subscription-deliveries hidden"></div>
+          </article>
         </section>
 
         <section class="view" id="view-account">
@@ -734,6 +747,76 @@
       return d.toLocaleDateString("en-NG", { day:"2-digit", month:"short", year:"numeric" });
     }
 
+    function formatSubscriptionMonth(value) {
+      if (!value) return "Subscription period";
+      const date = new Date(value);
+      return Number.isNaN(date.getTime())
+        ? "Subscription period"
+        : date.toLocaleDateString("en-NG", { month: "long", year: "numeric" });
+    }
+
+    async function loadSubscriptionHistory(email) {
+      const history = $("subscriptionHistory");
+      if (!history) return;
+      try {
+        const data = await api(`/api/account/subscriptions?email=${encodeURIComponent(email)}`);
+        const subscriptions = data.subscriptions || [];
+        history.innerHTML = subscriptions.length
+          ? subscriptions.map(subscription => `
+              <button type="button" class="subscription-history-item" aria-expanded="false" data-subscription-id="${escapeHtml(subscription.id)}">
+                <span><strong>${escapeHtml(formatSubscriptionMonth(subscription.periodStart))}</strong><small>${escapeHtml(subscription.plan || "No plan")}</small></span>
+                <span><strong>${formatMoney(subscription.amount)}</strong><small>${escapeHtml(subscription.subscriptionStatus === "exhausted" ? "Exhausted" : subscription.paymentStatus === "paid" ? "Paid" : subscription.paymentStatus || "Pending")}</small></span>
+              </button>
+            `).join("")
+          : '<p class="muted">No previous subscriptions recorded.</p>';
+        history.querySelectorAll("[data-subscription-id]").forEach(button => {
+          button.addEventListener("click", () => {
+            const deliveries = $("subscriptionDeliveries");
+            const isExpanded =
+              button.getAttribute("aria-expanded") === "true";
+
+            if (isExpanded) {
+              button.setAttribute("aria-expanded", "false");
+              button.classList.remove("selected");
+              deliveries?.classList.add("hidden");
+              return;
+            }
+
+            loadSubscriptionDeliveries(
+              email,
+              button.dataset.subscriptionId,
+              button
+            );
+          });
+        });
+      } catch (error) {
+        history.innerHTML = `<p class="muted">${escapeHtml(error.message)}</p>`;
+      }
+    }
+
+    async function loadSubscriptionDeliveries(email, subscriptionId, selectedButton) {
+      const container = $("subscriptionDeliveries");
+      if (!container) return;
+      document.querySelectorAll(".subscription-history-item").forEach(button => {
+        button.classList.remove("selected");
+        button.setAttribute("aria-expanded", "false");
+      });
+      selectedButton.classList.add("selected");
+      selectedButton.setAttribute("aria-expanded", "true");
+      container.classList.remove("hidden");
+      container.innerHTML = '<p class="muted">Loading deliveries for this subscription...</p>';
+      try {
+        const data = await api(`/api/account/subscriptions?email=${encodeURIComponent(email)}&subscriptionId=${encodeURIComponent(subscriptionId)}`);
+        const deliveries = data.deliveries || [];
+        container.innerHTML = `<h4>Deliveries for ${escapeHtml(selectedButton.querySelector("strong").textContent)}</h4>` +
+          (deliveries.length ? `<div class="subscription-delivery-list">${deliveries.map(delivery => `
+            <div class="subscription-delivery-item"><strong>${escapeHtml(delivery.orderRef || `Order #${delivery.id}`)}</strong><span>${escapeHtml(delivery.pickup || "—")} → ${escapeHtml(delivery.dropoff || "—")}</span><span>${escapeHtml(statusLabel(delivery.status))}</span></div>
+          `).join("")}</div>` : '<p class="muted">No deliveries were recorded during this subscription period.</p>');
+      } catch (error) {
+        container.innerHTML = `<p class="muted">${escapeHtml(error.message)}</p>`;
+      }
+    }
+
     function statusLabel(status) {
       return String(status || "requested").replace("-", " ").replace(/\b\w/g, c => c.toUpperCase());
     }
@@ -981,7 +1064,14 @@
     });
 
     function renderStatusList() {
-      const counts = state.account?.deliveryStats?.counts || {};
+      const counts = {};
+      state.deliveries.forEach(delivery => {
+        const rawStatus = String(delivery.status || "requested").toLowerCase();
+        const status = ["on_delivery", "on-delivery", "in_transit"].includes(rawStatus)
+          ? "in-transit"
+          : rawStatus;
+        counts[status] = (counts[status] || 0) + 1;
+      });
       const rows = [
         ["requested","Requested"],["assigned","Assigned"],["in-transit","In transit"],["delivered","Delivered"],["cancelled","Cancelled"]
       ];
@@ -1749,6 +1839,7 @@
         updateAccountUI();
         renderRecent();
         renderDeliveries();
+        loadSubscriptionHistory(state.account.email);
       } catch (error) {
         clearSession();
         showLogin();
@@ -1795,6 +1886,7 @@
       state.account = account;
       startSessionTimer();
       state.deliveries = (await api(`/api/account/deliveries?email=${encodeURIComponent(account.email)}`)).deliveries || [];
+      loadSubscriptionHistory(account.email);
       showPortal();
       updateAccountUI();
       renderRecent();
@@ -1997,10 +2089,10 @@ $("resetBackLoginBtn").addEventListener("click", () => {
       try {
         const result = await api("/api/calculate", {
           method:"POST",
-          body:JSON.stringify({ pickup, dropoff })
+          body:JSON.stringify({ pickup, dropoff, email: state.account?.email })
         });
         $("routeUnits").textContent = `${result.units} unit${result.units === 1 ? "" : "s"}`;
-        $("routeCost").textContent = `${formatMoney(result.cost)} estimated`;
+        $("routeCost").textContent = `${formatMoney(result.cost)} at ${formatMoney(result.unitPrice)}/unit`;
         $("routePreview").classList.add("ready");
       } catch (error) {
         $("routeUnits").textContent = "Unable to calculate";
@@ -2133,6 +2225,7 @@ $("resetBackLoginBtn").addEventListener("click", () => {
           body:JSON.stringify({ email:state.account.email })
         }).then(async () => api(`/api/account/summary?email=${encodeURIComponent(state.account.email)}`));
         updateAccountUI();
+        loadSubscriptionHistory(state.account.email);
         toast("Payment recorded and subscription activated.");
       } catch (error) {
         toast(error.message);

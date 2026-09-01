@@ -312,6 +312,19 @@ textarea{resize:vertical;min-block-size:85px}
 }
 .payment-panel{display:flex;align-items:center;justify-content:space-between;margin-block-start:20px}
 .payment-panel p{font-size:12px;margin:5px 0 0}
+.subscription-history-panel{margin-block-start:20px}
+.subscription-history-list{display:grid;gap:10px}
+.subscription-history-item{display:flex;align-items:center;justify-content:space-between;gap:20px;inline-size:100%;padding:14px 16px;border:1px solid var(--border);border-radius:10px;background:var(--surface);color:inherit;text-align:start;cursor:pointer}
+.subscription-history-item:hover,.subscription-history-item.selected{border-color:var(--accent);background:var(--surface-soft)}
+.subscription-history-item span{display:grid;gap:4px}
+.subscription-history-item span:last-child{text-align:end}
+.subscription-history-item small{font-size:12px;opacity:.65;text-transform:capitalize}
+.subscription-deliveries{margin-block-start:18px;padding-block-start:18px;border-block-start:1px solid var(--border)}
+.subscription-deliveries h4{margin:0 0 12px}
+.subscription-delivery-list{display:grid;gap:8px}
+.subscription-delivery-item{display:grid;grid-template-columns:1fr 2fr auto;gap:14px;padding:10px 0;border-block-end:1px solid var(--border);font-size:13px}
+.subscription-delivery-item span:last-child{text-transform:capitalize}
+@media (max-width:700px){.subscription-history-item{align-items:flex-start;flex-direction:column}.subscription-history-item span:last-child{text-align:start}.subscription-delivery-item{grid-template-columns:1fr;gap:4px}}
 .account-grid{display:grid;grid-template-columns:300px 1fr;gap:20px}
 #view-settings .account-grid {
   grid-template-columns: minmax(320px, 0.9fr) minmax(380px, 1.1fr);
@@ -440,6 +453,11 @@ textarea{resize:vertical;min-block-size:85px}
   .welcome-row,.section-title{align-items:flex-start;flex-direction:column}
   .welcome-row h2,.section-title h2{font-size:26px}
   .request-grid,.account-grid{grid-template-columns:1fr}
+  #view-settings .account-grid{grid-template-columns:minmax(0,1fr)}
+  #view-settings .details-card{min-inline-size:0;padding:22px 18px}
+  #view-settings .detail-row{align-items:flex-start;gap:12px}
+  #view-settings .detail-row>div:first-child{min-inline-size:0}
+  #view-settings .detail-row strong,#view-settings .detail-row p{overflow-wrap:anywhere}
   .side-card{position:static}
   .form-grid{grid-template-columns:1fr}
 }

@@ -968,6 +968,8 @@ if (logoutBtn) {
 
         });
 
+      loadAdminSubscriptionHistory();
+
 
     } catch (error) {
 
@@ -986,6 +988,86 @@ if (logoutBtn) {
 
     }
 
+  }
+
+  function escapeSubscriptionValue(value) {
+    return String(value ?? "").replace(/[&<>"']/g, character => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      "\"": "&quot;",
+      "'": "&#039;"
+    }[character]));
+  }
+
+  async function loadAdminSubscriptionHistory() {
+    const tableBody = document.getElementById("adminSubscriptionHistoryBody");
+    const monthFilter = document.getElementById("adminSubscriptionMonthFilter");
+    if (!tableBody) return;
+    try {
+      const response = await fetch("/api/admin/subscriptions", {
+        credentials: "same-origin",
+        cache: "no-store"
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Unable to load subscription history.");
+      const records = data.subscriptions || [];
+      const monthKey = record => {
+        const date = new Date(record.periodStart);
+        return Number.isNaN(date.getTime()) ? "unknown" : date.toISOString().slice(0, 7);
+      };
+      const monthLabel = key => {
+        if (key === "unknown") return "Unknown period";
+        const date = new Date(`${key}-01T00:00:00Z`);
+        return date.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
+      };
+      const months = [...new Set(records.map(monthKey))].sort().reverse();
+      if (monthFilter) {
+        monthFilter.innerHTML = '<option value="all">All months</option>' + months.map(month => `<option value="${month}">${monthLabel(month)}</option>`).join("");
+        monthFilter.onchange = () => renderAdminSubscriptionHistory(records, monthFilter.value, tableBody);
+      }
+      renderAdminSubscriptionHistory(records, monthFilter?.value || "all", tableBody);
+    } catch (error) {
+      tableBody.innerHTML = `<tr><td colspan="7" class="empty-state">${escapeSubscriptionValue(error.message)}</td></tr>`;
+    }
+  }
+
+  function renderAdminSubscriptionHistory(records, selectedMonth, tableBody) {
+    const visibleRecords = selectedMonth === "all"
+      ? records
+      : records.filter(record => {
+        const date = new Date(record.periodStart);
+        return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 7) === selectedMonth;
+      });
+    tableBody.innerHTML = visibleRecords.length ? visibleRecords.map(record => `
+        <tr>
+          <td><strong>${escapeSubscriptionValue(record.name || "—")}</strong></td>
+          <td>${escapeSubscriptionValue(new Date(record.periodStart).toLocaleDateString("en-GB", { month: "long", year: "numeric" }))}</td>
+          <td>${escapeSubscriptionValue(record.plan || "—")}</td>
+          <td>${escapeSubscriptionValue(new Date(record.periodStart).toLocaleDateString("en-GB"))} – ${escapeSubscriptionValue(new Date(record.periodEnd).toLocaleDateString("en-GB"))}</td>
+          <td>${escapeSubscriptionValue(record.deliveryCount ?? 0)}</td>
+          <td>${escapeSubscriptionValue(record.subscriptionStatus === "exhausted" ? "Exhausted" : record.paymentStatus === "paid" ? "Paid" : record.paymentStatus || "—")}</td>
+          <td><button type="button" class="btn outline admin-history-view-btn" data-subscription-id="${escapeSubscriptionValue(record.id)}" data-subscription-email="${escapeSubscriptionValue(record.email)}">View</button></td>
+        </tr>
+      `).join("") : '<tr><td colspan="7" class="empty-state">No subscription history found for this month.</td></tr>';
+    tableBody.querySelectorAll(".admin-history-view-btn").forEach(button => {
+      button.addEventListener("click", () => openAdminSubscriptionRecord(button.dataset.subscriptionId, button.dataset.subscriptionEmail));
+    });
+  }
+
+  async function openAdminSubscriptionRecord(subscriptionId, email) {
+    try {
+      const response = await fetch(`/api/admin/subscriptions/details?subscriptionId=${encodeURIComponent(subscriptionId)}`, { credentials: "same-origin" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Unable to load subscription deliveries.");
+      const deliveries = data.deliveries || [];
+      subscriptionDetailsTitle.textContent = `${email} · ${subscriptionId}`;
+      subscriptionDetailsBody.innerHTML = deliveries.length ? `<div class="vendor-detail-grid">${deliveries.map(delivery => `<div class="vendor-detail-item"><span>${escapeSubscriptionValue(delivery.orderRef || `Order #${delivery.id}`)}</span><strong>${escapeSubscriptionValue(delivery.pickup || "—")} → ${escapeSubscriptionValue(delivery.dropoff || "—")} · ${escapeSubscriptionValue(delivery.status || "—")}</strong></div>`).join("")}</div>` : '<p class="muted">No deliveries were recorded during this subscription period.</p>';
+      subscriptionDetailsModal.classList.add("show");
+      subscriptionDetailsModal.setAttribute("aria-hidden", "false");
+    } catch (error) {
+      console.error("ADMIN SUBSCRIPTION HISTORY ERROR:", error);
+    }
   }
 
   async function loadAdminRiders() {
@@ -2589,6 +2671,12 @@ if (logoutBtn) {
           )
       );
 
+    const riderDeliveries =
+      rider.deliveries ||
+      adminOrders.filter(
+        order => String(order.riderId) === String(rider.id)
+      );
+
 
     riderDetailsBody.innerHTML = `
 
@@ -2689,6 +2777,38 @@ if (logoutBtn) {
           </strong>
         </div>
 
+      </div>
+
+      <div class="rider-delivery-history">
+        <h3>Delivery history</h3>
+        ${riderDeliveries.length ? `
+          <div class="table-wrap">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Order</th>
+                  <th>Vendor</th>
+                  <th>Route</th>
+                  <th>Units</th>
+                  <th>Status</th>
+                  <th>Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${riderDeliveries.map(order => `
+                  <tr>
+                    <td>${order.orderRef || `#${order.id}`}</td>
+                    <td>${order.vendorName || "—"}</td>
+                    <td>${order.pickup || "—"} → ${order.dropoff || "—"}</td>
+                    <td>${order.units ?? 0}</td>
+                    <td>${order.status || "—"}</td>
+                    <td>${order.createdAt ? new Date(order.createdAt).toLocaleDateString("en-GB") : "—"}</td>
+                  </tr>
+                `).join("")}
+              </tbody>
+            </table>
+          </div>
+        ` : '<p class="muted">No deliveries have been assigned to this rider.</p>'}
       </div>
 
     `;

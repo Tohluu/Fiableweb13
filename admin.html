@@ -529,6 +529,39 @@
 
           </article>
 
+          <article class="panel">
+            <div class="section-title">
+              <div>
+                <h2>Subscription history</h2>
+                <p class="muted">All recorded vendor subscription periods and their deliveries.</p>
+              </div>
+              <label class="subscription-month-filter">
+                <span>Month</span>
+                <select id="adminSubscriptionMonthFilter">
+                  <option value="all">All months</option>
+                </select>
+              </label>
+            </div>
+            <div class="table-wrap">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>Vendor</th>
+                    <th>Month</th>
+                    <th>Plan</th>
+                    <th>Period</th>
+                    <th>Deliveries</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="adminSubscriptionHistoryBody">
+                  <tr><td colspan="7" class="empty-state">Loading subscription history...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
+
         </section>
 
 
@@ -1661,7 +1694,7 @@
   </div>
 
   <!-- Admin JavaScript -->
-  <script src="admin.js"></script>
+  <script src="admin.js?v=8"></script>
 
   <!-- =====================================================
       ADMIN TOAST
