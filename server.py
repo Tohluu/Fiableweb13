@@ -611,6 +611,7 @@ def rider_payment_summary(month=None):
     riders = load_riders()
     deliveries = load_deliveries()
     accounts = load_accounts()
+    rider_payments = load_rider_payments()
     summaries = []
 
     def delivery_month(delivery):
@@ -624,7 +625,6 @@ def rider_payment_summary(month=None):
         rider_deliveries = [
             delivery for delivery in deliveries
             if str(delivery.get("riderId", "")) == rider_id
-            and (not month or delivery_month(delivery) == month)
         ]
         completed = [
             delivery for delivery in rider_deliveries
@@ -668,6 +668,7 @@ def rider_payment_summary(month=None):
                 plan = delivery.get("subscriptionPlan") or (account.get("plan") if account else None)
                 delivery_fee = int(delivery.get("units", 0) or 0) * PLAN_UNIT_PRICES.get(plan, 0)
             breakdown.append({
+                "id": delivery.get("id"),
                 "orderRef": delivery.get("orderRef", f"#{delivery.get('id')}"),
                 "route": f"{delivery.get('pickup', '—')} → {delivery.get('dropoff', '—')}",
                 "units": delivery.get("units", 0),
@@ -675,34 +676,87 @@ def rider_payment_summary(month=None):
                 "deliveryFee": delivery_fee,
                 "riderPayment": rider_payment,
                 "payable": rider_payment > 0,
+                "completedAt": delivery.get("updatedAt") or delivery.get("createdAt"),
+                "deliveryMonth": delivery_month(delivery),
+                "paidAmount": 0,
             })
+
+        completed_breakdown = sorted(
+            (item for item in breakdown if item["payable"]),
+            key=lambda item: item["completedAt"] or ""
+        )
+        payments = sorted(
+            (
+                item for item in rider_payments
+                if str(item.get("riderId")) == rider_id
+            ),
+            key=lambda item: item.get("paidAt") or ""
+        )
+
+        for payment in payments:
+            remaining_payment = float(payment.get("amount", 0) or 0)
+            paid_at = payment.get("paidAt") or ""
+
+            for delivery in completed_breakdown:
+                if remaining_payment <= 0 or (delivery["completedAt"] or "") > paid_at:
+                    continue
+
+                remaining_delivery = (
+                    float(delivery["riderPayment"]) -
+                    float(delivery["paidAmount"])
+                )
+                applied_amount = min(remaining_payment, remaining_delivery)
+                delivery["paidAmount"] += applied_amount
+                remaining_payment -= applied_amount
+
+        for delivery in breakdown:
+            if not delivery["payable"]:
+                delivery["paymentStatus"] = "not_payable"
+            elif delivery["paidAmount"] >= delivery["riderPayment"]:
+                delivery["paymentStatus"] = "paid"
+            elif delivery["paidAmount"] > 0:
+                delivery["paymentStatus"] = "part_paid"
+            else:
+                delivery["paymentStatus"] = "outstanding"
+
+            delivery["outstandingAmount"] = max(
+                0,
+                delivery["riderPayment"] - delivery["paidAmount"]
+            )
+
+        breakdown.sort(
+            key=lambda item: item["completedAt"] or "",
+            reverse=True
+        )
+        visible_breakdown = [
+            item for item in breakdown
+            if not month or item["deliveryMonth"] == month
+        ]
+        visible_completed = [
+            item for item in visible_breakdown
+            if str(item["status"]).lower() == "delivered"
+        ]
+        visible_failed = [
+            item for item in visible_breakdown
+            if str(item["status"]).lower() in {"failed", "cancelled"}
+        ]
+        visible_payable = sum(
+            item["riderPayment"] for item in visible_completed
+        )
+        visible_paid = sum(
+            item["paidAmount"] for item in visible_completed
+        )
         summaries.append({
             "riderId": rider.get("id"),
             "riderRef": rider.get("riderRef", ""),
             "name": rider.get("name", ""),
-            "completedDeliveries": len(completed),
-            "failedDeliveries": len(failed),
-            "payable": payable,
-            "paid": 0,
-            "outstanding": payable,
-            "breakdown": breakdown,
+            "completedDeliveries": len(visible_completed),
+            "failedDeliveries": len(visible_failed),
+            "payable": visible_payable,
+            "paid": visible_paid,
+            "outstanding": max(0, visible_payable - visible_paid),
+            "breakdown": visible_breakdown,
         })
-
-    # Load paid amounts from rider_payments
-    rider_payments = load_rider_payments()
-    
-    for summary in summaries:
-        paid = 0
-        for payment in rider_payments:
-            if str(payment.get("riderId")) == str(summary["riderId"]):
-                # When viewing all months, aggregate all payments across all months
-                if not month:
-                    paid += payment.get("amount", 0)
-                # When viewing specific month, only count payments for that month
-                elif payment.get("month") == month:
-                    paid += payment.get("amount", 0)
-        summary["paid"] = paid
-        summary["outstanding"] = max(0, summary["payable"] - paid)
 
     return summaries
 

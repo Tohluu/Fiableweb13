@@ -1525,6 +1525,47 @@
   font-size: 12px;
 }
 
+.rider-payment-outstanding {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-block-end: 20px;
+  padding: 12px 14px;
+  border: 1px solid #fbbf24;
+  border-radius: 8px;
+  background: #fffbeb;
+  color: #92400e;
+  font-size: 13px;
+}
+
+.rider-payment-outstanding span {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.rider-payment-row-outstanding {
+  background: #fffbeb;
+}
+
+.rider-payment-status {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.rider-payment-status.paid {
+  color: #15803d;
+}
+
+.rider-payment-status.part_paid,
+.rider-payment-status.outstanding {
+  color: #b45309;
+}
+
+.rider-payment-status.not_payable {
+  color: var(--muted);
+}
+
 .rider-payment-controls {
   display: flex;
   align-items: end;
@@ -1564,6 +1605,12 @@
 
   .rider-payment-controls select {
     inline-size: 100%;
+  }
+
+  .rider-payment-outstanding {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 5px;
   }
 }
 

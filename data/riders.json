@@ -147,8 +147,8 @@
     "salt": "9d6b9d8ebc2536c4190f09159ee9662f",
     "vehicle": "Motorcycle",
     "status": "available",
-    "totalDeliveries": 3,
-    "completedDeliveries": 3,
+    "totalDeliveries": 8,
+    "completedDeliveries": 8,
     "failedDeliveries": 0,
     "createdAt": "2026-08-27T07:41:53.662121+00:00"
   },

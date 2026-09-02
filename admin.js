@@ -378,6 +378,16 @@ if (logoutBtn) {
           summary.orders?.requested ?? 0;
       }
 
+      const assignedDeliveries =
+        document.getElementById(
+          "adminAssignedDeliveries"
+        );
+
+      if (assignedDeliveries) {
+        assignedDeliveries.textContent =
+          summary.orders?.assigned ?? 0;
+      }
+
       /* -----------------------------------------------------
          On DELIVERIES
          on_delivery = on delivery
@@ -793,14 +803,6 @@ if (logoutBtn) {
             vendor.subscriptionState === "expiring_soon"
         ).length;
 
-      const monthlyRevenue =
-        vendors.reduce(
-          (total, vendor) =>
-            total + (PLAN_PRICES[vendor.plan] ?? 0),
-          0
-        );
-
-
       document.getElementById(
         "subscriptionTotal"
       ).textContent = totalSubscriptions;
@@ -816,12 +818,6 @@ if (logoutBtn) {
       document.getElementById(
         "subscriptionExpiring"
       ).textContent = expiringSubscriptions;
-
-      document.getElementById(
-        "subscriptionRevenue"
-      ).textContent =
-        `₦${monthlyRevenue.toLocaleString("en-NG")}`;
-
 
       tableBody.innerHTML = vendors.map(
         (vendor, index) => {
@@ -1026,9 +1022,13 @@ if (logoutBtn) {
       const months = [...new Set(records.map(monthKey))].sort().reverse();
       const revenueMonthFilter = document.getElementById("adminRevenueMonthFilter");
       if (revenueMonthFilter) {
-        const currentMonth = new Date().toISOString().slice(0, 7);
+        const selectedRevenueMonth = revenueMonthFilter.value || "current";
         revenueMonthFilter.innerHTML = '<option value="current">Current month</option>' + months.map(month => `<option value="${month}">${monthLabel(month)}</option>`).join("");
-        revenueMonthFilter.value = months.includes(currentMonth) ? currentMonth : "current";
+        revenueMonthFilter.value =
+          selectedRevenueMonth === "current" ||
+          months.includes(selectedRevenueMonth)
+            ? selectedRevenueMonth
+            : "current";
         revenueMonthFilter.onchange = () => renderSubscriptionRevenue(records, revenueMonthFilter.value, revenueSummary);
       }
       renderSubscriptionRevenue(records, revenueMonthFilter?.value || "current", revenueSummary);
@@ -1458,10 +1458,20 @@ if (logoutBtn) {
   function openRiderPaymentBreakdown(payment) {
     if (!payment || !riderDetailsModal || !riderDetailsBody) return;
     riderDetailsTitle.textContent = `${payment.name || "Rider"} payment breakdown`;
-    
+
     const selectedMonth = document.getElementById("riderPaymentMonthFilter")?.value || "all";
     const monthValue = selectedMonth === "all" ? getCurrentMonth() : selectedMonth;
-    
+    const outstandingDeliveries = (payment.breakdown || []).filter(
+      delivery => delivery.paymentStatus === "outstanding" ||
+        delivery.paymentStatus === "part_paid"
+    );
+    const paymentStatusLabel = status => ({
+      paid: "Paid",
+      part_paid: "Part paid",
+      outstanding: "Outstanding",
+      not_payable: "Not payable"
+    })[status] || "Not payable";
+
     riderDetailsBody.innerHTML = `
       <div class="rider-payment-summary-grid">
         <div><span>Completed deliveries</span><strong>${payment.completedDeliveries}</strong></div>
@@ -1469,9 +1479,10 @@ if (logoutBtn) {
         <div><span>Already paid</span><strong>₦${Number(payment.paid || 0).toLocaleString("en-NG")}</strong></div>
         <div><span>Outstanding</span><strong>₦${Number(payment.outstanding || 0).toLocaleString("en-NG")}</strong></div>
       </div>
+      ${outstandingDeliveries.length ? `<div class="rider-payment-outstanding"><strong>${outstandingDeliveries.length} ${outstandingDeliveries.length === 1 ? "delivery" : "deliveries"} need payment</strong><span>₦${outstandingDeliveries.reduce((total, delivery) => total + Number(delivery.outstandingAmount || 0), 0).toLocaleString("en-NG")} outstanding</span></div>` : ""}
       <h3>Delivery payments</h3>
-      ${payment.breakdown?.length ? `<div class="table-wrap"><table class="admin-table"><thead><tr><th>Order</th><th>Route</th><th>Units</th><th>Status</th><th>Delivery fee</th><th>Rider 80%</th></tr></thead><tbody>${payment.breakdown.map(delivery => `
-        <tr><td>${escapeSubscriptionValue(delivery.orderRef)}</td><td>${escapeSubscriptionValue(delivery.route)}</td><td>${delivery.units}</td><td>${escapeSubscriptionValue(delivery.status || "—")}</td><td>₦${Number(delivery.deliveryFee || 0).toLocaleString("en-NG")}</td><td>${delivery.payable ? `₦${Number(delivery.riderPayment).toLocaleString("en-NG")}` : "Not payable"}</td></tr>
+      ${payment.breakdown?.length ? `<div class="table-wrap"><table class="admin-table"><thead><tr><th>Order</th><th>Route</th><th>Units</th><th>Status</th><th>Rider 80%</th><th>Payment</th></tr></thead><tbody>${payment.breakdown.map(delivery => `
+        <tr class="${delivery.paymentStatus === "outstanding" || delivery.paymentStatus === "part_paid" ? "rider-payment-row-outstanding" : ""}"><td>${escapeSubscriptionValue(delivery.orderRef)}</td><td>${escapeSubscriptionValue(delivery.route)}</td><td>${delivery.units}</td><td>${escapeSubscriptionValue(delivery.status || "—")}</td><td>${delivery.payable ? `₦${Number(delivery.riderPayment).toLocaleString("en-NG")}` : "Not payable"}</td><td><span class="rider-payment-status ${escapeSubscriptionValue(delivery.paymentStatus)}">${paymentStatusLabel(delivery.paymentStatus)}${delivery.paymentStatus === "outstanding" || delivery.paymentStatus === "part_paid" ? ` · ₦${Number(delivery.outstandingAmount || 0).toLocaleString("en-NG")}` : ""}</span></td></tr>
       `).join("")}</tbody></table></div>` : '<p class="muted">No deliveries found for this rider.</p>'}
       <div class="rider-payment-actions" style="margin-block-start: 20px;">
         <button type="button" id="markRiderPaymentPaidBtn" class="btn primary">Mark payment as paid</button>
@@ -4577,7 +4588,7 @@ if (logoutBtn) {
   }
 
   /* =======================================================
-    AUTO REFRESH ADMIN ORDERS
+    AUTO REFRESH ADMIN DATA
   ======================================================= */
 
   setInterval(
@@ -4586,7 +4597,13 @@ if (logoutBtn) {
       if (
         document.visibilityState === "visible"
       ) {
+        loadAdminDashboard();
         loadAdminOrders();
+        loadAdminRecentOrders();
+        loadAdminVendors();
+        loadAdminSubscriptions();
+        loadAdminRiders();
+        loadAdminRiderPayments();
       }
 
     },

@@ -61,5 +61,26 @@
     "amount": 14240,
     "month": "2026-08",
     "paidAt": "2026-09-02T08:04:34.900420+00:00"
+  },
+  {
+    "id": "tuMkACY5NVcNTY3N",
+    "riderId": 5,
+    "amount": 13520,
+    "month": "2026-09",
+    "paidAt": "2026-09-02T09:56:21.552883+00:00"
+  },
+  {
+    "id": "OQR2kJYivwpKrgqV",
+    "riderId": 4,
+    "amount": 3120,
+    "month": "2026-09",
+    "paidAt": "2026-09-02T12:13:22.914347+00:00"
+  },
+  {
+    "id": "-preI2wxAQ0dBSDK",
+    "riderId": 6,
+    "amount": 16080,
+    "month": "2026-09",
+    "paidAt": "2026-09-02T12:13:34.199309+00:00"
   }
 ]

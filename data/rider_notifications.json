@@ -208,5 +208,55 @@
     "orderId": 53,
     "read": false,
     "createdAt": "2026-09-02T09:34:25.877970+00:00"
+  },
+  {
+    "id": "x6nG_Q94HfbNv_Hh",
+    "riderId": 11,
+    "type": "order_assigned",
+    "title": "New Delivery Assigned",
+    "message": "Order #54 has been assigned to you.",
+    "orderId": 54,
+    "read": false,
+    "createdAt": "2026-09-02T09:58:33.651588+00:00"
+  },
+  {
+    "id": "UzMyelcqlh2LexU3",
+    "riderId": 11,
+    "type": "order_assigned",
+    "title": "New Delivery Assigned",
+    "message": "Order #56 has been assigned to you.",
+    "orderId": 56,
+    "read": false,
+    "createdAt": "2026-09-02T10:02:40.285204+00:00"
+  },
+  {
+    "id": "N9p7KOxR27apxu7u",
+    "riderId": 11,
+    "type": "order_assigned",
+    "title": "New Delivery Assigned",
+    "message": "Order #55 has been assigned to you.",
+    "orderId": 55,
+    "read": false,
+    "createdAt": "2026-09-02T10:02:40.308653+00:00"
+  },
+  {
+    "id": "EdTb_eA5KnaVFAWE",
+    "riderId": 11,
+    "type": "order_assigned",
+    "title": "New Delivery Assigned",
+    "message": "Order #57 has been assigned to you.",
+    "orderId": 57,
+    "read": false,
+    "createdAt": "2026-09-02T10:07:10.218814+00:00"
+  },
+  {
+    "id": "66hsUjnnwcbtwmGi",
+    "riderId": 11,
+    "type": "order_assigned",
+    "title": "New Delivery Assigned",
+    "message": "Order #58 has been assigned to you.",
+    "orderId": 58,
+    "read": false,
+    "createdAt": "2026-09-02T10:12:09.477869+00:00"
   }
 ]
