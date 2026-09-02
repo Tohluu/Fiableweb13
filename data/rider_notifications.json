@@ -118,5 +118,15 @@
     "orderId": 44,
     "read": false,
     "createdAt": "2026-09-01T18:08:15.225682+00:00"
+  },
+  {
+    "id": "eSQ5WiT4cX4D0N6B",
+    "riderId": 11,
+    "type": "order_assigned",
+    "title": "New Delivery Assigned",
+    "message": "Order #45 has been assigned to you.",
+    "orderId": 45,
+    "read": false,
+    "createdAt": "2026-09-01T21:40:05.675742+00:00"
   }
 ]

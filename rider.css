@@ -935,3 +935,146 @@ body {
   color: #2563eb;
   cursor: pointer;
 }
+
+.rider-text-btn {
+  display: block;
+  margin: 16px auto 0;
+  border: 0;
+  background: transparent;
+  color: #1447d6;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.rider-secondary-form {
+  display: grid;
+  gap: 10px;
+  margin-block-start: 20px;
+}
+
+.rider-secondary-form[hidden],
+#riderLoginForm[hidden],
+#riderForgotPasswordBtn[hidden] {
+  display: none !important;
+}
+
+.rider-secondary-form h2 {
+  margin: 0 0 6px;
+  font-size: 22px;
+}
+
+.rider-secondary-form label {
+  margin-block-start: 6px;
+  color: #344054;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.rider-secondary-form input {
+  inline-size: 100%;
+  min-block-size: 48px;
+  padding: 0 14px;
+  box-sizing: border-box;
+  border: 1px solid #d0d5dd;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #101828;
+  font: inherit;
+  font-size: 15px;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.rider-secondary-form input:focus {
+  border-color: #246bfe;
+  box-shadow: 0 0 0 3px rgba(36, 107, 254, 0.12);
+}
+
+.rider-secondary-form .rider-login-btn {
+  margin-block-start: 8px;
+}
+
+.rider-secondary-form .rider-text-btn {
+  margin-block-start: 6px;
+}
+
+.rider-security-panel {
+  grid-column: 1 / -1;
+  margin-block-start: 8px;
+  padding-block-start: 18px;
+  border-block-start: 1px solid #edf2f7;
+}
+
+.rider-security-panel h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.rider-security-panel .rider-text-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-block-size: 40px;
+  margin-block-start: 16px;
+  margin-inline-start: 0;
+  padding: 8px 16px;
+  border: 1px solid #cbdaf3;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #246bfe;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.rider-security-panel .rider-text-btn:hover {
+  border-color: #246bfe;
+  background: #eef4ff;
+}
+
+.rider-dashboard-nav {
+  display: flex;
+  gap: 8px;
+  margin-block-end: 4px;
+  padding-block-end: 14px;
+  border-block-end: 1px solid #edf2f7;
+}
+
+.rider-nav-btn {
+  min-block-size: 40px;
+  padding: 8px 16px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: #667085;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.rider-nav-btn:hover,
+.rider-nav-btn.active {
+  border-color: #cfe0ff;
+  background: #eef4ff;
+  color: #246bfe;
+}
+
+.rider-dashboard-view {
+  display: none;
+}
+
+.rider-dashboard-view.active {
+  display: block;
+}
+
+@media (max-width: 600px) {
+  .rider-dashboard-nav {
+    overflow-x: auto;
+  }
+
+  .rider-nav-btn {
+    flex: 1 0 auto;
+    white-space: nowrap;
+  }
+}

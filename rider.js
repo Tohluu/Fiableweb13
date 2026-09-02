@@ -32,6 +32,37 @@ const toggleRiderPassword =
     "toggleRiderPassword"
   );
 
+const riderForgotPasswordBtn =
+  document.getElementById("riderForgotPasswordBtn");
+const riderForgotPasswordForm =
+  document.getElementById("riderForgotPasswordForm");
+const riderResetPasswordForm =
+  document.getElementById("riderResetPasswordForm");
+const riderChangePasswordBtn =
+  document.getElementById("riderChangePasswordBtn");
+const riderChangePasswordForm =
+  document.getElementById("riderChangePasswordForm");
+
+document.querySelectorAll(".rider-nav-btn").forEach(button => {
+  button.addEventListener("click", () => {
+    const view = button.dataset.riderView;
+
+    document.querySelectorAll(".rider-nav-btn").forEach(navButton => {
+      navButton.classList.toggle(
+        "active",
+        navButton.dataset.riderView === view
+      );
+    });
+
+    document.querySelectorAll(".rider-dashboard-view").forEach(panel => {
+      panel.classList.toggle(
+        "active",
+        panel.dataset.riderViewPanel === view
+      );
+    });
+  });
+});
+
 
 /* =====================================================
    RIDER PAGE PARAMETERS
@@ -157,6 +188,15 @@ async function initializeRiderPage() {
     }
 
     /* Not authenticated */
+
+    if (riderParams.get("reset")) {
+      riderLoginForm?.setAttribute("hidden", "true");
+      riderForgotPasswordBtn?.setAttribute("hidden", "true");
+      riderResetPasswordForm?.removeAttribute("hidden");
+      riderLoginCard.style.display = "block";
+      riderDashboardView.style.display = "none";
+      return;
+    }
 
     riderLoginCard.style.display =
       "block";
@@ -400,6 +440,94 @@ riderLoginForm?.addEventListener(
 
   }
 );
+
+riderForgotPasswordBtn?.addEventListener("click", () => {
+  riderLoginForm?.setAttribute("hidden", "true");
+  riderForgotPasswordBtn.setAttribute("hidden", "true");
+  riderForgotPasswordForm?.removeAttribute("hidden");
+});
+
+document.getElementById("riderBackToLoginBtn")?.addEventListener("click", () => {
+  riderForgotPasswordForm?.setAttribute("hidden", "true");
+  riderLoginForm?.removeAttribute("hidden");
+  riderForgotPasswordBtn?.removeAttribute("hidden");
+});
+
+riderForgotPasswordForm?.addEventListener("submit", async event => {
+  event.preventDefault();
+  const message = document.getElementById("riderForgotMessage");
+  const email = document.getElementById("riderForgotEmail")?.value.trim().toLowerCase();
+  try {
+    const response = await fetch("/api/rider/forgot-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify({ email })
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Unable to create reset link.");
+    message.textContent = data.resetLink
+      ? `Reset link: ${data.resetLink}`
+      : data.message;
+  } catch (error) {
+    message.textContent = error.message;
+  }
+});
+
+riderResetPasswordForm?.addEventListener("submit", async event => {
+  event.preventDefault();
+  const message = document.getElementById("riderResetMessage");
+  try {
+    const response = await fetch("/api/rider/reset-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify({
+        token: riderParams.get("reset"),
+        password: document.getElementById("riderResetPassword")?.value,
+        confirmPassword: document.getElementById("riderResetConfirmPassword")?.value
+      })
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Unable to reset password.");
+    message.textContent = data.message;
+    setTimeout(() => window.location.replace("rider.html"), 800);
+  } catch (error) {
+    message.textContent = error.message;
+  }
+});
+
+riderChangePasswordBtn?.addEventListener("click", () => {
+  riderChangePasswordForm?.toggleAttribute("hidden");
+});
+
+riderChangePasswordForm?.addEventListener("submit", async event => {
+  event.preventDefault();
+  const message = document.getElementById("riderChangePasswordMessage");
+  const newPassword = document.getElementById("riderNewPassword")?.value;
+  const confirmPassword = document.getElementById("riderConfirmPassword")?.value;
+  if (newPassword !== confirmPassword) {
+    message.textContent = "Passwords do not match.";
+    return;
+  }
+  try {
+    const response = await fetch("/api/rider/change-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify({
+        currentPassword: document.getElementById("riderCurrentPassword")?.value,
+        newPassword
+      })
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Unable to change password.");
+    message.textContent = data.message;
+    riderChangePasswordForm.reset();
+  } catch (error) {
+    message.textContent = error.message;
+  }
+});
 
 
 /* =====================================================

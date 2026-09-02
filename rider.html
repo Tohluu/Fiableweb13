@@ -111,6 +111,33 @@
 
       </form>
 
+      <button
+        type="button"
+        id="riderForgotPasswordBtn"
+        class="rider-text-btn"
+      >
+        Forgot password?
+      </button>
+
+      <form id="riderForgotPasswordForm" class="rider-secondary-form" hidden>
+        <h2>Reset your password</h2>
+        <label for="riderForgotEmail">Rider email</label>
+        <input id="riderForgotEmail" type="email" required placeholder="rider@example.com">
+        <button type="submit" class="rider-login-btn">Send reset link</button>
+        <div id="riderForgotMessage" class="rider-login-message" aria-live="polite"></div>
+        <button type="button" id="riderBackToLoginBtn" class="rider-text-btn">Back to login</button>
+      </form>
+
+      <form id="riderResetPasswordForm" class="rider-secondary-form" hidden>
+        <h2>Create a new password</h2>
+        <label for="riderResetPassword">New password</label>
+        <input id="riderResetPassword" type="password" minlength="8" required>
+        <label for="riderResetConfirmPassword">Confirm password</label>
+        <input id="riderResetConfirmPassword" type="password" minlength="8" required>
+        <button type="submit" class="rider-login-btn">Reset password</button>
+        <div id="riderResetMessage" class="rider-login-message" aria-live="polite"></div>
+      </form>
+
     </section>
 
     <section
@@ -145,10 +172,16 @@
 
         </div>
 
+          <nav class="rider-dashboard-nav" aria-label="Rider dashboard navigation">
+            <button type="button" class="rider-nav-btn active" data-rider-view="profile">Profile</button>
+            <button type="button" class="rider-nav-btn" data-rider-view="deliveries">My Deliveries</button>
+            <button type="button" class="rider-nav-btn" data-rider-view="settings">Settings</button>
+          </nav>
+
 
         <!-- RIDER INFORMATION -->
 
-        <div class="rider-dashboard-section">
+          <div class="rider-dashboard-section rider-dashboard-view active" data-rider-view-panel="profile">
 
             <h2>
             Rider Information
@@ -188,7 +221,7 @@
 
         <!-- CURRENT DELIVERY -->
 
-        <div class="rider-dashboard-section">
+        <div class="rider-dashboard-section rider-dashboard-view" data-rider-view-panel="deliveries">
 
             <div class="rider-section-heading">
 
@@ -229,7 +262,7 @@
 
         <!-- PREVIOUS DELIVERIES -->
 
-        <div class="rider-dashboard-section">
+        <div class="rider-dashboard-section rider-dashboard-view" data-rider-view-panel="deliveries">
 
           <div class="rider-section-heading">
             <div>
@@ -250,9 +283,33 @@
         </div>
 
 
+        <!-- SETTINGS -->
+
+        <div class="rider-dashboard-section rider-dashboard-view" data-rider-view-panel="settings">
+
+            <h2>Settings</h2>
+
+            <div class="rider-security-panel">
+              <h3>Security</h3>
+              <button type="button" id="riderChangePasswordBtn" class="rider-text-btn">Change password</button>
+              <form id="riderChangePasswordForm" class="rider-secondary-form" hidden>
+                <label for="riderCurrentPassword">Current password</label>
+                <input id="riderCurrentPassword" type="password" autocomplete="current-password" required>
+                <label for="riderNewPassword">New password</label>
+                <input id="riderNewPassword" type="password" minlength="8" autocomplete="new-password" required>
+                <label for="riderConfirmPassword">Confirm password</label>
+                <input id="riderConfirmPassword" type="password" minlength="8" autocomplete="new-password" required>
+                <button type="submit" class="rider-login-btn">Update password</button>
+                <div id="riderChangePasswordMessage" class="rider-login-message" aria-live="polite"></div>
+              </form>
+            </div>
+
+        </div>
+
+
         <!-- NOTIFICATIONS -->
 
-        <div class="rider-dashboard-section">
+        <div class="rider-dashboard-section rider-dashboard-view" data-rider-view-panel="settings">
 
             <div class="rider-section-heading">
 
@@ -331,7 +388,7 @@
   </main>
 
 
-  <script src="rider.js"></script>
+  <script src="rider.js?v=3"></script>
 
 </body>
 

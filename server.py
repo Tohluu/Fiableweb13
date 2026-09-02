@@ -597,6 +597,161 @@ def deliveries_for_account(email):
     return [d for d in load_deliveries() if d.get("accountEmail") == email_n]
 
 
+def rider_payment_for_delivery(delivery, account_plan=None):
+    delivery_fee = delivery.get("cost")
+    if delivery_fee is None:
+        plan = delivery.get("subscriptionPlan") or account_plan
+        unit_price = PLAN_UNIT_PRICES.get(plan, 0)
+        delivery_fee = int(delivery.get("units", 0) or 0) * unit_price
+    return round(float(delivery_fee or 0) * 0.80)
+
+
+def rider_payment_summary(month=None):
+    riders = load_riders()
+    deliveries = load_deliveries()
+    accounts = load_accounts()
+    summaries = []
+
+    def delivery_month(delivery):
+        delivered_at = parse_iso_date(
+            delivery.get("updatedAt") or delivery.get("createdAt")
+        )
+        return delivered_at.strftime("%Y-%m") if delivered_at else None
+
+    for rider in riders:
+        rider_id = str(rider.get("id", ""))
+        rider_deliveries = [
+            delivery for delivery in deliveries
+            if str(delivery.get("riderId", "")) == rider_id
+            and (not month or delivery_month(delivery) == month)
+        ]
+        completed = [
+            delivery for delivery in rider_deliveries
+            if str(delivery.get("status", "")).lower() == "delivered"
+        ]
+        failed = [
+            delivery for delivery in rider_deliveries
+            if str(delivery.get("status", "")).lower()
+            in {"failed", "cancelled"}
+        ]
+        payable = 0
+        breakdown = []
+        for delivery in completed:
+            account = next(
+                (
+                    item for item in accounts
+                    if item.get("email", "").lower() ==
+                    str(delivery.get("accountEmail", "")).lower()
+                ),
+                None
+            )
+            payable += rider_payment_for_delivery(
+                delivery,
+                account.get("plan") if account else None
+            )
+        for delivery in rider_deliveries:
+            account = next(
+                (
+                    item for item in accounts
+                    if item.get("email", "").lower() ==
+                    str(delivery.get("accountEmail", "")).lower()
+                ),
+                None
+            )
+            rider_payment = rider_payment_for_delivery(
+                delivery,
+                account.get("plan") if account else None
+            ) if str(delivery.get("status", "")).lower() == "delivered" else 0
+            delivery_fee = delivery.get("cost")
+            if delivery_fee is None:
+                plan = delivery.get("subscriptionPlan") or (account.get("plan") if account else None)
+                delivery_fee = int(delivery.get("units", 0) or 0) * PLAN_UNIT_PRICES.get(plan, 0)
+            breakdown.append({
+                "orderRef": delivery.get("orderRef", f"#{delivery.get('id')}"),
+                "route": f"{delivery.get('pickup', '—')} → {delivery.get('dropoff', '—')}",
+                "units": delivery.get("units", 0),
+                "status": delivery.get("status", ""),
+                "deliveryFee": delivery_fee,
+                "riderPayment": rider_payment,
+                "payable": rider_payment > 0,
+            })
+        summaries.append({
+            "riderId": rider.get("id"),
+            "riderRef": rider.get("riderRef", ""),
+            "name": rider.get("name", ""),
+            "completedDeliveries": len(completed),
+            "failedDeliveries": len(failed),
+            "payable": payable,
+            "paid": 0,
+            "outstanding": payable,
+            "breakdown": breakdown,
+        })
+
+    return summaries
+
+
+def admin_revenue_summary():
+    subscriptions = []
+    for account in load_accounts():
+        subscriptions.extend(subscription_history_for_account(account))
+
+    monthly_revenue = {}
+    for subscription in subscriptions:
+        if subscription.get("paymentStatus") != "paid":
+            continue
+        paid_at = parse_iso_date(
+            subscription.get("periodStart") or subscription.get("paidAt")
+        )
+        if paid_at:
+            month = paid_at.strftime("%Y-%m")
+            monthly_revenue[month] = monthly_revenue.get(month, 0) + int(
+                subscription.get("amount", 0) or 0
+            )
+
+    monthly_rider_payments = {}
+    accounts = load_accounts()
+    for delivery in load_deliveries():
+        if str(delivery.get("status", "")).lower() != "delivered":
+            continue
+        delivered_at = parse_iso_date(
+            delivery.get("updatedAt") or delivery.get("createdAt")
+        )
+        if delivered_at:
+            month = delivered_at.strftime("%Y-%m")
+            account = next(
+                (
+                    item for item in accounts
+                    if item.get("email", "").lower() ==
+                    str(delivery.get("accountEmail", "")).lower()
+                ),
+                None
+            )
+            monthly_rider_payments[month] = monthly_rider_payments.get(month, 0) + rider_payment_for_delivery(
+                delivery,
+                account.get("plan") if account else None
+            )
+
+    months = sorted(
+        set(monthly_revenue) | set(monthly_rider_payments),
+        reverse=True
+    )
+    monthly = {
+        month: {
+            "revenue": monthly_revenue.get(month, 0),
+            "riderPayments": monthly_rider_payments.get(month, 0),
+            "profit": monthly_revenue.get(month, 0) - monthly_rider_payments.get(month, 0),
+        }
+        for month in months
+    }
+    current_year = str(datetime.now(timezone.utc).year)
+    yearly = {
+        "revenue": sum(value["revenue"] for month, value in monthly.items() if month.startswith(current_year)),
+        "riderPayments": sum(value["riderPayments"] for month, value in monthly.items() if month.startswith(current_year)),
+    }
+    yearly["profit"] = yearly["revenue"] - yearly["riderPayments"]
+    return {"monthly": monthly, "yearly": yearly}
+
+
 def dashboard_stats_for_account(email):
     items = deliveries_for_account(email)
     counts = {"requested": 0, "assigned": 0, "picked-up": 0, "in-transit": 0, "delivered": 0, "failed": 0, "cancelled": 0}
@@ -1287,6 +1442,76 @@ class FiableHandler(SimpleHTTPRequestHandler):
 
                 self.wfile.write(body)
 
+                return
+
+            if path == "/api/rider/change-password":
+                rider = get_logged_in_rider(self)
+                if not rider:
+                    self._json_response(401, {"error": "Rider authentication required."})
+                    return
+                current_password = clean(payload.get("currentPassword"), 128)
+                new_password = clean(payload.get("newPassword"), 128)
+                if not current_password or not new_password:
+                    self._json_response(400, {"error": "All password fields are required."})
+                    return
+                if len(new_password) < 8:
+                    self._json_response(400, {"error": "New password must be at least 8 characters."})
+                    return
+                riders = load_riders()
+                stored_rider = next(
+                    (item for item in riders if str(item.get("id")) == str(rider.get("id"))),
+                    None
+                )
+                if not stored_rider or not stored_rider.get("passwordHash") or not hmac.compare_digest(
+                    stored_rider["passwordHash"],
+                    password_hash(current_password, stored_rider.get("salt", ""))
+                ):
+                    self._json_response(401, {"error": "Current password is incorrect."})
+                    return
+                salt = secrets.token_hex(16)
+                stored_rider["salt"] = salt
+                stored_rider["passwordHash"] = password_hash(new_password, salt)
+                stored_rider["passwordChangedAt"] = datetime.now(timezone.utc).isoformat()
+                save_riders(riders)
+                self._json_response(200, {"message": "Password changed successfully."})
+                return
+
+            if path == "/api/rider/forgot-password":
+                email = clean(payload.get("email"), 160).lower()
+                if not valid_email(email):
+                    self._json_response(400, {"error": "Enter a valid email address."})
+                    return
+                rider = next((item for item in load_riders() if item.get("email", "").lower() == email), None)
+                if not rider:
+                    self._json_response(202, {"message": "If an account exists for this email, a password reset link has been created."})
+                    return
+                token = create_reset_token(email)
+                self._json_response(202, {
+                    "message": "Password reset link created.",
+                    "resetLink": f"/rider.html?reset={token}"
+                })
+                return
+
+            if path == "/api/rider/reset-password":
+                token = clean(payload.get("token"), 200)
+                new_password = clean(payload.get("password"), 128)
+                confirm_password = clean(payload.get("confirmPassword"), 128)
+                reset_data = verify_reset_token(token)
+                if not reset_data or len(new_password) < 8 or new_password != confirm_password:
+                    self._json_response(400, {"error": "The reset link or password is invalid."})
+                    return
+                riders = load_riders()
+                rider = next((item for item in riders if item.get("email", "").lower() == reset_data["email"].lower()), None)
+                if not rider:
+                    self._json_response(400, {"error": "Rider account not found."})
+                    return
+                salt = secrets.token_hex(16)
+                rider["salt"] = salt
+                rider["passwordHash"] = password_hash(new_password, salt)
+                rider["passwordResetAt"] = datetime.now(timezone.utc).isoformat()
+                save_riders(riders)
+                consume_reset_token(token)
+                self._json_response(200, {"message": "Password reset successfully."})
                 return
 
             # =====================================================
@@ -3019,7 +3244,10 @@ class FiableHandler(SimpleHTTPRequestHandler):
                     )
                     records.append(record)
             records.sort(key=lambda record: record.get("periodStart", ""), reverse=True)
-            self._json_response(200, {"subscriptions": records})
+            self._json_response(200, {
+                "subscriptions": records,
+                "revenueSummary": admin_revenue_summary()
+            })
             return
         if self.path.startswith("/api/admin/subscriptions/details"):
             if not require_admin(self):
@@ -3173,6 +3401,36 @@ class FiableHandler(SimpleHTTPRequestHandler):
                 }
             )
 
+            return
+
+        if self.path.startswith("/api/admin/rider-payments"):
+            if not require_admin(self):
+                self._json_response(
+                    401,
+                    {"error": "Admin authentication required."}
+                )
+                return
+
+            month = parse_qs(urlparse(self.path).query).get("month", [None])[0]
+            all_delivery_months = sorted(
+                {
+                    parsed.strftime("%Y-%m")
+                    for delivery in load_deliveries()
+                    if str(delivery.get("status", "")).lower() == "delivered"
+                    and (parsed := parse_iso_date(
+                        delivery.get("updatedAt") or delivery.get("createdAt")
+                    ))
+                },
+                reverse=True
+            )
+            self._json_response(
+                200,
+                {
+                    "payments": rider_payment_summary(month),
+                    "months": all_delivery_months,
+                    "selectedMonth": month
+                }
+            )
             return
         # =====================================================
         # ADMIN VENDORS

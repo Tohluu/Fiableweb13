@@ -1012,6 +1012,7 @@ if (logoutBtn) {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Unable to load subscription history.");
       const records = data.subscriptions || [];
+      const revenueSummary = data.revenueSummary || { monthly: {}, yearly: { revenue: 0, riderPayments: 0, profit: 0 } };
       const monthKey = record => {
         const date = new Date(record.periodStart);
         return Number.isNaN(date.getTime()) ? "unknown" : date.toISOString().slice(0, 7);
@@ -1022,6 +1023,14 @@ if (logoutBtn) {
         return date.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
       };
       const months = [...new Set(records.map(monthKey))].sort().reverse();
+      const revenueMonthFilter = document.getElementById("adminRevenueMonthFilter");
+      if (revenueMonthFilter) {
+        const currentMonth = new Date().toISOString().slice(0, 7);
+        revenueMonthFilter.innerHTML = '<option value="current">Current month</option>' + months.map(month => `<option value="${month}">${monthLabel(month)}</option>`).join("");
+        revenueMonthFilter.value = months.includes(currentMonth) ? currentMonth : "current";
+        revenueMonthFilter.onchange = () => renderSubscriptionRevenue(records, revenueMonthFilter.value, revenueSummary);
+      }
+      renderSubscriptionRevenue(records, revenueMonthFilter?.value || "current", revenueSummary);
       if (monthFilter) {
         monthFilter.innerHTML = '<option value="all">All months</option>' + months.map(month => `<option value="${month}">${monthLabel(month)}</option>`).join("");
         monthFilter.onchange = () => renderAdminSubscriptionHistory(records, monthFilter.value, tableBody);
@@ -1030,6 +1039,54 @@ if (logoutBtn) {
     } catch (error) {
       tableBody.innerHTML = `<tr><td colspan="7" class="empty-state">${escapeSubscriptionValue(error.message)}</td></tr>`;
     }
+  }
+
+  function renderSubscriptionRevenue(records, selectedMonth = "current", revenueSummary = { monthly: {}, yearly: { revenue: 0, riderPayments: 0, profit: 0 } }) {
+    const yearRevenue = document.getElementById("subscriptionYearRevenue");
+    const monthRevenue = document.getElementById("subscriptionRevenueByMonth");
+    if (!yearRevenue || !monthRevenue) return;
+
+    const paidRecords = records.filter(record => record.paymentStatus === "paid");
+    const monthlyTotals = {};
+    paidRecords.forEach(record => {
+      const date = new Date(record.periodStart || record.paidAt);
+      if (Number.isNaN(date.getTime())) return;
+      const key = date.toISOString().slice(0, 7);
+      monthlyTotals[key] = (monthlyTotals[key] || 0) + Number(record.amount || 0);
+    });
+
+    const currentYear = String(new Date().getUTCFullYear());
+    const yearlyTotal = Object.entries(monthlyTotals)
+      .filter(([month]) => month.startsWith(`${currentYear}-`))
+      .reduce((total, [, amount]) => total + amount, 0);
+    yearRevenue.textContent = `₦${yearlyTotal.toLocaleString("en-NG")} this year`;
+
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    const displayedMonth = selectedMonth === "current" ? currentMonth : selectedMonth;
+    const selectedTotals = revenueSummary.monthly?.[displayedMonth] || { revenue: 0, riderPayments: 0, profit: 0 };
+    const currentMonthTotal = selectedTotals.revenue;
+    const monthlyRevenueCard = document.getElementById("subscriptionRevenue");
+    if (monthlyRevenueCard) {
+      monthlyRevenueCard.textContent = `₦${currentMonthTotal.toLocaleString("en-NG")}`;
+    }
+    const monthlyRevenueLabel = document.querySelector("#subscriptionRevenue")?.previousElementSibling;
+    if (monthlyRevenueLabel) {
+      monthlyRevenueLabel.textContent = displayedMonth === currentMonth
+        ? "Monthly Revenue"
+        : `${new Date(`${displayedMonth}-01T00:00:00Z`).toLocaleDateString("en-GB", { month: "long" })} Revenue`;
+    }
+    document.getElementById("selectedMonthRevenue").textContent = `₦${selectedTotals.revenue.toLocaleString("en-NG")}`;
+    document.getElementById("selectedMonthRiderPayments").textContent = `₦${selectedTotals.riderPayments.toLocaleString("en-NG")}`;
+    document.getElementById("selectedMonthProfit").textContent = `₦${selectedTotals.profit.toLocaleString("en-NG")}`;
+    yearRevenue.textContent = `₦${revenueSummary.yearly.profit.toLocaleString("en-NG")} profit this year`;
+
+    const months = Object.entries(monthlyTotals).sort(([a], [b]) => b.localeCompare(a));
+    monthRevenue.innerHTML = months.length ? months.map(([month, amount]) => {
+      const date = new Date(`${month}-01T00:00:00Z`);
+      const label = date.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
+      const totals = revenueSummary.monthly?.[month] || { revenue: amount, riderPayments: 0, profit: amount };
+      return `<div class="subscription-revenue-row"><span>${label}</span><strong>₦${totals.profit.toLocaleString("en-NG")} profit</strong></div>`;
+    }).join("") : '<p class="muted">No paid subscription revenue recorded.</p>';
   }
 
   function renderAdminSubscriptionHistory(records, selectedMonth, tableBody) {
@@ -1095,6 +1152,8 @@ if (logoutBtn) {
       }
 
       const riders = data.riders || [];
+
+      loadAdminRiderPayments();
 
 
       /* =====================================================
@@ -1353,6 +1412,62 @@ if (logoutBtn) {
 
     }
 
+  }
+
+  async function loadAdminRiderPayments() {
+    const tableBody = document.getElementById("adminRiderPaymentsBody");
+    const totalElement = document.getElementById("riderPaymentsTotal");
+    const monthFilter = document.getElementById("riderPaymentMonthFilter");
+    if (!tableBody) return;
+    try {
+      const selectedMonth = monthFilter?.value || "all";
+      const query = selectedMonth === "all" ? "" : `?month=${encodeURIComponent(selectedMonth)}`;
+      const response = await fetch(`/api/admin/rider-payments${query}`, { credentials: "same-origin", cache: "no-store" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Unable to load rider payments.");
+      const payments = data.payments || [];
+      if (monthFilter && !monthFilter.dataset.ready) {
+        monthFilter.innerHTML = '<option value="all">All months</option>' + (data.months || []).map(month => `<option value="${month}">${new Date(`${month}-01T00:00:00Z`).toLocaleDateString("en-GB", { month: "long", year: "numeric" })}</option>`).join("");
+        monthFilter.dataset.ready = "true";
+        monthFilter.addEventListener("change", loadAdminRiderPayments);
+      }
+      const outstandingTotal = payments.reduce((total, payment) => total + Number(payment.outstanding || 0), 0);
+      if (totalElement) totalElement.textContent = `₦${outstandingTotal.toLocaleString("en-NG")} outstanding`;
+      tableBody.innerHTML = payments.length ? payments.map(payment => `
+        <tr>
+          <td><button type="button" class="rider-payment-view-btn" data-rider-payment-id="${payment.riderId}"><strong>${escapeSubscriptionValue(payment.name || "—")}</strong></button></td>
+          <td>${escapeSubscriptionValue(payment.riderRef || "—")}</td>
+          <td>${payment.completedDeliveries ?? 0}</td>
+          <td>${payment.failedDeliveries ?? 0}</td>
+          <td>₦${Number(payment.payable || 0).toLocaleString("en-NG")}</td>
+          <td>₦${Number(payment.paid || 0).toLocaleString("en-NG")}</td>
+          <td><strong>₦${Number(payment.outstanding || 0).toLocaleString("en-NG")}</strong></td>
+        </tr>
+      `).join("") : '<tr><td colspan="7" class="empty-state">No rider payment records found.</td></tr>';
+      tableBody.querySelectorAll(".rider-payment-view-btn").forEach(button => {
+        const payment = payments.find(item => String(item.riderId) === button.dataset.riderPaymentId);
+        button.addEventListener("click", () => openRiderPaymentBreakdown(payment));
+      });
+    } catch (error) {
+      tableBody.innerHTML = `<tr><td colspan="7" class="empty-state">${escapeSubscriptionValue(error.message)}</td></tr>`;
+    }
+  }
+
+  function openRiderPaymentBreakdown(payment) {
+    if (!payment || !riderDetailsModal || !riderDetailsBody) return;
+    riderDetailsTitle.textContent = `${payment.name || "Rider"} payment breakdown`;
+    riderDetailsBody.innerHTML = `
+      <div class="rider-payment-summary-grid">
+        <div><span>Completed deliveries</span><strong>${payment.completedDeliveries}</strong></div>
+        <div><span>Total payable</span><strong>₦${Number(payment.payable).toLocaleString("en-NG")}</strong></div>
+      </div>
+      <h3>Delivery payments</h3>
+      ${payment.breakdown?.length ? `<div class="table-wrap"><table class="admin-table"><thead><tr><th>Order</th><th>Route</th><th>Units</th><th>Status</th><th>Delivery fee</th><th>Rider 80%</th></tr></thead><tbody>${payment.breakdown.map(delivery => `
+        <tr><td>${escapeSubscriptionValue(delivery.orderRef)}</td><td>${escapeSubscriptionValue(delivery.route)}</td><td>${delivery.units}</td><td>${escapeSubscriptionValue(delivery.status || "—")}</td><td>₦${Number(delivery.deliveryFee || 0).toLocaleString("en-NG")}</td><td>${delivery.payable ? `₦${Number(delivery.riderPayment).toLocaleString("en-NG")}` : "Not payable"}</td></tr>
+      `).join("")}</tbody></table></div>` : '<p class="muted">No deliveries found for this rider.</p>'}
+    `;
+    riderDetailsModal.classList.add("show");
+    riderDetailsModal.setAttribute("aria-hidden", "false");
   }
 
   async function loadAvailableRiders() {

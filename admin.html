@@ -496,6 +496,32 @@
 
           </div>
 
+          <article class="panel subscription-revenue-panel">
+            <div class="section-title">
+              <div>
+                <h2>Revenue summary</h2>
+                <p class="muted">Revenue from paid subscription periods.</p>
+              </div>
+              <div class="subscription-revenue-controls">
+                <label class="subscription-month-filter">
+                  <span>View month</span>
+                  <select id="adminRevenueMonthFilter">
+                    <option value="current">Current month</option>
+                  </select>
+                </label>
+                <strong id="subscriptionYearRevenue" class="subscription-year-revenue">₦0 profit this year</strong>
+              </div>
+            </div>
+            <div class="subscription-profit-summary">
+              <div><span>Revenue</span><strong id="selectedMonthRevenue">₦0</strong></div>
+              <div><span>Rider payments</span><strong id="selectedMonthRiderPayments">₦0</strong></div>
+              <div><span>Profit after riders</span><strong id="selectedMonthProfit">₦0</strong></div>
+            </div>
+            <div id="subscriptionRevenueByMonth" class="subscription-revenue-list">
+              <p class="muted">Loading monthly revenue...</p>
+            </div>
+          </article>
+
           <article class="panel">
 
             <div class="table-wrap">
@@ -703,6 +729,42 @@
 
             </div>
 
+          </article>
+
+          <article class="panel rider-payments-panel">
+            <div class="panel-header">
+              <div>
+                <h2>Rider payments</h2>
+                <p class="muted">Payable amounts are calculated from delivered orders only.</p>
+              </div>
+              <div class="rider-payment-controls">
+                <label>
+                  <span>Payment month</span>
+                  <select id="riderPaymentMonthFilter">
+                    <option value="all">All months</option>
+                  </select>
+                </label>
+                <strong id="riderPaymentsTotal">₦0 outstanding</strong>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>Rider</th>
+                    <th>Rider ID</th>
+                    <th>Completed</th>
+                    <th>Failed / Cancelled</th>
+                    <th>Payable</th>
+                    <th>Paid</th>
+                    <th>Outstanding</th>
+                  </tr>
+                </thead>
+                <tbody id="adminRiderPaymentsBody">
+                  <tr><td colspan="7" class="empty-state">Loading rider payments...</td></tr>
+                </tbody>
+              </table>
+            </div>
           </article>
 
         </section>
@@ -1694,7 +1756,7 @@
   </div>
 
   <!-- Admin JavaScript -->
-  <script src="admin.js?v=8"></script>
+  <script src="admin.js?v=15"></script>
 
   <!-- =====================================================
       ADMIN TOAST
