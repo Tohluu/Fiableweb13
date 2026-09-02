@@ -313,9 +313,9 @@ textarea{resize:vertical;min-block-size:85px}
 .payment-panel{display:flex;align-items:center;justify-content:space-between;margin-block-start:20px}
 .payment-panel p{font-size:12px;margin:5px 0 0}
 .subscription-history-panel{margin-block-start:20px}
-.subscription-history-list{display:grid;gap:10px}
-.subscription-history-item{display:flex;align-items:center;justify-content:space-between;gap:20px;inline-size:100%;padding:14px 16px;border:1px solid var(--border);border-radius:10px;background:var(--surface);color:inherit;text-align:start;cursor:pointer}
-.subscription-history-item:hover,.subscription-history-item.selected{border-color:var(--accent);background:var(--surface-soft)}
+.subscription-history-list{display:grid;gap:0}
+.subscription-history-item{display:flex;align-items:center;justify-content:space-between;gap:20px;inline-size:100%;padding:14px 16px;border-block-end:1px solid var(--border);color:inherit;text-align:start;cursor:pointer}
+.subscription-history-item:hover,.subscription-history-item.selected{border-block-end-color:var(--accent);background:var(--surface-soft)}
 .subscription-history-item span{display:grid;gap:4px}
 .subscription-history-item span:last-child{text-align:end}
 .subscription-history-item small{font-size:12px;opacity:.65;text-transform:capitalize}

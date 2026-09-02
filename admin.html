@@ -407,6 +407,21 @@
 
             </div>
 
+            <!-- BULK ASSIGNMENT PANEL -->
+            <div class="bulk-assignment-panel hidden" id="bulkAssignmentPanel">
+              <div class="bulk-assignment-controls">
+                <span id="selectedOrdersCount" class="bulk-info">0 orders selected</span>
+                <select id="bulkAssignRiderSelect" class="bulk-select">
+                  <option value="">Select a rider...</option>
+                </select>
+                <button id="bulkAssignBtn" class="btn primary" type="button">
+                  Assign to Rider
+                </button>
+                <button id="bulkCancelBtn" class="btn outline" type="button">
+                  Cancel
+                </button>
+              </div>
+            </div>
 
             <div class="admin-table-wrap">
 
@@ -414,6 +429,7 @@
 
                 <thead>
                   <tr>
+                    <th style="inline-size: 40px;"><input type="checkbox" id="selectAllOrdersCheckbox" aria-label="Select all orders"></th>
                     <th>Order</th>
                     <th>Vendor</th>
                     <th>Pickup</th>
@@ -428,7 +444,7 @@
                 <tbody id="adminOrdersBody">
 
                   <tr>
-                    <td colspan="8" class="empty-state">
+                    <td colspan="9" class="empty-state">
                       Loading orders...
                     </td>
                   </tr>
@@ -509,7 +525,11 @@
                     <option value="current">Current month</option>
                   </select>
                 </label>
-                <strong id="subscriptionYearRevenue" class="subscription-year-revenue">₦0 profit this year</strong>
+                <div class="subscription-year-totals">
+                  <span>Revenue this year</span>
+                  <strong id="subscriptionYearRevenue" class="subscription-year-revenue">₦0</strong>
+                  <small>Rider payments: <b id="subscriptionYearRiderPayments">₦0</b> · Profit: <b id="subscriptionYearProfit">₦0</b></small>
+                </div>
               </div>
             </div>
             <div class="subscription-profit-summary">

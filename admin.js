@@ -64,6 +64,7 @@ window.addEventListener("pageshow", async () => {
 document.addEventListener("DOMContentLoaded", async () => {
 
   let adminOrders = [];
+  const selectedOrderIds = new Set();
 
   const PLAN_PRICES = {
     Basic: 67500,
@@ -1059,7 +1060,10 @@ if (logoutBtn) {
     const yearlyTotal = Object.entries(monthlyTotals)
       .filter(([month]) => month.startsWith(`${currentYear}-`))
       .reduce((total, [, amount]) => total + amount, 0);
-    yearRevenue.textContent = `₦${yearlyTotal.toLocaleString("en-NG")} this year`;
+    const yearly = revenueSummary.yearly || { revenue: yearlyTotal, riderPayments: 0, profit: yearlyTotal };
+    yearRevenue.textContent = `₦${yearly.revenue.toLocaleString("en-NG")}`;
+    document.getElementById("subscriptionYearRiderPayments").textContent = `₦${yearly.riderPayments.toLocaleString("en-NG")}`;
+    document.getElementById("subscriptionYearProfit").textContent = `₦${yearly.profit.toLocaleString("en-NG")}`;
 
     const currentMonth = new Date().toISOString().slice(0, 7);
     const displayedMonth = selectedMonth === "current" ? currentMonth : selectedMonth;
@@ -1078,8 +1082,6 @@ if (logoutBtn) {
     document.getElementById("selectedMonthRevenue").textContent = `₦${selectedTotals.revenue.toLocaleString("en-NG")}`;
     document.getElementById("selectedMonthRiderPayments").textContent = `₦${selectedTotals.riderPayments.toLocaleString("en-NG")}`;
     document.getElementById("selectedMonthProfit").textContent = `₦${selectedTotals.profit.toLocaleString("en-NG")}`;
-    yearRevenue.textContent = `₦${revenueSummary.yearly.profit.toLocaleString("en-NG")} profit this year`;
-
     const months = Object.entries(monthlyTotals).sort(([a], [b]) => b.localeCompare(a));
     monthRevenue.innerHTML = months.length ? months.map(([month, amount]) => {
       const date = new Date(`${month}-01T00:00:00Z`);
@@ -1456,19 +1458,87 @@ if (logoutBtn) {
   function openRiderPaymentBreakdown(payment) {
     if (!payment || !riderDetailsModal || !riderDetailsBody) return;
     riderDetailsTitle.textContent = `${payment.name || "Rider"} payment breakdown`;
+    
+    const selectedMonth = document.getElementById("riderPaymentMonthFilter")?.value || "all";
+    const monthValue = selectedMonth === "all" ? getCurrentMonth() : selectedMonth;
+    
     riderDetailsBody.innerHTML = `
       <div class="rider-payment-summary-grid">
         <div><span>Completed deliveries</span><strong>${payment.completedDeliveries}</strong></div>
         <div><span>Total payable</span><strong>₦${Number(payment.payable).toLocaleString("en-NG")}</strong></div>
+        <div><span>Already paid</span><strong>₦${Number(payment.paid || 0).toLocaleString("en-NG")}</strong></div>
+        <div><span>Outstanding</span><strong>₦${Number(payment.outstanding || 0).toLocaleString("en-NG")}</strong></div>
       </div>
       <h3>Delivery payments</h3>
       ${payment.breakdown?.length ? `<div class="table-wrap"><table class="admin-table"><thead><tr><th>Order</th><th>Route</th><th>Units</th><th>Status</th><th>Delivery fee</th><th>Rider 80%</th></tr></thead><tbody>${payment.breakdown.map(delivery => `
         <tr><td>${escapeSubscriptionValue(delivery.orderRef)}</td><td>${escapeSubscriptionValue(delivery.route)}</td><td>${delivery.units}</td><td>${escapeSubscriptionValue(delivery.status || "—")}</td><td>₦${Number(delivery.deliveryFee || 0).toLocaleString("en-NG")}</td><td>${delivery.payable ? `₦${Number(delivery.riderPayment).toLocaleString("en-NG")}` : "Not payable"}</td></tr>
       `).join("")}</tbody></table></div>` : '<p class="muted">No deliveries found for this rider.</p>'}
+      <div class="rider-payment-actions" style="margin-block-start: 20px;">
+        <button type="button" id="markRiderPaymentPaidBtn" class="btn primary">Mark payment as paid</button>
+      </div>
     `;
+    
+    const markPaidBtn = document.getElementById("markRiderPaymentPaidBtn");
+    if (markPaidBtn && payment.outstanding > 0) {
+      markPaidBtn.addEventListener("click", () => {
+        markRiderPaymentAsPaid(payment, monthValue);
+      });
+    } else if (markPaidBtn) {
+      markPaidBtn.disabled = true;
+      markPaidBtn.textContent = "No outstanding payment";
+    }
+    
     riderDetailsModal.classList.add("show");
     riderDetailsModal.setAttribute("aria-hidden", "false");
   }
+
+  function getCurrentMonth() {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  }
+
+  async function markRiderPaymentAsPaid(payment, month) {
+    if (!payment.outstanding || payment.outstanding <= 0) {
+      alert("No outstanding payment to mark as paid.");
+      return;
+    }
+
+    const amount = Math.round(payment.outstanding);
+    
+    if (!confirm(`Mark ₦${amount.toLocaleString("en-NG")} as paid for ${payment.name}?`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        "/api/admin/rider-payments/mark-paid",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify({
+            riderId: payment.riderId,
+            amount: amount,
+            month: month
+          })
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to mark payment as paid.");
+      }
+
+      toast("Payment recorded successfully.");
+      loadAdminRiderPayments();
+      riderDetailsModal.classList.remove("show");
+      riderDetailsModal.setAttribute("aria-hidden", "true");
+    } catch (error) {
+      alert(`Error: ${error.message}`);
+    }
+  }
+
 
   async function loadAvailableRiders() {
 
@@ -1500,7 +1570,7 @@ if (logoutBtn) {
 
       const riders =
         (data.riders || []).filter(
-          rider => rider.status === "available"
+          rider => rider.status !== "on_delivery"
         );
 
 
@@ -1509,7 +1579,7 @@ if (logoutBtn) {
         selects.forEach(select => {
           select.innerHTML = `
             <option value="">
-              No available riders
+              No assignable riders
             </option>
           `;
         });
@@ -2047,7 +2117,7 @@ if (logoutBtn) {
 
         tableBody.innerHTML = `
           <tr>
-            <td colspan="8" class="empty-state">
+            <td colspan="9" class="empty-state">
               No orders found.
             </td>
           </tr>
@@ -2111,6 +2181,11 @@ if (logoutBtn) {
         return `
           <tr>
 
+            <!-- Checkbox -->
+            <td>
+              <input type="checkbox" class="order-select-checkbox" data-order-id="${order.id}" aria-label="Select order ${order.orderRef}"${selectedOrderIds.has(String(order.id)) ? " checked" : ""}>
+            </td>
+
             <!-- Order -->
             <td>
               <strong>${order.orderRef || "—"}</strong>
@@ -2171,6 +2246,21 @@ if (logoutBtn) {
 
       }).join("");
 
+      const selectAllCheckbox = document.getElementById(
+        "selectAllOrdersCheckbox"
+      );
+
+      if (selectAllCheckbox) {
+        selectAllCheckbox.checked =
+          orders.length > 0 && orders.every(order =>
+            selectedOrderIds.has(String(order.id))
+          );
+      }
+
+      updateBulkAssignmentPanel();
+
+      /* Setup bulk assignment event listeners */
+      setupBulkAssignmentListeners();
 
     } catch (error) {
 
@@ -2181,7 +2271,7 @@ if (logoutBtn) {
 
       tableBody.innerHTML = `
         <tr>
-          <td colspan="8" class="empty-state">
+          <td colspan="9" class="empty-state">
             Unable to load orders.
           </td>
         </tr>
@@ -2189,6 +2279,166 @@ if (logoutBtn) {
 
     }
 
+  }
+
+  /* ========================================================
+     BULK ASSIGNMENT FUNCTIONS
+  ======================================================== */
+
+  function setupBulkAssignmentListeners() {
+    const selectAllCheckbox = document.getElementById("selectAllOrdersCheckbox");
+    const orderCheckboxes = document.querySelectorAll(".order-select-checkbox");
+    const bulkPanel = document.getElementById("bulkAssignmentPanel");
+    const bulkRiderSelect = document.getElementById("bulkAssignRiderSelect");
+    const bulkAssignBtn = document.getElementById("bulkAssignBtn");
+    const bulkCancelBtn = document.getElementById("bulkCancelBtn");
+
+    // Select/Deselect all checkboxes
+    if (selectAllCheckbox) {
+      selectAllCheckbox.addEventListener("change", (e) => {
+        orderCheckboxes.forEach(cb => {
+          cb.checked = e.target.checked;
+
+          if (e.target.checked) {
+            selectedOrderIds.add(cb.dataset.orderId);
+          } else {
+            selectedOrderIds.delete(cb.dataset.orderId);
+          }
+        });
+        updateBulkAssignmentPanel();
+        populateBulkRiderSelect();
+      });
+    }
+
+    // Individual checkbox changes
+    orderCheckboxes.forEach(checkbox => {
+      checkbox.addEventListener("change", () => {
+        if (checkbox.checked) {
+          selectedOrderIds.add(checkbox.dataset.orderId);
+        } else {
+          selectedOrderIds.delete(checkbox.dataset.orderId);
+        }
+
+        if (selectAllCheckbox) {
+          selectAllCheckbox.checked = Array.from(orderCheckboxes).every(
+            item => item.checked
+          );
+        }
+
+        updateBulkAssignmentPanel();
+        populateBulkRiderSelect();
+      });
+    });
+
+    // Bulk assign button
+    if (bulkAssignBtn) {
+      bulkAssignBtn.addEventListener("click", bulkAssignOrders);
+    }
+
+    // Cancel bulk assignment
+    if (bulkCancelBtn) {
+      bulkCancelBtn.addEventListener("click", () => {
+        orderCheckboxes.forEach(cb => cb.checked = false);
+        selectedOrderIds.clear();
+        if (selectAllCheckbox) selectAllCheckbox.checked = false;
+        updateBulkAssignmentPanel();
+      });
+    }
+  }
+
+  function updateBulkAssignmentPanel() {
+    const count = selectedOrderIds.size;
+    const panel = document.getElementById("bulkAssignmentPanel");
+    const countSpan = document.getElementById("selectedOrdersCount");
+
+    if (count > 0) {
+      panel.classList.remove("hidden");
+      countSpan.textContent = `${count} order${count !== 1 ? "s" : ""} selected`;
+    } else {
+      panel.classList.add("hidden");
+    }
+  }
+
+  async function populateBulkRiderSelect() {
+    const select = document.getElementById("bulkAssignRiderSelect");
+    if (!select) return;
+
+    // Only populate if empty
+    if (select.options.length > 1) return;
+
+    try {
+      const response = await fetch("/api/admin/riders", { credentials: "same-origin" });
+      const data = await response.json();
+      if (response.ok && data.riders) {
+        data.riders.forEach(rider => {
+          const option = document.createElement("option");
+          option.value = rider.id;
+          option.textContent = `${rider.name} (${rider.riderRef})`;
+          select.appendChild(option);
+        });
+      }
+    } catch (error) {
+      console.error("Error loading riders:", error);
+    }
+  }
+
+  async function bulkAssignOrders() {
+    const riderId = document.getElementById("bulkAssignRiderSelect").value;
+
+    if (!riderId) {
+      toast("Please select a rider.");
+      return;
+    }
+
+    if (selectedOrderIds.size === 0) {
+      toast("Please select at least one order.");
+      return;
+    }
+
+    const orderIds = Array.from(selectedOrderIds).map(Number);
+
+    const bulkAssignBtn = document.getElementById("bulkAssignBtn");
+    bulkAssignBtn.disabled = true;
+    bulkAssignBtn.textContent = "Assigning...";
+
+    try {
+      const response = await fetch(
+        "/api/admin/orders/bulk-assign",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify({
+            orderIds,
+            riderId: Number(riderId)
+          })
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Unable to assign orders.");
+      }
+
+      toast(`${orderIds.length} order${orderIds.length !== 1 ? "s" : ""} assigned successfully.`);
+
+      // Refresh orders and riders
+      loadAdminOrders();
+      loadAdminRiders();
+
+      // Clear selections
+      selectedOrderIds.clear();
+      document.querySelectorAll(".order-select-checkbox").forEach(cb => cb.checked = false);
+      document.getElementById("selectAllOrdersCheckbox").checked = false;
+      updateBulkAssignmentPanel();
+
+    } catch (error) {
+      console.error("BULK ASSIGN ERROR:", error);
+      toast(error.message || "Unable to assign orders.");
+      bulkAssignBtn.disabled = false;
+      bulkAssignBtn.textContent = "Assign to Rider";
+    }
   }
 
   async function loadAdminRecentOrders() {

@@ -1,0 +1,65 @@
+[
+  {
+    "id": "Q2ToahOnx4mU6O2s",
+    "riderId": 1,
+    "amount": 16400,
+    "month": "2026-08",
+    "paidAt": "2026-09-02T07:34:51.737098+00:00"
+  },
+  {
+    "id": "jtg0ujpomu7cyeuo",
+    "riderId": 1,
+    "amount": 8400,
+    "month": "2026-09",
+    "paidAt": "2026-09-02T07:35:40.327779+00:00"
+  },
+  {
+    "id": "CodQHfKv-C2U9tKn",
+    "riderId": 2,
+    "amount": 3600,
+    "month": "2026-09",
+    "paidAt": "2026-09-02T07:37:03.494523+00:00"
+  },
+  {
+    "id": "kz5n-CpKcn3ezp3s",
+    "riderId": 11,
+    "amount": 1040,
+    "month": "2026-08",
+    "paidAt": "2026-09-02T07:37:52.510928+00:00"
+  },
+  {
+    "id": "u6nfEBvNLTt1m_iX",
+    "riderId": 11,
+    "amount": 12080,
+    "month": "2026-09",
+    "paidAt": "2026-09-02T07:39:15.862089+00:00"
+  },
+  {
+    "id": "UApvSH2VpjXR-06H",
+    "riderId": 12,
+    "amount": 1040,
+    "month": "2026-08",
+    "paidAt": "2026-09-02T07:48:06.155376+00:00"
+  },
+  {
+    "id": "Y2x6FGt-nG_sBXPy",
+    "riderId": 12,
+    "amount": 10880,
+    "month": "2026-09",
+    "paidAt": "2026-09-02T07:48:28.053490+00:00"
+  },
+  {
+    "id": "axz4PVcJuYV0BtB1",
+    "riderId": 2,
+    "amount": 18960,
+    "month": "2026-08",
+    "paidAt": "2026-09-02T07:55:53.243841+00:00"
+  },
+  {
+    "id": "SerNyMBUGBL6uk1L",
+    "riderId": 3,
+    "amount": 14240,
+    "month": "2026-08",
+    "paidAt": "2026-09-02T08:04:34.900420+00:00"
+  }
+]

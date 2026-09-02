@@ -162,8 +162,8 @@
     "salt": "f8d00b3d7ed03db1b75c82a26788dd07",
     "vehicle": "Car",
     "status": "available",
-    "totalDeliveries": 1,
-    "completedDeliveries": 1,
+    "totalDeliveries": 9,
+    "completedDeliveries": 9,
     "failedDeliveries": 0,
     "createdAt": "2026-08-27T22:44:34.149668+00:00"
   }

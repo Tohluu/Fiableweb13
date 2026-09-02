@@ -60,6 +60,7 @@ RIDERS_FILE = ROOT / "data" / "riders.json"
 RIDER_NOTIFICATIONS_FILE = (
     ROOT / "data" / "rider_notifications.json"
 )
+RIDER_PAYMENTS_FILE = ROOT / "data" / "rider_payments.json"
 ADMIN_CREDENTIALS_FILE = ROOT / "data" / "admin_credentials.json"
 RESET_TOKENS_FILE = ROOT / "data" / "reset_tokens.json"
 SUBSCRIPTIONS_FILE = ROOT / "data" / "subscriptions.json"
@@ -687,6 +688,22 @@ def rider_payment_summary(month=None):
             "breakdown": breakdown,
         })
 
+    # Load paid amounts from rider_payments
+    rider_payments = load_rider_payments()
+    
+    for summary in summaries:
+        paid = 0
+        for payment in rider_payments:
+            if str(payment.get("riderId")) == str(summary["riderId"]):
+                # When viewing all months, aggregate all payments across all months
+                if not month:
+                    paid += payment.get("amount", 0)
+                # When viewing specific month, only count payments for that month
+                elif payment.get("month") == month:
+                    paid += payment.get("amount", 0)
+        summary["paid"] = paid
+        summary["outstanding"] = max(0, summary["payable"] - paid)
+
     return summaries
 
 
@@ -883,6 +900,35 @@ def create_rider_notification(
     save_rider_notifications(notifications)
 
     return notification
+
+def load_rider_payments():
+    if not RIDER_PAYMENTS_FILE.exists():
+        return []
+
+    try:
+        return json.loads(
+            RIDER_PAYMENTS_FILE.read_text(
+                encoding="utf-8"
+            )
+        )
+    except json.JSONDecodeError:
+        return []
+
+
+def save_rider_payments(payments):
+    RIDER_PAYMENTS_FILE.parent.mkdir(
+        parents=True,
+        exist_ok=True
+    )
+
+    RIDER_PAYMENTS_FILE.write_text(
+        json.dumps(
+            payments,
+            indent=2,
+            ensure_ascii=False
+        ),
+        encoding="utf-8"
+    )
 
 # =========================================================
 # ADMIN SESSION FUNCTIONS
@@ -1750,7 +1796,15 @@ class FiableHandler(SimpleHTTPRequestHandler):
 
                     order["status"] = "delivered"
 
-                    rider["status"] = "available"
+                    has_queued_delivery = any(
+                        str(delivery.get("riderId", "")) == rider_id
+                        and str(delivery.get("status", "")).strip().lower()
+                        == "assigned"
+                        for delivery in deliveries
+                    )
+                    rider["status"] = (
+                        "assigned" if has_queued_delivery else "available"
+                    )
 
 
                     rider["totalDeliveries"] = (
@@ -2008,6 +2062,132 @@ class FiableHandler(SimpleHTTPRequestHandler):
                 return
 
             # =====================================================
+            # ADMIN FORGOT PASSWORD
+            # =====================================================
+
+            if path == "/api/admin/forgot-password":
+
+                email = clean(
+                    payload.get("email"),
+                    160
+                ).lower()
+
+                if not valid_email(email):
+                    self._json_response(
+                        202,
+                        {
+                            "message": "If an account exists for this email, a password reset link has been created."
+                        }
+                    )
+                    return
+
+                admin_creds = load_admin_credentials()
+
+                admin_exists = next(
+                    (
+                        item for item in admin_creds
+                        if item.get("email", "").lower() == email
+                    ),
+                    None
+                )
+
+                # Don't reveal whether an account exists
+                if not admin_exists:
+                    self._json_response(
+                        202,
+                        {
+                            "message": "If an account exists for this email, a password reset link has been created."
+                        }
+                    )
+                    return
+
+                token = create_reset_token(email)
+
+                save_submission("admin-password-reset", {
+                    "email": email,
+                    "token": token
+                })
+
+                # LOCAL DEVELOPMENT ONLY
+                reset_link = f"/admin-login.html?reset={token}"
+
+                self._json_response(
+                    202,
+                    {
+                        "message": "Password reset link created.",
+                        "resetLink": reset_link
+                    }
+                )
+
+                return
+
+            # =====================================================
+            # ADMIN RESET PASSWORD
+            # =====================================================
+
+            if path == "/api/admin/reset-password":
+
+                token = clean(
+                    payload.get("token"),
+                    200
+                )
+                password = clean(
+                    payload.get("password"),
+                    128
+                )
+                confirm_password = clean(
+                    payload.get("confirmPassword"),
+                    128
+                )
+
+                if not token:
+                    raise ValueError("Invalid or missing reset link")
+
+                if len(password) < 8:
+                    raise ValueError("Your password must be at least 8 characters")
+
+                if password != confirm_password:
+                    raise ValueError("Passwords do not match")
+
+                reset_data = verify_reset_token(token)
+
+                if not reset_data:
+                    raise ValueError(
+                        "This reset link is invalid or has expired. Please request a new one."
+                    )
+
+                email = reset_data["email"]
+
+                admin_creds = load_admin_credentials()
+
+                admin_found = False
+
+                for admin in admin_creds:
+                    if admin.get("email", "").lower() == email:
+                        salt = secrets.token_hex(16)
+
+                        admin["salt"] = salt
+                        admin["passwordHash"] = password_hash(password, salt)
+                        admin["passwordResetAt"] = datetime.now(timezone.utc).isoformat()
+
+                        admin_found = True
+                        break
+
+                if not admin_found:
+                    raise ValueError("Admin account not found")
+
+                save_admin_credentials(admin_creds)
+
+                self._json_response(
+                    200,
+                    {
+                        "message": "Password reset successfully. Please log in with your new password."
+                    }
+                )
+
+                return
+
+            # =====================================================
             # ADMIN CHANGE PASSWORD
             # =====================================================
 
@@ -2259,6 +2439,70 @@ class FiableHandler(SimpleHTTPRequestHandler):
                 return
 
             # =====================================================
+            # ADMIN MARK RIDER PAYMENT AS PAID
+            # =====================================================
+
+            if path == "/api/admin/rider-payments/mark-paid":
+
+                if not require_admin(self):
+                    self._json_response(
+                        401,
+                        {
+                            "error": "Admin authentication required."
+                        }
+                    )
+                    return
+
+                rider_id = payload.get("riderId")
+                amount = payload.get("amount")
+                month = payload.get("month")
+
+                if not rider_id or amount is None or not month:
+                    self._json_response(
+                        400,
+                        {
+                            "error": "Rider ID, amount, and month are required."
+                        }
+                    )
+                    return
+
+                try:
+                    amount = int(amount)
+                    if amount <= 0:
+                        raise ValueError("Amount must be positive")
+                except (ValueError, TypeError):
+                    self._json_response(
+                        400,
+                        {
+                            "error": "Amount must be a positive number."
+                        }
+                    )
+                    return
+
+                rider_payments = load_rider_payments()
+                
+                payment = {
+                    "id": secrets.token_urlsafe(12),
+                    "riderId": rider_id,
+                    "amount": amount,
+                    "month": month,
+                    "paidAt": datetime.now(timezone.utc).isoformat()
+                }
+                
+                rider_payments.append(payment)
+                save_rider_payments(rider_payments)
+
+                self._json_response(
+                    200,
+                    {
+                        "message": "Payment recorded successfully.",
+                        "payment": payment
+                    }
+                )
+
+                return
+
+            # =====================================================
             # ADMIN ASSIGN RIDER TO DELIVERY
             # =====================================================
 
@@ -2329,8 +2573,8 @@ class FiableHandler(SimpleHTTPRequestHandler):
                     )
                     return
 
-                # Rider must be available
-                if rider.get("status") != "available":
+                # Only riders actively on a delivery are unavailable.
+                if rider.get("status") == "on_delivery":
                     self._json_response(
                         400,
                         {
@@ -2394,6 +2638,167 @@ class FiableHandler(SimpleHTTPRequestHandler):
                         "message": "Rider assigned successfully.",
                         "order": order,
                         "rider": rider
+                    }
+                )
+
+                return
+
+            # =====================================================
+            # ADMIN BULK ASSIGN RIDER TO MULTIPLE DELIVERIES
+            # =====================================================
+
+            if path == "/api/admin/orders/bulk-assign":
+
+                if not require_admin(self):
+                    self._json_response(
+                        401,
+                        {
+                            "error": "Admin authentication required."
+                        }
+                    )
+                    return
+
+                order_ids = payload.get("orderIds", [])
+                rider_id = payload.get("riderId")
+
+                # Validate inputs
+                if not order_ids or not isinstance(order_ids, list):
+                    self._json_response(
+                        400,
+                        {
+                            "error": "Valid order IDs array is required."
+                        }
+                    )
+                    return
+
+                if not rider_id:
+                    self._json_response(
+                        400,
+                        {
+                            "error": "Rider ID is required."
+                        }
+                    )
+                    return
+
+                try:
+                    rider_id = int(rider_id)
+                    order_ids = [int(oid) for oid in order_ids]
+                except (TypeError, ValueError):
+                    self._json_response(
+                        400,
+                        {
+                            "error": "Valid order IDs and rider ID are required."
+                        }
+                    )
+                    return
+
+                deliveries = load_deliveries()
+                riders = load_riders()
+
+                # Find the rider
+                rider = next(
+                    (
+                        item
+                        for item in riders
+                        if str(item.get("id", "")) == str(rider_id)
+                    ),
+                    None
+                )
+
+                if not rider:
+                    self._json_response(
+                        404,
+                        {
+                            "error": "Rider not found."
+                        }
+                    )
+                    return
+
+                # Only riders actively on a delivery are unavailable.
+                if rider.get("status") == "on_delivery":
+                    self._json_response(
+                        400,
+                        {
+                            "error": "Rider is not available for assignment."
+                        }
+                    )
+                    return
+
+                # Assign all orders
+                assigned_count = 0
+                failed_count = 0
+                failed_orders = []
+
+                for order_id in order_ids:
+                    # Find the order
+                    order = next(
+                        (
+                            item
+                            for item in deliveries
+                            if str(item.get("id", "")) == str(order_id)
+                        ),
+                        None
+                    )
+
+                    if not order:
+                        failed_count += 1
+                        failed_orders.append(order_id)
+                        continue
+
+                    # Order must be assignable
+                    order_status = str(
+                        order.get("status", "")
+                    ).strip().lower()
+
+                    if order_status != "requested":
+                        failed_count += 1
+                        failed_orders.append(order_id)
+                        continue
+
+                    # Assign rider to order
+                    order["riderId"] = rider["id"]
+                    order["riderRef"] = rider.get("riderRef", "")
+                    order["riderName"] = rider.get("name", "")
+                    order["riderPhone"] = rider.get("phone", "")
+
+                    # Order becomes assigned
+                    order["status"] = "assigned"
+                    order["updatedAt"] = datetime.now(
+                        timezone.utc
+                    ).isoformat()
+
+                    assigned_count += 1
+
+                    # Create rider notification
+                    create_rider_notification(
+                        rider_id=rider["id"],
+                        notification_type="order_assigned",
+                        title="New Delivery Assigned",
+                        message=(
+                            f"Order #{order.get('id')} "
+                            "has been assigned to you."
+                        ),
+                        order_id=order.get("id")
+                    )
+
+                # Mark rider as assigned if they have assignments
+                if assigned_count > 0:
+                    rider["status"] = "assigned"
+
+                save_deliveries(deliveries)
+                save_riders(riders)
+
+                message = f"Successfully assigned {assigned_count} order(s)"
+                if failed_count > 0:
+                    message += f" ({failed_count} failed)"
+
+                self._json_response(
+                    200,
+                    {
+                        "message": message,
+                        "assigned": assigned_count,
+                        "failed": failed_count,
+                        "failedOrders": failed_orders
                     }
                 )
 
@@ -2500,8 +2905,8 @@ class FiableHandler(SimpleHTTPRequestHandler):
                     )
                     return
 
-                # New rider must be available
-                if new_rider.get("status") != "available":
+                # Only riders actively on a delivery are unavailable.
+                if new_rider.get("status") == "on_delivery":
                     self._json_response(
                         400,
                         {
@@ -2669,7 +3074,18 @@ class FiableHandler(SimpleHTTPRequestHandler):
 
                     if rider:
 
-                        rider["status"] = "available"
+                        has_queued_delivery = any(
+                            str(delivery.get("riderId", "")) ==
+                            str(rider.get("id", ""))
+                            and str(delivery.get("status", "")).strip().lower()
+                            == "assigned"
+                            for delivery in deliveries
+                        )
+                        rider["status"] = (
+                            "assigned"
+                            if has_queued_delivery
+                            else "available"
+                        )
 
                         if new_status == "delivered":
 
@@ -3593,10 +4009,8 @@ class FiableHandler(SimpleHTTPRequestHandler):
 
             deliveries = load_deliveries()
 
-
-            assigned_delivery = None
-            on_delivery = None
-
+            # Get all assigned and on_delivery orders for this rider
+            assigned_deliveries = []
 
             for order in deliveries:
 
@@ -3604,38 +4018,37 @@ class FiableHandler(SimpleHTTPRequestHandler):
                     order.get("riderId", "")
                 )
 
-
                 if order_rider_id != rider_id:
                     continue
-
 
                 status = str(
                     order.get("status", "")
                 ).strip().lower()
 
+                if status in {"assigned", "on_delivery"}:
+                    assigned_deliveries.append(order)
 
-                if status == "on_delivery":
-
-                    on_delivery = order
-                    break
-
-
-                if status == "assigned":
-
-                    assigned_delivery = order
-
-
-            # Prefer an order already being delivered
-            current_delivery = (
-                on_delivery
-                or assigned_delivery
+            # Sort: on_delivery first, then assigned
+            assigned_deliveries.sort(
+                key=lambda x: (
+                    x.get("status", "").lower() != "on_delivery",
+                    x.get("createdAt", "")
+                )
             )
 
+            # Return the current delivery (first one) for backward compatibility
+            current_delivery = (
+                assigned_deliveries[0]
+                if assigned_deliveries
+                else None
+            )
 
             self._json_response(
                 200,
                 {
-                    "delivery": current_delivery
+                    "delivery": current_delivery,
+                    "deliveries": assigned_deliveries,
+                    "count": len(assigned_deliveries)
                 }
             )
 
@@ -3712,6 +4125,11 @@ class FiableHandler(SimpleHTTPRequestHandler):
                 )
 
                 orders.append(order)
+
+            orders.sort(
+                key=lambda order: order.get("createdAt", ""),
+                reverse=True
+            )
 
             self._json_response(
                 200,

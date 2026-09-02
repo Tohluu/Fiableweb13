@@ -1051,6 +1051,7 @@ body {
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
+  position: relative;
 }
 
 .rider-nav-btn:hover,
@@ -1058,6 +1059,26 @@ body {
   border-color: #cfe0ff;
   background: #eef4ff;
   color: #246bfe;
+}
+
+.rider-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-inline-size: 20px;
+  block-size: 20px;
+  padding: 0 6px;
+  margin-inline-start: 6px;
+  background: #ef4444;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 10px;
+  vertical-align: middle;
+}
+
+.rider-badge.hidden {
+  display: none;
 }
 
 .rider-dashboard-view {

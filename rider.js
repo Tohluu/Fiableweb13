@@ -818,11 +818,14 @@ async function loadRiderDelivery() {
       "riderCurrentDelivery"
     );
 
+  const badgeElement =
+    document.getElementById(
+      "deliveryCountBadge"
+    );
 
   if (!deliveryContainer) {
     return;
   }
-
 
   try {
 
@@ -839,10 +842,8 @@ async function loadRiderDelivery() {
         }
       );
 
-
     const data =
       await response.json();
-
 
     if (!response.ok) {
 
@@ -853,14 +854,25 @@ async function loadRiderDelivery() {
 
     }
 
+    const deliveries =
+      data.deliveries || [];
 
-    const delivery =
-      data.delivery;
+    const count = data.count || 0;
 
+    /* UPDATE BADGE */
 
-    /* NO ACTIVE DELIVERY */
+    if (badgeElement) {
+      if (count > 0) {
+        badgeElement.textContent = count;
+        badgeElement.classList.remove("hidden");
+      } else {
+        badgeElement.classList.add("hidden");
+      }
+    }
 
-    if (!delivery) {
+    /* NO ACTIVE DELIVERIES */
+
+    if (!deliveries || deliveries.length === 0) {
 
       deliveryContainer.innerHTML = `
         <div class="rider-empty-state">
@@ -872,213 +884,24 @@ async function loadRiderDelivery() {
       return;
     }
 
+    /* RENDER ALL ASSIGNED DELIVERIES */
 
-    /* EXTRACT DELIVERY FIELDS */
+    deliveryContainer.innerHTML = deliveries
+      .map(delivery => renderDeliveryCard(delivery))
+      .join("");
 
-    const orderRef =
-      delivery.orderRef ||
-      delivery.id ||
-      "—";
+    /* ATTACH EVENT HANDLERS */
 
-    const status =
-      String(
-        delivery.status || "assigned"
-      ).toLowerCase();
-
-    const pickup =
-      delivery.pickup ||
-      "—";
-
-    const dropoff =
-      delivery.dropoff ||
-      "—";
-
-    const units =
-      delivery.units ?? "—";
-
-    const details =
-      delivery.details || {};
-
-    const pickupContactName =
-      details.pickupContactName || "—";
-
-    const pickupPhone =
-      details.pickupPhone || "—";
-
-    const recipientName =
-      details.recipientName || "—";
-
-    const recipientPhone =
-      details.recipientPhone || "—";
-
-    const packageType =
-      details.packageType ||
-      delivery.packageType ||
-      "—";
-
-    const priority =
-      details.priority ||
-      delivery.priority ||
-      "—";
-
-    const deliveryWindow =
-      details.deliveryWindow ||
-      "—";
-
-    const packageDescription =
-      details.packageDescription ||
-      delivery.packageDescription ||
-      "—";
-
-
-    /* ACTION BUTTON */
-
-    let actionButton = "";
-
-    if (status === "assigned") {
-
-      actionButton = `
-        <button
-          type="button"
-          class="rider-delivery-action-btn"
-          data-order-id="${delivery.id}"
-          data-status="on_delivery"
-        >
-          Start Delivery
-        </button>
-      `;
-
-    } else if (status === "on_delivery") {
-
-      actionButton = `
-        <button
-          type="button"
-          class="rider-delivery-action-btn"
-          data-order-id="${delivery.id}"
-          data-status="delivered"
-        >
-          Mark Delivered
-        </button>
-      `;
-
-    } else if (status === "delivered") {
-
-      actionButton = `
-        <div class="rider-delivery-completed">
-          Delivery Completed
-        </div>
-      `;
-
-    }
-
-
-    /* DISPLAY DELIVERY CARD */
-
-    deliveryContainer.innerHTML = `
-
-      <div class="rider-delivery-card">
-
-        <div class="rider-delivery-header">
-
-          <div>
-            <span class="rider-delivery-label">
-              Order
-            </span>
-            <h3>${orderRef}</h3>
-          </div>
-
-          <span class="rider-delivery-status">
-            ${status.replace("_", " ")}
-          </span>
-
-        </div>
-
-
-        <div class="rider-delivery-details">
-
-          <div class="rider-delivery-item">
-            <span>Pickup</span>
-            <strong>${pickup}</strong>
-          </div>
-
-          <div class="rider-delivery-item">
-            <span>Destination</span>
-            <strong>${dropoff}</strong>
-          </div>
-
-          <div class="rider-delivery-item">
-            <span>Recipient</span>
-            <strong>${recipientName}</strong>
-          </div>
-
-          <div class="rider-delivery-item">
-            <span>Package Type</span>
-            <strong>${packageType}</strong>
-          </div>
-
-          <div class="rider-delivery-item">
-            <span>Units</span>
-            <strong>${units}</strong>
-          </div>
-
-          <div class="rider-delivery-item">
-            <span>Priority</span>
-            <strong>${priority}</strong>
-          </div>
-
-        </div>
-
-
-        <div class="rider-delivery-actions">
-
-          <button
-            type="button"
-            class="rider-view-order-btn"
-            data-order-id="${delivery.id}"
-            data-order-ref="${orderRef}"
-            data-pickup="${pickup}"
-            data-dropoff="${dropoff}"
-            data-pickup-contact="${pickupContactName}"
-            data-pickup-phone="${pickupPhone}"
-            data-recipient="${recipientName}"
-            data-recipient-phone="${recipientPhone}"
-            data-package-type="${packageType}"
-            data-description="${packageDescription}"
-            data-units="${units}"
-            data-priority="${priority}"
-            data-window="${deliveryWindow}"
-            data-status="${status}"
-          >
-            View Order
-          </button>
-
-          ${actionButton}
-
-        </div>
-
-      </div>
-
-    `;
-
-
-    /* ATTACH VIEW ORDER HANDLER */
-
-    const viewOrderBtn =
-      deliveryContainer.querySelector(
-        ".rider-view-order-btn"
-      );
-
-    if (viewOrderBtn) {
-
-      viewOrderBtn.addEventListener(
-        "click",
-        () => {
-          openOrderDetailsModal(delivery);
-        }
-      );
-
-    }
-
+    deliveryContainer.querySelectorAll(".rider-view-order-btn")
+      .forEach(btn => {
+        btn.addEventListener("click", () => {
+          const orderId = Number(btn.dataset.orderId);
+          const assignedDelivery = deliveries.find(d => d.id === orderId);
+          if (assignedDelivery) {
+            openOrderDetailsModal(assignedDelivery);
+          }
+        });
+      });
 
   } catch (error) {
 
@@ -1106,6 +929,190 @@ async function loadRiderDelivery() {
   }
 
 }
+
+function renderDeliveryCard(delivery) {
+
+  const orderRef =
+    delivery.orderRef ||
+    delivery.id ||
+    "—";
+
+  const status =
+    String(
+      delivery.status || "assigned"
+    ).toLowerCase();
+
+  const pickup =
+    delivery.pickup ||
+    "—";
+
+  const dropoff =
+    delivery.dropoff ||
+    "—";
+
+  const units =
+    delivery.units ?? "—";
+
+  const details =
+    delivery.details || {};
+
+  const pickupContactName =
+    details.pickupContactName || "—";
+
+  const pickupPhone =
+    details.pickupPhone || "—";
+
+  const recipientName =
+    details.recipientName || "—";
+
+  const recipientPhone =
+    details.recipientPhone || "—";
+
+  const packageType =
+    details.packageType ||
+    delivery.packageType ||
+    "—";
+
+  const priority =
+    details.priority ||
+    delivery.priority ||
+    "—";
+
+  const deliveryWindow =
+    details.deliveryWindow ||
+    "—";
+
+  const packageDescription =
+    details.packageDescription ||
+    delivery.packageDescription ||
+    "—";
+
+  /* ACTION BUTTON */
+
+  let actionButton = "";
+
+  if (status === "assigned") {
+
+    actionButton = `
+      <button
+        type="button"
+        class="rider-delivery-action-btn"
+        data-order-id="${delivery.id}"
+        data-status="on_delivery"
+      >
+        Start Delivery
+      </button>
+    `;
+
+  } else if (status === "on_delivery") {
+
+    actionButton = `
+      <button
+        type="button"
+        class="rider-delivery-action-btn"
+        data-order-id="${delivery.id}"
+        data-status="delivered"
+      >
+        Mark Delivered
+      </button>
+    `;
+
+  } else if (status === "delivered") {
+
+    actionButton = `
+      <div class="rider-delivery-completed">
+        Delivery Completed
+      </div>
+    `;
+
+  }
+
+  return `
+
+    <div class="rider-delivery-card">
+
+      <div class="rider-delivery-header">
+
+        <div>
+          <span class="rider-delivery-label">
+            Order
+          </span>
+          <h3>${orderRef}</h3>
+        </div>
+
+        <span class="rider-delivery-status">
+          ${status.replace("_", " ")}
+        </span>
+
+      </div>
+
+      <div class="rider-delivery-details">
+
+        <div class="rider-delivery-item">
+          <span>Pickup</span>
+          <strong>${pickup}</strong>
+        </div>
+
+        <div class="rider-delivery-item">
+          <span>Destination</span>
+          <strong>${dropoff}</strong>
+        </div>
+
+        <div class="rider-delivery-item">
+          <span>Recipient</span>
+          <strong>${recipientName}</strong>
+        </div>
+
+        <div class="rider-delivery-item">
+          <span>Package Type</span>
+          <strong>${packageType}</strong>
+        </div>
+
+        <div class="rider-delivery-item">
+          <span>Units</span>
+          <strong>${units}</strong>
+        </div>
+
+        <div class="rider-delivery-item">
+          <span>Priority</span>
+          <strong>${priority}</strong>
+        </div>
+
+      </div>
+
+      <div class="rider-delivery-actions">
+
+        <button
+          type="button"
+          class="rider-view-order-btn"
+          data-order-id="${delivery.id}"
+          data-order-ref="${orderRef}"
+          data-pickup="${pickup}"
+          data-dropoff="${dropoff}"
+          data-pickup-contact="${pickupContactName}"
+          data-pickup-phone="${pickupPhone}"
+          data-recipient="${recipientName}"
+          data-recipient-phone="${recipientPhone}"
+          data-package-type="${packageType}"
+          data-description="${packageDescription}"
+          data-units="${units}"
+          data-priority="${priority}"
+          data-window="${deliveryWindow}"
+          data-status="${status}"
+        >
+          View Order
+        </button>
+
+        ${actionButton}
+
+      </div>
+
+    </div>
+
+  `;
+
+}
+
 
 
 /* =====================================================

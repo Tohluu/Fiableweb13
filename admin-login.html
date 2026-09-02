@@ -98,6 +98,132 @@
           Log in
         </button>
 
+        <button
+          type="button"
+          class="admin-forgot-btn"
+          id="adminForgotBtn"
+        >
+          Forgot your password?
+        </button>
+
+      </form>
+
+
+      <form id="adminForgotForm" class="admin-form hidden" novalidate>
+
+        <h2>Reset your password</h2>
+
+        <p class="admin-form-info">
+          Enter your admin email and we'll send you a secure password reset link.
+        </p>
+
+        <div class="form-group">
+          <label for="adminForgotEmail">Email address</label>
+          <input
+            type="email"
+            id="adminForgotEmail"
+            placeholder="admin@fiablelogistics.com"
+            required
+          >
+        </div>
+
+        <div
+          id="adminForgotError"
+          class="admin-login-error"
+          role="alert"
+          aria-live="polite"
+        ></div>
+
+        <button
+          type="submit"
+          class="admin-login-btn"
+          id="adminForgotSubmitBtn"
+        >
+          Send reset link
+        </button>
+
+        <button
+          type="button"
+          class="admin-back-btn"
+          id="adminBackToLoginBtn"
+        >
+          ← Back to login
+        </button>
+
+      </form>
+
+
+      <form id="adminResetForm" class="admin-form hidden" novalidate>
+
+        <h2>Create a new password</h2>
+
+        <p class="admin-form-info">
+          Enter a new password for your admin account.
+        </p>
+
+        <div class="form-group">
+          <label for="adminResetPassword">New password</label>
+          <div class="password-field">
+            <input
+              type="password"
+              id="adminResetPassword"
+              placeholder="Enter your new password"
+              minlength="8"
+              required
+            >
+            <button
+              type="button"
+              class="password-toggle"
+              id="adminResetPasswordToggle"
+            >
+              Show
+            </button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="adminResetConfirmPassword">Confirm new password</label>
+          <div class="password-field">
+            <input
+              type="password"
+              id="adminResetConfirmPassword"
+              placeholder="Confirm your new password"
+              minlength="8"
+              required
+            >
+            <button
+              type="button"
+              class="password-toggle"
+              id="adminResetConfirmPasswordToggle"
+            >
+              Show
+            </button>
+          </div>
+        </div>
+
+        <div
+          id="adminResetError"
+          class="admin-login-error"
+          role="alert"
+          aria-live="polite"
+        ></div>
+
+        <button
+          type="submit"
+          class="admin-login-btn"
+          id="adminResetSubmitBtn"
+        >
+          Reset password
+        </button>
+
+        <button
+          type="button"
+          class="admin-back-btn"
+          id="adminResetBackBtn"
+        >
+          ← Back to login
+        </button>
+
       </form>
 
 

@@ -247,6 +247,121 @@ body {
 
 
 /* =========================================================
+   FORGOT PASSWORD BUTTON
+========================================================= */
+
+.admin-forgot-btn {
+  inline-size: 100%;
+  block-size: auto;
+  padding: 12px 16px;
+
+  border: 0;
+  background: transparent;
+
+  color: #1769e0;
+  font-size: 13px;
+  font-weight: 700;
+
+  cursor: pointer;
+
+  margin-block-start: 12px;
+
+  transition: opacity 0.2s ease;
+}
+
+.admin-forgot-btn:hover {
+  opacity: 0.8;
+}
+
+
+/* =========================================================
+   FORMS
+========================================================= */
+
+#adminLoginForm {
+  display: block;
+}
+
+#adminForgotForm,
+#adminResetForm {
+  display: none;
+}
+
+#adminLoginForm:not(.hidden) {
+  display: block;
+}
+
+#adminLoginForm.hidden {
+  display: none;
+}
+
+#adminForgotForm.hidden,
+#adminResetForm.hidden {
+  display: none;
+}
+
+#adminForgotForm:not(.hidden) {
+  display: block;
+}
+
+#adminResetForm:not(.hidden) {
+  display: block;
+}
+
+.admin-form {
+  display: none;
+}
+
+.admin-form:not(.hidden) {
+  display: block;
+}
+
+.admin-form.hidden {
+  display: none;
+}
+
+.admin-form h2 {
+  margin: 0 0 8px;
+  font-size: 24px;
+  line-height: 1.2;
+}
+
+.admin-form-info {
+  margin: 8px 0 20px;
+  color: #64748b;
+  font-size: 14px;
+}
+
+
+/* =========================================================
+   BACK BUTTON
+========================================================= */
+
+.admin-back-btn {
+  inline-size: 100%;
+  block-size: auto;
+  padding: 12px 16px;
+
+  border: 0;
+  background: transparent;
+
+  color: #1769e0;
+  font-size: 13px;
+  font-weight: 700;
+
+  cursor: pointer;
+
+  margin-block-start: 12px;
+
+  transition: opacity 0.2s ease;
+}
+
+.admin-back-btn:hover {
+  opacity: 0.8;
+}
+
+
+/* =========================================================
    MOBILE
 ========================================================= */
 

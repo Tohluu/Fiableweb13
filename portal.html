@@ -702,6 +702,8 @@
       localStorage.removeItem("fiableVendorEmail");
       state.account = null;
       state.deliveries = [];
+      clearInterval(vendorRefreshInterval);
+      vendorRefreshInterval = null;
     }
 
     function showLogin() {
@@ -1835,6 +1837,7 @@
         state.account = await api(`/api/account/summary?email=${encodeURIComponent(email)}`);
         state.deliveries = (await api(`/api/account/deliveries?email=${encodeURIComponent(email)}`)).deliveries || [];
         startSessionTimer();
+        startVendorAutoRefresh();
         showPortal();
         updateAccountUI();
         renderRecent();
@@ -1872,7 +1875,18 @@
 
     const SESSION_TIMEOUT = 30 * 60 * 1000; // 30 minutes
     let sessionTimer = null;
+    let vendorRefreshInterval = null;
     let lastActivity = Date.now();
+
+    function startVendorAutoRefresh() {
+      if (vendorRefreshInterval || !state.account) return;
+
+      vendorRefreshInterval = setInterval(() => {
+        if (document.visibilityState === "visible") {
+          refreshAccount();
+        }
+      }, 5000);
+    }
 
     async function login(email, password) {
       const account = await api("/api/login", {
@@ -1886,6 +1900,7 @@
       state.account = account;
       startSessionTimer();
       state.deliveries = (await api(`/api/account/deliveries?email=${encodeURIComponent(account.email)}`)).deliveries || [];
+      startVendorAutoRefresh();
       loadSubscriptionHistory(account.email);
       showPortal();
       updateAccountUI();
@@ -1908,6 +1923,8 @@
     function expireSession() {
         clearInterval(sessionTimer);
         sessionTimer = null;
+      clearInterval(vendorRefreshInterval);
+      vendorRefreshInterval = null;
         localStorage.removeItem("fiableVendorEmail");
         state.account = null;
         state.deliveries = [];

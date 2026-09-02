@@ -128,5 +128,85 @@
     "orderId": 45,
     "read": false,
     "createdAt": "2026-09-01T21:40:05.675742+00:00"
+  },
+  {
+    "id": "lHV4AylPG7aYu330",
+    "riderId": 12,
+    "type": "order_assigned",
+    "title": "New Delivery Assigned",
+    "message": "Order #46 has been assigned to you.",
+    "orderId": 46,
+    "read": false,
+    "createdAt": "2026-09-02T01:01:23.618626+00:00"
+  },
+  {
+    "id": "hrUnurG9NN0fMPzP",
+    "riderId": 12,
+    "type": "order_assigned",
+    "title": "New Delivery Assigned",
+    "message": "Order #47 has been assigned to you.",
+    "orderId": 47,
+    "read": false,
+    "createdAt": "2026-09-02T08:40:39.152484+00:00"
+  },
+  {
+    "id": "vz22qnoduIvDYCU0",
+    "riderId": 12,
+    "type": "order_assigned",
+    "title": "New Delivery Assigned",
+    "message": "Order #48 has been assigned to you.",
+    "orderId": 48,
+    "read": false,
+    "createdAt": "2026-09-02T08:40:39.245149+00:00"
+  },
+  {
+    "id": "DLUEAfmFMVnV4S1h",
+    "riderId": 12,
+    "type": "order_assigned",
+    "title": "New Delivery Assigned",
+    "message": "Order #50 has been assigned to you.",
+    "orderId": 50,
+    "read": false,
+    "createdAt": "2026-09-02T09:23:27.700523+00:00"
+  },
+  {
+    "id": "-LJAmShJ1sMW08Gs",
+    "riderId": 12,
+    "type": "order_assigned",
+    "title": "New Delivery Assigned",
+    "message": "Order #49 has been assigned to you.",
+    "orderId": 49,
+    "read": false,
+    "createdAt": "2026-09-02T09:23:27.723285+00:00"
+  },
+  {
+    "id": "Xpokj_GHMxQnkukg",
+    "riderId": 12,
+    "type": "order_assigned",
+    "title": "New Delivery Assigned",
+    "message": "Order #51 has been assigned to you.",
+    "orderId": 51,
+    "read": false,
+    "createdAt": "2026-09-02T09:25:10.021426+00:00"
+  },
+  {
+    "id": "PA8CB3tgUODXf_Dl",
+    "riderId": 12,
+    "type": "order_assigned",
+    "title": "New Delivery Assigned",
+    "message": "Order #52 has been assigned to you.",
+    "orderId": 52,
+    "read": false,
+    "createdAt": "2026-09-02T09:32:57.641559+00:00"
+  },
+  {
+    "id": "PKbr8GX3MU4jEMWZ",
+    "riderId": 12,
+    "type": "order_assigned",
+    "title": "New Delivery Assigned",
+    "message": "Order #53 has been assigned to you.",
+    "orderId": 53,
+    "read": false,
+    "createdAt": "2026-09-02T09:34:25.877970+00:00"
   }
 ]
