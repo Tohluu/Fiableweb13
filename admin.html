@@ -7,7 +7,7 @@
   <title>Fiable Admin Portal</title>
 
   <link rel="stylesheet" href="portal.css">
-  <link rel="stylesheet" href="admin.css">
+  <link rel="stylesheet" href="admin.css?v=2">
   <style>
     body.admin-page-loading {
       visibility: hidden;
@@ -90,6 +90,15 @@
         >
           <span>🚚</span>
           Riders
+        </button>
+
+        <button
+          class="nav-item"
+          data-admin-view="admin-team"
+          type="button"
+        >
+          <span>♙</span>
+          Team
         </button>
 
         <button
@@ -1273,6 +1282,66 @@
 
 
         <!-- =========================
+            ADMIN TEAM
+        ========================== -->
+        <section class="view" id="view-admin-team">
+
+          <div class="section-title">
+            <div>
+              <div class="eyebrow">Access management</div>
+              <h1>Team</h1>
+              <p class="muted">Manage who can sign in to the admin portal.</p>
+            </div>
+            <button type="button" class="btn primary" id="addAdminBtn">Add Admin</button>
+          </div>
+
+          <article class="panel">
+            <div class="table-wrap">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>Admin</th>
+                    <th>Role</th>
+                    <th>Status</th>
+                    <th>Added</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="adminTeamBody">
+                  <tr><td colspan="5" class="empty-state">Loading team...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+
+        <div class="admin-team-modal" id="addAdminModal" aria-hidden="true">
+          <div class="admin-team-modal-backdrop" id="addAdminBackdrop"></div>
+          <div class="admin-team-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="addAdminTitle">
+            <div class="modal-header">
+              <div>
+                <div class="eyebrow">Access management</div>
+                <h2 id="addAdminTitle">Add Admin</h2>
+              </div>
+              <button type="button" class="modal-close" id="closeAddAdmin" aria-label="Close add admin">×</button>
+            </div>
+            <form id="addAdminForm" class="admin-team-form">
+              <label for="newAdminName">Name</label>
+              <input id="newAdminName" type="text" required placeholder="Admin name">
+              <label for="newAdminEmail">Email</label>
+              <input id="newAdminEmail" type="email" required placeholder="admin@example.com">
+              <label for="newAdminRole">Role</label>
+              <select id="newAdminRole">
+                <option value="staff">Staff</option>
+                <option value="admin">Admin</option>
+              </select>
+              <div id="addAdminMessage" class="admin-team-message" aria-live="polite"></div>
+              <button type="submit" class="btn primary">Add Admin</button>
+            </form>
+          </div>
+        </div>
+
+        <!-- =========================
             ADMIN SETTINGS
         ========================== -->
         <section
@@ -1781,7 +1850,7 @@
   </div>
 
   <!-- Admin JavaScript -->
-  <script src="admin.js?v=15"></script>
+  <script src="admin.js?v=18"></script>
 
   <!-- =====================================================
       ADMIN TOAST

@@ -558,6 +558,127 @@ if (logoutBtn) {
 
   }
 
+  const addAdminModal = document.getElementById("addAdminModal");
+  const addAdminForm = document.getElementById("addAdminForm");
+  const addAdminBtn = document.getElementById("addAdminBtn");
+  const addAdminMessage = document.getElementById("addAdminMessage");
+
+  function closeAddAdminModal() {
+    addAdminModal?.classList.remove("show");
+    addAdminModal?.setAttribute("aria-hidden", "true");
+  }
+
+  function openAddAdminModal() {
+    addAdminMessage.textContent = "";
+    addAdminForm?.reset();
+    addAdminModal?.classList.add("show");
+    addAdminModal?.setAttribute("aria-hidden", "false");
+  }
+
+  async function teamRequest(url, body) {
+    const response = await fetch(url, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Unable to update team.");
+    return data;
+  }
+
+  async function loadAdminTeam() {
+    const tableBody = document.getElementById("adminTeamBody");
+    if (!tableBody) return;
+
+    try {
+      const response = await fetch("/api/admin/team", {
+        credentials: "same-origin",
+        cache: "no-store"
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Unable to load team.");
+
+      addAdminBtn.disabled = !data.isOwner;
+      const admins = data.admins || [];
+      tableBody.innerHTML = admins.length ? admins.map(admin => {
+        const isCurrent = admin.email.toLowerCase() === (data.currentAdminEmail || "").toLowerCase();
+        const canManage = data.isOwner && !isCurrent && admin.role !== "owner";
+        const roleControl = admin.role === "owner"
+          ? "Owner"
+          : `<select class="admin-team-role" data-email="${escapeSubscriptionValue(admin.email)}" ${canManage ? "" : "disabled"}><option value="staff" ${admin.role === "staff" ? "selected" : ""}>Staff</option><option value="admin" ${admin.role === "admin" ? "selected" : ""}>Admin</option></select>`;
+        return `
+          <tr>
+            <td><strong>${escapeSubscriptionValue(admin.email || "—")}</strong></td>
+            <td>${roleControl}</td>
+            <td><span class="admin-team-status ${admin.status}">${escapeSubscriptionValue(admin.status)}</span></td>
+            <td>${admin.createdAt ? new Date(admin.createdAt).toLocaleDateString("en-GB") : "—"}</td>
+            <td>${canManage ? `<button type="button" class="btn outline admin-team-access" data-email="${escapeSubscriptionValue(admin.email)}" data-action="${admin.status === "revoked" ? "restore" : "revoke"}">${admin.status === "revoked" ? "Restore access" : "Revoke access"}</button><button type="button" class="btn danger admin-team-delete" data-email="${escapeSubscriptionValue(admin.email)}">Delete</button>` : isCurrent ? "You cannot change your own access." : "Protected"}</td>
+          </tr>
+        `;
+      }).join("") : '<tr><td colspan="5" class="empty-state">No administrators found.</td></tr>';
+
+      tableBody.querySelectorAll(".admin-team-role").forEach(select => {
+        select.addEventListener("change", async () => {
+          try {
+            await teamRequest("/api/admin/team/role", { email: select.dataset.email, role: select.value });
+            showAdminToast("Role updated successfully.");
+            loadAdminTeam();
+          } catch (error) {
+            showAdminToast(error.message, "error");
+            loadAdminTeam();
+          }
+        });
+      });
+
+      tableBody.querySelectorAll(".admin-team-access").forEach(button => {
+        button.addEventListener("click", async () => {
+          try {
+            await teamRequest(`/api/admin/team/${button.dataset.action}`, { email: button.dataset.email });
+            showAdminToast("Team access updated.");
+            loadAdminTeam();
+          } catch (error) {
+            showAdminToast(error.message, "error");
+          }
+        });
+      });
+
+      tableBody.querySelectorAll(".admin-team-delete").forEach(button => {
+        button.addEventListener("click", async () => {
+          if (!window.confirm("Remove this admin from the team?")) return;
+          try {
+            await teamRequest("/api/admin/team/delete", { email: button.dataset.email });
+            showAdminToast("Admin removed.");
+            loadAdminTeam();
+          } catch (error) {
+            showAdminToast(error.message, "error");
+          }
+        });
+      });
+    } catch (error) {
+      tableBody.innerHTML = `<tr><td colspan="5" class="empty-state">${escapeSubscriptionValue(error.message)}</td></tr>`;
+    }
+  }
+
+  addAdminBtn?.addEventListener("click", openAddAdminModal);
+  document.getElementById("closeAddAdmin")?.addEventListener("click", closeAddAdminModal);
+  document.getElementById("addAdminBackdrop")?.addEventListener("click", closeAddAdminModal);
+  addAdminForm?.addEventListener("submit", async event => {
+    event.preventDefault();
+    addAdminMessage.textContent = "";
+    try {
+      const data = await teamRequest("/api/admin/team/add", {
+        name: document.getElementById("newAdminName").value.trim(),
+        email: document.getElementById("newAdminEmail").value.trim(),
+        role: document.getElementById("newAdminRole").value
+      });
+      addAdminMessage.textContent = `Admin added. Share this first-login link: ${data.resetLink}`;
+      loadAdminTeam();
+    } catch (error) {
+      addAdminMessage.textContent = error.message;
+    }
+  });
+
   async function loadAdminVendors() {
 
     const tableBody = document.getElementById("adminVendorsBody");
@@ -1033,7 +1154,13 @@ if (logoutBtn) {
       }
       renderSubscriptionRevenue(records, revenueMonthFilter?.value || "current", revenueSummary);
       if (monthFilter) {
+        const selectedHistoryMonth = monthFilter.value || "all";
         monthFilter.innerHTML = '<option value="all">All months</option>' + months.map(month => `<option value="${month}">${monthLabel(month)}</option>`).join("");
+        monthFilter.value =
+          selectedHistoryMonth === "all" ||
+          months.includes(selectedHistoryMonth)
+            ? selectedHistoryMonth
+            : "all";
         monthFilter.onchange = () => renderAdminSubscriptionHistory(records, monthFilter.value, tableBody);
       }
       renderAdminSubscriptionHistory(records, monthFilter?.value || "all", tableBody);
@@ -1167,7 +1294,7 @@ if (logoutBtn) {
 
       const activeRiders =
         riders.filter(
-          rider => rider.status === "active"
+          rider => rider.isLoggedIn
         ).length;
 
       const availableRiders =
@@ -1187,7 +1314,7 @@ if (logoutBtn) {
 
       const inactiveRiders =
         riders.filter(
-          rider => rider.status === "inactive"
+          rider => !rider.isLoggedIn
         ).length;
 
 
@@ -1245,7 +1372,9 @@ if (logoutBtn) {
         riders.map((rider, index) => {
 
           const statusLabel =
-            rider.status === "on_delivery"
+            !rider.isLoggedIn
+              ? "Inactive"
+              : rider.status === "on_delivery"
               ? "On Delivery"
               : rider.status === "available"
                 ? "Available"
@@ -1581,7 +1710,7 @@ if (logoutBtn) {
 
       const riders =
         (data.riders || []).filter(
-          rider => rider.status !== "on_delivery"
+          rider => rider.isLoggedIn && rider.status !== "on_delivery"
         );
 
 
@@ -2381,7 +2510,9 @@ if (logoutBtn) {
       const response = await fetch("/api/admin/riders", { credentials: "same-origin" });
       const data = await response.json();
       if (response.ok && data.riders) {
-        data.riders.forEach(rider => {
+        data.riders
+          .filter(rider => rider.isLoggedIn && rider.status !== "on_delivery")
+          .forEach(rider => {
           const option = document.createElement("option");
           option.value = rider.id;
           option.textContent = `${rider.name} (${rider.riderRef})`;
@@ -4604,6 +4735,7 @@ if (logoutBtn) {
         loadAdminSubscriptions();
         loadAdminRiders();
         loadAdminRiderPayments();
+        loadAdminTeam();
       }
 
     },
@@ -4624,6 +4756,7 @@ if (logoutBtn) {
   loadAdminSubscriptions();
   loadAdminRiders();
   loadAdminSettings();
+  loadAdminTeam();
   loadAdminNotificationSettings();
 
 });

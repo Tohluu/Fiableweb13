@@ -258,5 +258,75 @@
     "orderId": 58,
     "read": false,
     "createdAt": "2026-09-02T10:12:09.477869+00:00"
+  },
+  {
+    "id": "Ow-5XKZ9sQuns1xp",
+    "riderId": 12,
+    "type": "order_assigned",
+    "title": "New Delivery Assigned",
+    "message": "Order #59 has been assigned to you.",
+    "orderId": 59,
+    "read": false,
+    "createdAt": "2026-09-02T14:03:11.799789+00:00"
+  },
+  {
+    "id": "-b3n6AGH3OGQFHVb",
+    "riderId": 12,
+    "type": "order_assigned",
+    "title": "New Delivery Assigned",
+    "message": "Order #60 has been assigned to you.",
+    "orderId": 60,
+    "read": false,
+    "createdAt": "2026-09-02T14:03:11.864794+00:00"
+  },
+  {
+    "id": "NXRK4tWJRW55pjpV",
+    "riderId": 12,
+    "type": "order_assigned",
+    "title": "New Delivery Assigned",
+    "message": "Order #61 has been assigned to you.",
+    "orderId": 61,
+    "read": false,
+    "createdAt": "2026-09-02T14:03:11.952181+00:00"
+  },
+  {
+    "id": "EOTicgtNT9smzqhE",
+    "riderId": 12,
+    "type": "order_assigned",
+    "title": "New Delivery Assigned",
+    "message": "Order #62 has been assigned to you.",
+    "orderId": 62,
+    "read": false,
+    "createdAt": "2026-09-02T14:03:11.976281+00:00"
+  },
+  {
+    "id": "iHjztPGo85L_LNxI",
+    "riderId": 12,
+    "type": "order_assigned",
+    "title": "New Delivery Assigned",
+    "message": "Order #63 has been assigned to you.",
+    "orderId": 63,
+    "read": false,
+    "createdAt": "2026-09-02T14:03:12.000461+00:00"
+  },
+  {
+    "id": "LkUy6hI-t5i9l1US",
+    "riderId": 12,
+    "type": "order_assigned",
+    "title": "New Delivery Assigned",
+    "message": "Order #64 has been assigned to you.",
+    "orderId": 64,
+    "read": false,
+    "createdAt": "2026-09-02T14:03:12.037610+00:00"
+  },
+  {
+    "id": "oC_QiKbUuJPUjaiZ",
+    "riderId": 12,
+    "type": "order_assigned",
+    "title": "New Delivery Assigned",
+    "message": "Order #65 has been assigned to you.",
+    "orderId": 65,
+    "read": false,
+    "createdAt": "2026-09-07T08:46:06.299937+00:00"
   }
 ]

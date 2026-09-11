@@ -150,7 +150,8 @@
     "totalDeliveries": 8,
     "completedDeliveries": 8,
     "failedDeliveries": 0,
-    "createdAt": "2026-08-27T07:41:53.662121+00:00"
+    "createdAt": "2026-08-27T07:41:53.662121+00:00",
+    "lastLoginAt": "2026-09-02T22:47:28.088388+00:00"
   },
   {
     "id": 12,
@@ -162,9 +163,10 @@
     "salt": "f8d00b3d7ed03db1b75c82a26788dd07",
     "vehicle": "Car",
     "status": "available",
-    "totalDeliveries": 9,
-    "completedDeliveries": 9,
+    "totalDeliveries": 16,
+    "completedDeliveries": 16,
     "failedDeliveries": 0,
-    "createdAt": "2026-08-27T22:44:34.149668+00:00"
+    "createdAt": "2026-08-27T22:44:34.149668+00:00",
+    "lastLoginAt": "2026-09-07T11:13:58.113100+00:00"
   }
 ]

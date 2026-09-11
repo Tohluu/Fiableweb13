@@ -278,6 +278,15 @@ textarea{resize:vertical;min-block-size:85px}
     gap:15px
 }
 .mini-rule b{font-size:12px}.mini-rule span{color:var(--muted);font-size:11px;text-align:end}
+.batch-delivery-panel{margin-block-start:20px}
+.batch-delivery-rows{display:grid;gap:14px;margin-block:20px}
+.batch-delivery-row{padding:16px;border:1px solid var(--line);border-radius:8px;background:#fafcff}
+.batch-delivery-row .form-grid{margin:0}
+.batch-delivery-row-heading{display:flex;align-items:center;justify-content:space-between;margin-block-end:14px;font-size:13px}
+.batch-delivery-actions{display:flex;flex-wrap:wrap;gap:10px}
+.batch-quote-preview{display:grid;gap:4px;margin-block-start:16px;padding:14px 16px;border:1px solid #9dc0f7;border-radius:8px;background:var(--blue-soft);font-size:13px}
+.batch-quote-preview span{color:var(--muted)}
+.batch-quote-preview b{color:var(--blue-dark)}
 .subscription-current{display:flex;align-items:center;justify-content:space-between}
 .label{
     display:block;
@@ -453,6 +462,7 @@ textarea{resize:vertical;min-block-size:85px}
   .welcome-row,.section-title{align-items:flex-start;flex-direction:column}
   .welcome-row h2,.section-title h2{font-size:26px}
   .request-grid,.account-grid{grid-template-columns:1fr}
+  .batch-delivery-actions .btn{flex:1}
   #view-settings .account-grid{grid-template-columns:minmax(0,1fr)}
   #view-settings .details-card{min-inline-size:0;padding:22px 18px}
   #view-settings .detail-row{align-items:flex-start;gap:12px}

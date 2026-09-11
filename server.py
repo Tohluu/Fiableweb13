@@ -6,6 +6,7 @@ import re
 import hashlib
 import hmac
 import secrets
+import math
 from datetime import datetime, timezone, timedelta
 import os
 
@@ -48,6 +49,14 @@ PLAN_UNIT_PRICES = {
 }
 
 EXPRESS_UNIT_PRICE = 2000
+PRIORITY_SURCHARGE = 2000
+RIDER_PAYOUT_RATE = 0.80
+PRICING_VERSION = "2026-09-v1"
+BATCH_DISCOUNT_TIERS = (
+    (11, 0.15),
+    (6, 0.10),
+    (3, 0.05),
+)
 
 PLANS = {
     "Basic": {"units": 45},
@@ -89,6 +98,13 @@ LOCATION_ZONES = {
     "osapa-london": "lekki", "jakande-lekki": "lekki",
     "orchid-road": "lekki",
     "abraham-adesanya": "lekki", "ilasan": "lekki",
+    "marwa": "lekki",
+}
+
+LEKKI_AXIS_LOCATIONS = {
+    "lekki-phase-1", "marwa", "ikate-elegushi", "chevron", "ajah",
+    "ikota", "vgc", "osapa-london", "jakande-lekki", "orchid-road",
+    "abraham-adesanya", "ilasan",
 }
 
 # Distance-based unit matrix between zones.
@@ -129,7 +145,7 @@ ZONE_UNIT_MATRIX = {
 EXTENDED_UNITS = 7  # default for any route touching "extended", unless overridden above
 
 
-def estimate_delivery(pickup, dropoff, plan=None):
+def estimate_delivery(pickup, dropoff, plan=None, priority="Standard"):
     pickup_zone = LOCATION_ZONES.get(pickup)
     dropoff_zone = LOCATION_ZONES.get(dropoff)
     if not pickup_zone or not dropoff_zone:
@@ -144,12 +160,109 @@ def estimate_delivery(pickup, dropoff, plan=None):
     recommended = "Basic" if units <= 2 else "Growth" if units <= 4 else "Business"
     billed_plan = plan if plan in PLAN_UNIT_PRICES else recommended
     unit_price = PLAN_UNIT_PRICES[billed_plan]
+    priority = clean(priority, 40).title()
+    priority_surcharge = (
+        PRIORITY_SURCHARGE
+        if priority in {"Express", "Urgent"}
+        else 0
+    )
+    base_cost = units * unit_price
+    cost = base_cost + priority_surcharge
     return {
         "units": units,
-        "cost": units * unit_price,
+        "baseCost": base_cost,
+        "prioritySurcharge": priority_surcharge,
+        "cost": cost,
         "unitPrice": unit_price,
         "plan": billed_plan,
         "recommendedPlan": recommended,
+        "riderPayout": round(cost * RIDER_PAYOUT_RATE),
+        "pricingVersion": PRICING_VERSION,
+    }
+
+
+def batch_discount_rate(delivery_count):
+    for minimum_count, rate in BATCH_DISCOUNT_TIERS:
+        if delivery_count >= minimum_count:
+            return rate
+    return 0
+
+
+def estimate_batch_deliveries(delivery_requests, plan=None):
+    if len(delivery_requests) < 3:
+        raise ValueError("A batch requires at least 3 deliveries.")
+
+    pickup_locations = {
+        clean(item.get("pickup"), 120)
+        for item in delivery_requests
+    }
+    if len(pickup_locations) != 1:
+        raise ValueError("All batch deliveries must use the same pickup location.")
+
+    if not all(
+        clean(item.get("dropoff"), 120) in LEKKI_AXIS_LOCATIONS
+        for item in delivery_requests
+    ):
+        raise ValueError(
+            "All batch destinations must be within the Lekki axis to receive the discount."
+        )
+
+    quotes = [
+        estimate_delivery(
+            clean(item.get("pickup"), 120),
+            clean(item.get("dropoff"), 120),
+            plan,
+            clean(item.get("priority"), 40) or "Standard"
+        )
+        for item in delivery_requests
+    ]
+    total_original_units = sum(quote["units"] for quote in quotes)
+    discount_rate = batch_discount_rate(len(quotes))
+    total_charged_units = max(
+        len(quotes),
+        math.ceil(
+            total_original_units * (1 - discount_rate)
+        )
+    )
+
+    remaining_units = total_charged_units
+    remaining_original_units = total_original_units
+    for quote in quotes:
+        if remaining_original_units == quote["units"]:
+            charged_units = remaining_units
+        else:
+            charged_units = max(
+                1,
+                round(
+                    quote["units"] /
+                    remaining_original_units *
+                    remaining_units
+                )
+            )
+        quote["originalUnits"] = quote["units"]
+        quote["units"] = charged_units
+        quote["chargedUnits"] = charged_units
+        quote["batchAxis"] = "lekki"
+        quote["batchDiscountRate"] = discount_rate
+        quote["batchDiscountUnits"] = quote["originalUnits"] - charged_units
+        quote["vendorDiscountAmount"] = (
+            quote["originalUnits"] - charged_units
+        ) * quote["unitPrice"]
+        quote["riderPayout"] = round(
+            (quote["baseCost"] + quote["prioritySurcharge"]) *
+            RIDER_PAYOUT_RATE
+        )
+        remaining_units -= charged_units
+        remaining_original_units -= quote["originalUnits"]
+
+    return {
+        "axis": "lekki",
+        "discountRate": discount_rate,
+        "originalUnits": total_original_units,
+        "chargedUnits": total_charged_units,
+        "unitsSaved": total_original_units - total_charged_units,
+        "vendorSaving": sum(quote["vendorDiscountAmount"] for quote in quotes),
+        "deliveries": quotes,
     }
 
 
@@ -227,10 +340,18 @@ def save_account(account):
 def password_hash(password, salt):
     return hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), 120_000).hex()
 
+def save_admin_credentials(admins):
+    ADMIN_CREDENTIALS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    ADMIN_CREDENTIALS_FILE.write_text(
+        json.dumps(admins, indent=2),
+        encoding="utf-8"
+    )
+
+
 def load_admin_credentials():
 
     if not ADMIN_CREDENTIALS_FILE.exists():
-        return None
+        return []
 
     try:
 
@@ -239,18 +360,68 @@ def load_admin_credentials():
         ).strip()
 
         if not content:
-            return None
+            return []
 
-        credentials = json.loads(content)
-
-        if not isinstance(credentials, dict):
-            return None
-
-        return credentials
+        data = json.loads(content)
 
     except (json.JSONDecodeError, OSError):
 
+        return []
+
+    # Migrate the legacy single-admin dict file into a multi-admin list.
+    if isinstance(data, dict):
+        data = [{
+            "id": 1,
+            "email": data.get("email", ""),
+            "name": data.get("name") or "Administrator",
+            "passwordHash": data.get("passwordHash", ""),
+            "salt": data.get("salt", ""),
+            "role": "owner",
+            "status": "active",
+            "createdAt": data.get("createdAt") or datetime.now(timezone.utc).isoformat(),
+        }]
+        save_admin_credentials(data)
+
+    if not isinstance(data, list):
+        return []
+
+    next_id = 1
+    for admin in data:
+        admin.setdefault("id", next_id)
+        admin.setdefault("name", "Administrator")
+        admin.setdefault("role", "staff")
+        admin.setdefault("status", "active")
+        admin.setdefault("createdAt", datetime.now(timezone.utc).isoformat())
+        next_id = max(next_id, int(admin.get("id") or 0) + 1)
+
+    return data
+
+
+def find_admin_by_email(admins, email):
+    normalized = (email or "").strip().lower()
+    return next(
+        (item for item in admins if item.get("email", "").lower() == normalized),
+        None
+    )
+
+
+def get_current_admin(handler):
+    email = get_admin_email(handler)
+    if not email:
         return None
+    return find_admin_by_email(load_admin_credentials(), email)
+
+
+def require_owner(handler):
+    admin = get_current_admin(handler)
+    return bool(admin) and admin.get("role") == "owner"
+
+
+def purge_admin_sessions(email):
+    normalized = (email or "").strip().lower()
+    for token, session in list(ADMIN_SESSIONS.items()):
+        if session.get("email", "").strip().lower() == normalized:
+            ADMIN_SESSIONS.pop(token, None)
 
 
 def create_account(email, name, password, plan=None):
@@ -554,7 +725,7 @@ def save_deliveries(deliveries):
     DELIVERIES_FILE.write_text(json.dumps(deliveries, indent=2), encoding="utf-8")
 
 
-def create_delivery(account_email, pickup, dropoff, units, details=None, order_ref=None, unit_price=None, plan=None):
+def create_delivery(account_email, pickup, dropoff, units, details=None, order_ref=None, unit_price=None, plan=None, pricing=None):
     deliveries = load_deliveries()
     new_id = (deliveries[-1]["id"] + 1) if deliveries else 1
     record = {
@@ -565,7 +736,7 @@ def create_delivery(account_email, pickup, dropoff, units, details=None, order_r
         "dropoff": dropoff,
         "units": int(units),
         "unitPrice": int(unit_price or 0),
-        "cost": int(units) * int(unit_price or 0),
+        "cost": int(pricing.get("cost", 0)) if pricing else int(units) * int(unit_price or 0),
         "subscriptionPlan": plan or "",
         "priority": details.get("priority") if details else "Standard",
         "window": details.get("window") if details else "Standard",
@@ -577,6 +748,8 @@ def create_delivery(account_email, pickup, dropoff, units, details=None, order_r
         "updatedAt": datetime.now(timezone.utc).isoformat(),
         "details": details or {},
     }
+    if pricing:
+        record["pricing"] = dict(pricing)
     deliveries.append(record)
     save_deliveries(deliveries)
     return record
@@ -599,12 +772,16 @@ def deliveries_for_account(email):
 
 
 def rider_payment_for_delivery(delivery, account_plan=None):
+    saved_payout = delivery.get("pricing", {}).get("riderPayout")
+    if saved_payout is not None:
+        return round(float(saved_payout))
+
     delivery_fee = delivery.get("cost")
     if delivery_fee is None:
         plan = delivery.get("subscriptionPlan") or account_plan
         unit_price = PLAN_UNIT_PRICES.get(plan, 0)
         delivery_fee = int(delivery.get("units", 0) or 0) * unit_price
-    return round(float(delivery_fee or 0) * 0.80)
+    return round(float(delivery_fee or 0) * RIDER_PAYOUT_RATE)
 
 
 def rider_payment_summary(month=None):
@@ -1095,6 +1272,20 @@ def create_rider_session(rider_id):
     return token
 
 
+def logged_in_rider_ids():
+    now = datetime.now(timezone.utc)
+    active_rider_ids = set()
+
+    for token, session in list(RIDER_SESSIONS.items()):
+        expires_at = session.get("expiresAt")
+        if not expires_at or expires_at <= now:
+            RIDER_SESSIONS.pop(token, None)
+            continue
+        active_rider_ids.add(str(session.get("riderId", "")))
+
+    return active_rider_ids
+
+
 def get_rider_session(handler):
     cookie_header = handler.headers.get("Cookie", "")
 
@@ -1498,6 +1689,14 @@ class FiableHandler(SimpleHTTPRequestHandler):
                     )
 
                     return
+
+                if rider.get("status") == "inactive":
+                    rider["status"] = "available"
+
+                rider["lastLoginAt"] = datetime.now(
+                    timezone.utc
+                ).isoformat()
+                save_riders(riders)
 
 
                 session_token = create_rider_session(
@@ -1920,7 +2119,8 @@ class FiableHandler(SimpleHTTPRequestHandler):
                 result = estimate_delivery(
                     clean(payload.get("pickup"), 80),
                     clean(payload.get("dropoff"), 80),
-                    account.get("plan") if account else None
+                    account.get("plan") if account else None,
+                    clean(payload.get("priority"), 40) or "Standard"
                 )
                 self._json_response(200, result)
                 return
@@ -1973,61 +2173,11 @@ class FiableHandler(SimpleHTTPRequestHandler):
                 # ADMIN CREDENTIALS
                 # -------------------------------------------------
 
-                admin_credentials = load_admin_credentials()
+                admins = load_admin_credentials()
 
-                if not admin_credentials:
+                matched_admin = find_admin_by_email(admins, email)
 
-                    self._json_response(
-                        500,
-                        {
-                            "error": "Unable to load admin credentials."
-                        }
-                    )
-
-                    return
-
-
-                admin_email = clean(
-                    admin_credentials.get("email"),
-                    160
-                ).lower()
-
-                admin_password_hash = admin_credentials.get(
-                    "passwordHash"
-                )
-
-                admin_salt = admin_credentials.get(
-                    "salt"
-                )
-
-
-                if not admin_email or not admin_password_hash or not admin_salt:
-
-                    self._json_response(
-                        500,
-                        {
-                            "error": "Admin credentials are incomplete."
-                        }
-                    )
-
-                    return
-
-
-                valid_email_login = hmac.compare_digest(
-                    email,
-                    admin_email
-                )
-
-                valid_password_login = hmac.compare_digest(
-                    admin_password_hash,
-                    password_hash(
-                        password,
-                        admin_salt
-                    )
-                )
-
-
-                if not valid_email_login or not valid_password_login:
+                if not matched_admin:
 
                     self._json_response(
                         401,
@@ -2039,11 +2189,60 @@ class FiableHandler(SimpleHTTPRequestHandler):
                     return
 
 
+                admin_password_hash = matched_admin.get("passwordHash")
+                admin_salt = matched_admin.get("salt")
+
+
+                if not admin_password_hash or not admin_salt:
+
+                    self._json_response(
+                        500,
+                        {
+                            "error": "Admin credentials are incomplete."
+                        }
+                    )
+
+                    return
+
+
+                valid_password_login = hmac.compare_digest(
+                    admin_password_hash,
+                    password_hash(
+                        password,
+                        admin_salt
+                    )
+                )
+
+
+                if not valid_password_login:
+
+                    self._json_response(
+                        401,
+                        {
+                            "error": "Invalid admin email or password."
+                        }
+                    )
+
+                    return
+
+
+                if matched_admin.get("status") == "revoked":
+
+                    self._json_response(
+                        403,
+                        {
+                            "error": "Your access has been revoked. Contact the account owner."
+                        }
+                    )
+
+                    return
+
+
                 # -------------------------------------------------
                 # CREATE ADMIN SESSION
                 # -------------------------------------------------
 
-                session_token = create_admin_session(admin_email)
+                session_token = create_admin_session(matched_admin.get("email"))
 
 
                 body = json.dumps({
@@ -2232,6 +2431,8 @@ class FiableHandler(SimpleHTTPRequestHandler):
 
                 save_admin_credentials(admin_creds)
 
+                consume_reset_token(token)
+
                 self._json_response(
                     200,
                     {
@@ -2296,9 +2497,11 @@ class FiableHandler(SimpleHTTPRequestHandler):
                     return
 
 
-                credentials = load_admin_credentials()
+                admins = load_admin_credentials()
 
-                if not credentials:
+                target_admin = find_admin_by_email(admins, current_admin_email)
+
+                if not target_admin:
 
                     self._json_response(
                         500,
@@ -2310,8 +2513,8 @@ class FiableHandler(SimpleHTTPRequestHandler):
                     return
 
 
-                stored_hash = credentials.get("passwordHash")
-                stored_salt = credentials.get("salt")
+                stored_hash = target_admin.get("passwordHash")
+                stored_salt = target_admin.get("salt")
 
 
                 if not stored_hash or not stored_salt:
@@ -2349,21 +2552,15 @@ class FiableHandler(SimpleHTTPRequestHandler):
 
                 new_salt = secrets.token_hex(16)
 
-                credentials["passwordHash"] = password_hash(
+                target_admin["passwordHash"] = password_hash(
                     newPassword,
                     new_salt
                 )
 
-                credentials["salt"] = new_salt
+                target_admin["salt"] = new_salt
 
 
-                ADMIN_CREDENTIALS_FILE.write_text(
-                    json.dumps(
-                        credentials,
-                        indent=2
-                    ),
-                    encoding="utf-8"
-                )
+                save_admin_credentials(admins)
 
 
                 self._json_response(
@@ -2373,6 +2570,218 @@ class FiableHandler(SimpleHTTPRequestHandler):
                     }
                 )
 
+                return
+
+
+            # =====================================================
+            # ADMIN TEAM MANAGEMENT
+            # =====================================================
+
+            if path == "/api/admin/team/add":
+
+                if not require_owner(self):
+                    self._json_response(
+                        403,
+                        {"error": "Only the account owner can add admins."}
+                    )
+                    return
+
+                new_email = clean(payload.get("email"), 160).lower()
+                new_role = clean(payload.get("role"), 40).lower() or "staff"
+
+                if not valid_email(new_email):
+                    self._json_response(400, {"error": "Enter a valid email address."})
+                    return
+
+                if new_role not in ("staff", "admin"):
+                    self._json_response(400, {"error": "Invalid role."})
+                    return
+
+                admins = load_admin_credentials()
+
+                if find_admin_by_email(admins, new_email):
+                    self._json_response(
+                        400,
+                        {"error": "An admin with this email already exists."}
+                    )
+                    return
+
+                next_id = max((int(item.get("id") or 0) for item in admins), default=0) + 1
+                salt = secrets.token_hex(16)
+
+                new_admin = {
+                    "id": next_id,
+                    "email": new_email,
+                    "name": clean(payload.get("name"), 120) or new_email.split("@")[0],
+                    "passwordHash": password_hash(secrets.token_urlsafe(24), salt),
+                    "salt": salt,
+                    "role": new_role,
+                    "status": "active",
+                    "invitedBy": get_admin_email(self),
+                    "createdAt": datetime.now(timezone.utc).isoformat(),
+                }
+
+                admins.append(new_admin)
+                save_admin_credentials(admins)
+
+                reset_token = create_reset_token(new_email)
+
+                self._json_response(
+                    201,
+                    {
+                        "message": "Admin added successfully.",
+                        "resetLink": f"/admin-login.html?reset={reset_token}",
+                        "admin": {
+                            "id": new_admin["id"],
+                            "email": new_admin["email"],
+                            "name": new_admin["name"],
+                            "role": new_admin["role"],
+                            "status": new_admin["status"],
+                            "createdAt": new_admin["createdAt"],
+                        },
+                    }
+                )
+                return
+
+            if path == "/api/admin/team/role":
+
+                if not require_owner(self):
+                    self._json_response(
+                        403,
+                        {"error": "Only the account owner can update roles."}
+                    )
+                    return
+
+                target_email = clean(payload.get("email"), 160).lower()
+                new_role = clean(payload.get("role"), 40).lower()
+
+                if new_role not in ("staff", "admin"):
+                    self._json_response(400, {"error": "Invalid role."})
+                    return
+
+                current_admin_email_lower = (get_admin_email(self) or "").lower()
+
+                if target_email == current_admin_email_lower:
+                    self._json_response(
+                        400,
+                        {"error": "You cannot change your own access."}
+                    )
+                    return
+
+                admins = load_admin_credentials()
+                target_admin = find_admin_by_email(admins, target_email)
+
+                if not target_admin:
+                    self._json_response(404, {"error": "Admin not found."})
+                    return
+
+                if target_admin.get("role") == "owner":
+                    self._json_response(
+                        400,
+                        {"error": "The account owner's role cannot be changed."}
+                    )
+                    return
+
+                target_admin["role"] = new_role
+                save_admin_credentials(admins)
+
+                self._json_response(200, {"message": "Role updated successfully."})
+                return
+
+            if path in ("/api/admin/team/revoke", "/api/admin/team/restore"):
+
+                if not require_owner(self):
+                    self._json_response(
+                        403,
+                        {"error": "Only the account owner can manage admin access."}
+                    )
+                    return
+
+                target_email = clean(payload.get("email"), 160).lower()
+                current_admin_email_lower = (get_admin_email(self) or "").lower()
+
+                if target_email == current_admin_email_lower:
+                    self._json_response(
+                        400,
+                        {"error": "You cannot change your own access."}
+                    )
+                    return
+
+                admins = load_admin_credentials()
+                target_admin = find_admin_by_email(admins, target_email)
+
+                if not target_admin:
+                    self._json_response(404, {"error": "Admin not found."})
+                    return
+
+                if target_admin.get("role") == "owner":
+                    self._json_response(
+                        400,
+                        {"error": "The account owner's access cannot be changed."}
+                    )
+                    return
+
+                target_admin["status"] = (
+                    "revoked" if path.endswith("revoke") else "active"
+                )
+
+                save_admin_credentials(admins)
+                purge_admin_sessions(target_email)
+
+                self._json_response(
+                    200,
+                    {
+                        "message": (
+                            "Access revoked successfully."
+                            if path.endswith("revoke")
+                            else "Access restored successfully."
+                        )
+                    }
+                )
+                return
+
+            if path == "/api/admin/team/delete":
+
+                if not require_owner(self):
+                    self._json_response(
+                        403,
+                        {"error": "Only the account owner can remove admins."}
+                    )
+                    return
+
+                target_email = clean(payload.get("email"), 160).lower()
+                current_admin_email_lower = (get_admin_email(self) or "").lower()
+
+                if target_email == current_admin_email_lower:
+                    self._json_response(
+                        400,
+                        {"error": "You cannot remove your own access."}
+                    )
+                    return
+
+                admins = load_admin_credentials()
+                target_admin = find_admin_by_email(admins, target_email)
+
+                if not target_admin:
+                    self._json_response(404, {"error": "Admin not found."})
+                    return
+
+                if target_admin.get("role") == "owner":
+                    self._json_response(
+                        400,
+                        {"error": "The account owner cannot be removed."}
+                    )
+                    return
+
+                admins = [
+                    item for item in admins
+                    if item.get("email", "").lower() != target_email
+                ]
+
+                save_admin_credentials(admins)
+                purge_admin_sessions(target_email)
+
+                self._json_response(200, {"message": "Admin removed successfully."})
                 return
 
             # =====================================================
@@ -2627,8 +3036,11 @@ class FiableHandler(SimpleHTTPRequestHandler):
                     )
                     return
 
-                # Only riders actively on a delivery are unavailable.
-                if rider.get("status") == "on_delivery":
+                # A rider must be signed in and not actively on a delivery.
+                if (
+                    str(rider.get("id", "")) not in logged_in_rider_ids()
+                    or rider.get("status") == "on_delivery"
+                ):
                     self._json_response(
                         400,
                         {
@@ -2768,8 +3180,11 @@ class FiableHandler(SimpleHTTPRequestHandler):
                     )
                     return
 
-                # Only riders actively on a delivery are unavailable.
-                if rider.get("status") == "on_delivery":
+                # A rider must be signed in and not actively on a delivery.
+                if (
+                    str(rider.get("id", "")) not in logged_in_rider_ids()
+                    or rider.get("status") == "on_delivery"
+                ):
                     self._json_response(
                         400,
                         {
@@ -2959,8 +3374,11 @@ class FiableHandler(SimpleHTTPRequestHandler):
                     )
                     return
 
-                # Only riders actively on a delivery are unavailable.
-                if new_rider.get("status") == "on_delivery":
+                # A rider must be signed in and not actively on a delivery.
+                if (
+                    str(new_rider.get("id", "")) not in logged_in_rider_ids()
+                    or new_rider.get("status") == "on_delivery"
+                ):
                     self._json_response(
                         400,
                         {
@@ -3283,7 +3701,7 @@ class FiableHandler(SimpleHTTPRequestHandler):
                     ),
                     "salt": rider_salt,
                     "vehicle": vehicle,
-                    "status": "available",
+                    "status": "inactive",
                     "totalDeliveries": 0,
                     "completedDeliveries": 0,
                     "failedDeliveries": 0,
@@ -3387,6 +3805,102 @@ class FiableHandler(SimpleHTTPRequestHandler):
                 account = mark_payment_complete(email)
                 self._json_response(200, {"paymentStatus": account["paymentStatus"], "message": "Payment recorded for local demo checkout."})
                 return
+            if path == "/api/batch-delivery-quote":
+                email = clean(payload.get("email"), 160).lower()
+                requests = payload.get("deliveries")
+                if not isinstance(requests, list):
+                    raise ValueError("Batch deliveries must be provided as a list.")
+                account = next(
+                    (item for item in load_accounts() if item["email"] == email),
+                    None
+                )
+                if not account:
+                    self._json_response(401, {"error": "Account not found"})
+                    return
+                self._json_response(
+                    200,
+                    estimate_batch_deliveries(requests, account.get("plan"))
+                )
+                return
+            if path == "/api/batch-delivery-request":
+                email = clean(payload.get("email"), 160).lower()
+                requests = payload.get("deliveries")
+                if not isinstance(requests, list):
+                    raise ValueError("Batch deliveries must be provided as a list.")
+                account = next(
+                    (item for item in load_accounts() if item["email"] == email),
+                    None
+                )
+                if not account:
+                    self._json_response(401, {"error": "Account not found"})
+                    return
+                summary = summary_for_account(account)
+                if summary["subscriptionState"] not in ("active", "expiring_soon", "grace_period"):
+                    self._json_response(402, {"error": "Complete payment and activate your subscription before requesting deliveries."})
+                    return
+                batch_quote = estimate_batch_deliveries(
+                    requests,
+                    summary.get("plan")
+                )
+                if summary["unitsRemaining"] < batch_quote["chargedUnits"]:
+                    self._json_response(409, {"error": "Insufficient units for this batch delivery."})
+                    return
+
+                created_deliveries = []
+                batch_id = f"BATCH-{secrets.token_urlsafe(8)}"
+                for request, quote in zip(requests, batch_quote["deliveries"]):
+                    required_fields = {
+                        "pickup": clean(request.get("pickup"), 120),
+                        "dropoff": clean(request.get("dropoff"), 120),
+                        "pickupContactName": clean(request.get("pickupContactName"), 100),
+                        "pickupPhone": clean(request.get("pickupPhone"), 40),
+                        "pickupAddress": clean(request.get("pickupAddress"), 300),
+                        "recipientName": clean(request.get("recipientName"), 100),
+                        "recipientPhone": clean(request.get("recipientPhone"), 40),
+                        "deliveryAddress": clean(request.get("deliveryAddress"), 300),
+                    }
+                    if not all(required_fields.values()):
+                        raise ValueError("Complete all required details for every batch delivery.")
+                    priority = clean(request.get("priority"), 40) or "Standard"
+                    details = {
+                        "pickupContactName": required_fields["pickupContactName"],
+                        "pickupPhone": required_fields["pickupPhone"],
+                        "pickupAddress": required_fields["pickupAddress"],
+                        "recipientName": required_fields["recipientName"],
+                        "recipientPhone": required_fields["recipientPhone"],
+                        "deliveryAddress": required_fields["deliveryAddress"],
+                        "packageType": clean(request.get("packageType"), 40) or "General",
+                        "priority": priority,
+                        "deliveryWindow": clean(request.get("deliveryWindow"), 40) or "Standard",
+                        "packageDescription": clean(request.get("packageDescription"), 300),
+                        "pickupInstructions": clean(request.get("pickupInstructions"), 300),
+                        "deliveryInstructions": clean(request.get("deliveryInstructions"), 300),
+                    }
+                    quote["batchId"] = batch_id
+                    delivery = create_delivery(
+                        email,
+                        required_fields["pickup"],
+                        required_fields["dropoff"],
+                        quote["chargedUnits"],
+                        details,
+                        unit_price=quote["unitPrice"],
+                        plan=summary.get("plan"),
+                        pricing=quote
+                    )
+                    delivery["batchId"] = batch_id
+                    created_deliveries.append(delivery)
+
+                save_deliveries(
+                    load_deliveries()[:-len(created_deliveries)] +
+                    created_deliveries
+                )
+                self._json_response(201, {
+                    "message": "Batch delivery requests received.",
+                    "deliveries": created_deliveries,
+                    "batchQuote": batch_quote,
+                    "summary": summary_for_account(account),
+                })
+                return
             if path == "/api/delivery-request":
                 email = clean(payload.get("email"), 160).lower()
                 pickup = clean(payload.get("pickup"), 120)
@@ -3434,7 +3948,12 @@ class FiableHandler(SimpleHTTPRequestHandler):
                 if summary["subscriptionState"] not in ("active", "expiring_soon", "grace_period"):
                     self._json_response(402, {"error": "Complete payment and activate your subscription before requesting deliveries."})
                     return
-                est = estimate_delivery(pickup, dropoff, summary.get("plan"))
+                est = estimate_delivery(
+                    pickup,
+                    dropoff,
+                    summary.get("plan"),
+                    priority
+                )
                 if summary["unitsRemaining"] < est["units"]:
                     self._json_response(409, {"error": "Insufficient units for this delivery. Please renew or choose a smaller route."})
                     return
@@ -3459,7 +3978,8 @@ class FiableHandler(SimpleHTTPRequestHandler):
                     est.get("units", 1),
                     details,
                     unit_price=est.get("unitPrice"),
-                    plan=summary.get("plan")
+                    plan=summary.get("plan"),
+                    pricing=est
                 )
                 self._json_response(201, {"message": "Delivery request received", "delivery": delivery, "summary": summary_for_account(account)})
                 return
@@ -3778,9 +4298,9 @@ class FiableHandler(SimpleHTTPRequestHandler):
 
         if self.path == "/api/admin/account":
 
-            email = get_admin_email(self)
+            current_admin = get_current_admin(self)
 
-            if not email:
+            if not current_admin:
                 self._json_response(
                     401,
                     {
@@ -3792,7 +4312,45 @@ class FiableHandler(SimpleHTTPRequestHandler):
             self._json_response(
                 200,
                 {
-                    "email": email
+                    "id": current_admin.get("id"),
+                    "name": current_admin.get("name", "Administrator"),
+                    "email": current_admin.get("email", ""),
+                    "role": current_admin.get("role", "staff"),
+                    "status": current_admin.get("status", "active"),
+                    "isOwner": current_admin.get("role") == "owner"
+                }
+            )
+            return
+
+        if self.path == "/api/admin/team":
+
+            current_admin = get_current_admin(self)
+
+            if not current_admin:
+                self._json_response(
+                    401,
+                    {"error": "Admin authentication required."}
+                )
+                return
+
+            admins = [
+                {
+                    "id": admin.get("id"),
+                    "name": admin.get("name", "Administrator"),
+                    "email": admin.get("email", ""),
+                    "role": admin.get("role", "staff"),
+                    "status": admin.get("status", "active"),
+                    "createdAt": admin.get("createdAt"),
+                }
+                for admin in load_admin_credentials()
+            ]
+
+            self._json_response(
+                200,
+                {
+                    "admins": admins,
+                    "currentAdminEmail": current_admin.get("email", ""),
+                    "isOwner": current_admin.get("role") == "owner"
                 }
             )
             return
@@ -3811,6 +4369,7 @@ class FiableHandler(SimpleHTTPRequestHandler):
             riders = load_riders()
             deliveries = load_deliveries()
             accounts = load_accounts()
+            active_rider_ids = logged_in_rider_ids()
 
             # Calculate delivery history from actual orders
             for rider in riders:
@@ -3863,6 +4422,7 @@ class FiableHandler(SimpleHTTPRequestHandler):
                 rider["completedDeliveries"] = completed_count
                 rider["failedDeliveries"] = failed_count
                 rider["deliveries"] = rider_deliveries
+                rider["isLoggedIn"] = rider_id in active_rider_ids
 
             self._json_response(
                 200,

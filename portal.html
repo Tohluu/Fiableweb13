@@ -420,6 +420,35 @@
               <div class="mini-rule"><b>₦2,000</b><span>express estimate per unit</span></div>
             </aside>
           </div>
+
+          <article class="panel batch-delivery-panel">
+            <div class="panel-head">
+              <div>
+                <div class="eyebrow">Fiable Batch Saver</div>
+                <h3>Same-pickup Lekki axis deliveries</h3>
+                <p class="muted">Bundle three or more deliveries from one pickup point to Lekki-axis destinations and save up to 15% of route units.</p>
+              </div>
+            </div>
+
+            <form id="batchDeliveryForm">
+              <div class="form-grid batch-shared-details">
+                <div><label for="batchPickup">Pickup location</label><select id="batchPickup" required></select></div>
+                <div><label for="batchPriority">Priority</label><select id="batchPriority"><option>Standard</option><option>Express</option><option>Urgent</option></select></div>
+                <div><label for="batchPickupContactName">Pickup contact name</label><input id="batchPickupContactName" required></div>
+                <div><label for="batchPickupPhone">Pickup phone</label><input id="batchPickupPhone" type="tel" required></div>
+                <div class="full-width"><label for="batchPickupAddress">Pickup address</label><input id="batchPickupAddress" required placeholder="House number, street, estate, landmark"></div>
+              </div>
+
+              <div id="batchDeliveryRows" class="batch-delivery-rows"></div>
+
+              <div class="batch-delivery-actions">
+                <button type="button" class="btn outline" id="addBatchDeliveryBtn">Add destination</button>
+                <button type="button" class="btn outline" id="previewBatchQuoteBtn">Preview saving</button>
+                <button type="submit" class="btn primary" id="submitBatchDeliveryBtn">Submit batch</button>
+              </div>
+              <div id="batchQuotePreview" class="batch-quote-preview hidden" aria-live="polite"></div>
+            </form>
+          </article>
         </section>
 
         <section class="view" id="view-subscription">
@@ -664,11 +693,16 @@
       ["lagos-island","Lagos Island"],["lagos-mainland","Lagos Mainland"],["yaba","Yaba"],["mushin","Mushin"],
       ["ojo","Ojo"],["oshodi-isolo","Oshodi-Isolo"],["shomolu","Shomolu"],["surulere","Surulere"],
       ["ajegunle","Ajegunle"],["victoria-island-vi","Victoria Island (VI)"],["ikoyi","Ikoyi"],
-      ["lekki-phase-1","Lekki Phase 1"],["ikate-elegushi","Ikate Elegushi"],["ajah","Ajah"],["sangotedo","Sangotedo"],
+      ["lekki-phase-1","Lekki Phase 1"],["marwa","Marwa"],["ikate-elegushi","Ikate Elegushi"],["ajah","Ajah"],["sangotedo","Sangotedo"],
       ["oniru","Oniru"],["lekki-phase-2","Lekki Phase 2"],["chevron","Chevron"],["ikota","Ikota"],["vgc","VGC"],
       ["osapa-london","Osapa London"],["jakande-lekki","Jakande (Lekki)"],["orchid-road","Orchid Road"],
       ["abraham-adesanya","Abraham Adesanya"],["ilasan","Ilasan"]
     ];
+    const LEKKI_AXIS_LOCATION_VALUES = new Set([
+      "lekki-phase-1", "marwa", "ikate-elegushi", "chevron", "ajah",
+      "ikota", "vgc", "osapa-london", "jakande-lekki", "orchid-road",
+      "abraham-adesanya", "ilasan"
+    ]);
 
     const PLAN_PRICES = { Basic: 67500, Growth: 105000, Business: 143000 };
     const state = { account: null, deliveries: [] };
@@ -837,8 +871,9 @@
     }
 
     function populateLocations() {
-      ["pickup","dropoff"].forEach(id => {
+      ["pickup","dropoff","batchPickup"].forEach(id => {
         const select = $(id);
+        if (!select) return;
         select.innerHTML = '<option value="">Select location</option>' +
           LOCATIONS.map(([value,label]) => `<option value="${value}">${label}</option>`).join("");
       });
@@ -2106,7 +2141,12 @@ $("resetBackLoginBtn").addEventListener("click", () => {
       try {
         const result = await api("/api/calculate", {
           method:"POST",
-          body:JSON.stringify({ pickup, dropoff, email: state.account?.email })
+          body:JSON.stringify({
+            pickup,
+            dropoff,
+            priority: $("priority").value,
+            email: state.account?.email
+          })
         });
         $("routeUnits").textContent = `${result.units} unit${result.units === 1 ? "" : "s"}`;
         $("routeCost").textContent = `${formatMoney(result.cost)} at ${formatMoney(result.unitPrice)}/unit`;
@@ -2118,6 +2158,7 @@ $("resetBackLoginBtn").addEventListener("click", () => {
     }
     $("pickup").addEventListener("change", calculateRoute);
     $("dropoff").addEventListener("change", calculateRoute);
+    $("priority").addEventListener("change", calculateRoute);
 
     $("deliveryForm").addEventListener("submit", async e => {
       e.preventDefault();
@@ -2160,6 +2201,122 @@ $("resetBackLoginBtn").addEventListener("click", () => {
       } finally {
         btn.disabled = false;
         btn.textContent = "Submit delivery request";
+      }
+    });
+
+    function batchDestinationOptions() {
+      return LOCATIONS
+        .filter(([value]) => LEKKI_AXIS_LOCATION_VALUES.has(value))
+        .map(([value, label]) => `<option value="${value}">${label}</option>`)
+        .join("");
+    }
+
+    function addBatchDeliveryRow() {
+      const rows = $("batchDeliveryRows");
+      const row = document.createElement("section");
+      row.className = "batch-delivery-row";
+      row.innerHTML = `
+        <div class="batch-delivery-row-heading"><strong>Destination</strong><button type="button" class="text-btn remove-batch-delivery-btn">Remove</button></div>
+        <div class="form-grid">
+          <div><label>Destination</label><select class="batch-dropoff" required><option value="">Select Lekki-axis destination</option>${batchDestinationOptions()}</select></div>
+          <div><label>Recipient name</label><input class="batch-recipient-name" required></div>
+          <div><label>Recipient phone</label><input class="batch-recipient-phone" type="tel" required></div>
+          <div><label>Delivery address</label><input class="batch-delivery-address" required placeholder="House number, street, estate, landmark"></div>
+        </div>
+      `;
+      row.querySelector(".remove-batch-delivery-btn").addEventListener("click", () => {
+        if (rows.children.length > 3) {
+          row.remove();
+          hideBatchQuote();
+        } else {
+          toast("A batch requires at least three deliveries.");
+        }
+      });
+      row.querySelector(".batch-dropoff").addEventListener("change", hideBatchQuote);
+      rows.appendChild(row);
+    }
+
+    function hideBatchQuote() {
+      $("batchQuotePreview").classList.add("hidden");
+    }
+
+    function batchRequestsFromForm() {
+      const shared = {
+        pickup: $("batchPickup").value,
+        priority: $("batchPriority").value,
+        pickupContactName: $("batchPickupContactName").value.trim(),
+        pickupPhone: $("batchPickupPhone").value.trim(),
+        pickupAddress: $("batchPickupAddress").value.trim()
+      };
+      return Array.from($("batchDeliveryRows").children).map(row => ({
+        ...shared,
+        dropoff: row.querySelector(".batch-dropoff").value,
+        recipientName: row.querySelector(".batch-recipient-name").value.trim(),
+        recipientPhone: row.querySelector(".batch-recipient-phone").value.trim(),
+        deliveryAddress: row.querySelector(".batch-delivery-address").value.trim()
+      }));
+    }
+
+    async function previewBatchQuote() {
+      const form = $("batchDeliveryForm");
+      if (!form.reportValidity() || !state.account) return null;
+      const preview = $("batchQuotePreview");
+      preview.classList.remove("hidden");
+      preview.textContent = "Calculating batch saving...";
+      try {
+        const quote = await api("/api/batch-delivery-quote", {
+          method: "POST",
+          body: JSON.stringify({
+            email: state.account.email,
+            deliveries: batchRequestsFromForm()
+          })
+        });
+        preview.innerHTML = `<strong>Lekki axis batch saving</strong><span>${quote.originalUnits} route units reduced to ${quote.chargedUnits} units</span><b>${quote.unitsSaved} unit${quote.unitsSaved === 1 ? "" : "s"} saved, worth ${formatMoney(quote.vendorSaving)}</b>`;
+        return quote;
+      } catch (error) {
+        preview.textContent = error.message;
+        return null;
+      }
+    }
+
+    $("addBatchDeliveryBtn").addEventListener("click", addBatchDeliveryRow);
+    $("previewBatchQuoteBtn").addEventListener("click", previewBatchQuote);
+    ["batchPickup", "batchPriority", "batchPickupContactName", "batchPickupPhone", "batchPickupAddress"].forEach(id => {
+      $(id).addEventListener("change", hideBatchQuote);
+    });
+    [1, 2, 3].forEach(addBatchDeliveryRow);
+
+    $("batchDeliveryForm").addEventListener("submit", async event => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      if (!form.reportValidity() || !state.account) return;
+      const submitButton = $("submitBatchDeliveryBtn");
+      submitButton.disabled = true;
+      submitButton.textContent = "Submitting...";
+      try {
+        const result = await api("/api/batch-delivery-request", {
+          method: "POST",
+          body: JSON.stringify({
+            email: state.account.email,
+            deliveries: batchRequestsFromForm()
+          })
+        });
+        state.account = result.summary;
+        state.deliveries.unshift(...result.deliveries);
+        updateAccountUI();
+        renderRecent();
+        renderDeliveries();
+        form.reset();
+        $("batchDeliveryRows").innerHTML = "";
+        [1, 2, 3].forEach(addBatchDeliveryRow);
+        hideBatchQuote();
+        toast(`${result.deliveries.length} batch deliveries requested. ${result.batchQuote.unitsSaved} units saved.`);
+        switchView("deliveries");
+      } catch (error) {
+        toast(error.message);
+      } finally {
+        submitButton.disabled = false;
+        submitButton.textContent = "Submit batch";
       }
     });
 
