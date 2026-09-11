@@ -1598,7 +1598,13 @@
 
   .admin-team-table .admin-team-role {
     min-inline-size: 0;
-    inline-size: 100%;
+    inline-size: auto;
+    min-inline-size: 112px;
+    justify-self: start;
+  }
+
+  .admin-team-table td:nth-child(2) {
+    align-items: center;
   }
 
   .admin-team-table .admin-team-delete {
