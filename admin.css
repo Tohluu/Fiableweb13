@@ -1542,12 +1542,18 @@
 }
 
 .admin-team-table td:nth-child(2) {
+  text-align: start;
   vertical-align: middle;
 }
 
 .admin-team-table .admin-team-role {
   inline-size: 112px;
   margin: 0;
+}
+
+.admin-team-table td:nth-child(2) > .admin-team-role,
+.admin-team-table td:nth-child(2) {
+  line-height: 1.4;
 }
 
 @media (max-width: 700px) {

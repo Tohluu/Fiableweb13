@@ -2632,6 +2632,14 @@ class FiableHandler(SimpleHTTPRequestHandler):
                 admins.append(new_admin)
                 save_admin_credentials(admins)
 
+                saved_admins = load_admin_credentials()
+                if not find_admin_by_email(saved_admins, new_email):
+                    self._json_response(
+                        500,
+                        {"error": "Admin account could not be saved."}
+                    )
+                    return
+
                 self._json_response(
                     201,
                     {

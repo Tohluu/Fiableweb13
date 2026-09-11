@@ -673,8 +673,9 @@ if (logoutBtn) {
         password: document.getElementById("newAdminPassword").value,
         role: document.getElementById("newAdminRole").value
       });
-      addAdminMessage.textContent = "Admin added. Share the email and initial password securely.";
-      loadAdminTeam();
+      closeAddAdminModal();
+      await loadAdminTeam();
+      showAdminToast("Admin added successfully.");
     } catch (error) {
       addAdminMessage.textContent = error.message;
     }
