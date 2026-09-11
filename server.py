@@ -422,6 +422,40 @@ def purge_admin_sessions(email):
     for token, session in list(ADMIN_SESSIONS.items()):
         if session.get("email", "").strip().lower() == normalized:
             ADMIN_SESSIONS.pop(token, None)
+    
+def bootstrap_admin_from_environment():
+    email = clean(os.environ.get("ADMIN_BOOTSTRAP_EMAIL"), 160).lower()
+    password = clean(os.environ.get("ADMIN_BOOTSTRAP_PASSWORD"), 128)
+    
+    if not email and not password:
+        return
+    
+    if not valid_email(email) or len(password) < 8:
+        raise RuntimeError(
+            "ADMIN_BOOTSTRAP_EMAIL must be valid and ADMIN_BOOTSTRAP_PASSWORD must be at least 8 characters."
+        )
+    
+    admins = load_admin_credentials()
+    admin = find_admin_by_email(admins, email)
+    salt = secrets.token_hex(16)
+    
+    if admin is None:
+        admin = {
+            "id": max((int(item.get("id") or 0) for item in admins), default=0) + 1,
+            "email": email,
+            "name": "Administrator",
+            "role": "owner",
+            "status": "active",
+            "createdAt": datetime.now(timezone.utc).isoformat(),
+        }
+        admins.append(admin)
+    
+    admin["passwordHash"] = password_hash(password, salt)
+    admin["salt"] = salt
+    admin["role"] = "owner"
+    admin["status"] = "active"
+    save_admin_credentials(admins)
+    purge_admin_sessions(email)
 
 
 def create_account(email, name, password, plan=None):
@@ -4775,5 +4809,6 @@ class FiableHandler(SimpleHTTPRequestHandler):
 
 if __name__ == "__main__":
     migrate_subscriber_ids()
+    bootstrap_admin_from_environment()
     print(f"Fiable server running on 0.0.0.0:{PORT}")
     ThreadingHTTPServer(("0.0.0.0", PORT), FiableHandler).serve_forever()
