@@ -1859,12 +1859,16 @@
     async function refreshAccount() {
     const email = localStorage.getItem("fiableVendorEmail");
 
-    if (!email) {
-        if (resetToken) {
-            showResetPassword();
-            return;
-        }
+    if (resetToken) {
+      clearInterval(sessionTimer);
+      sessionTimer = null;
+      clearInterval(vendorRefreshInterval);
+      vendorRefreshInterval = null;
+      showResetPassword();
+      return;
+    }
 
+    if (!email) {
         showLogin();
         return;
     }
