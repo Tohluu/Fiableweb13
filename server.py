@@ -13,7 +13,7 @@ import os
 ROOT = Path(__file__).parent
 DATA_FILE = ROOT / "data" / "submissions.json"
 ACCOUNTS_FILE = ROOT / "data" / "accounts.json"
-PORT = 8000
+PORT = int(os.environ.get("PORT", "8000"))
 
 # =========================================================
 # ADMIN AUTHENTICATION
@@ -4762,5 +4762,5 @@ class FiableHandler(SimpleHTTPRequestHandler):
 
 if __name__ == "__main__":
     migrate_subscriber_ids()
-    print(f"Fiable server running at http://localhost:{PORT}")
-    ThreadingHTTPServer(("127.0.0.1", PORT), FiableHandler).serve_forever()
+    print(f"Fiable server running on 0.0.0.0:{PORT}")
+    ThreadingHTTPServer(("0.0.0.0", PORT), FiableHandler).serve_forever()
