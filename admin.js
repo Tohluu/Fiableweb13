@@ -610,7 +610,7 @@ if (logoutBtn) {
         return `
           <tr>
             <td><strong>${escapeSubscriptionValue(admin.email || "—")}</strong></td>
-            <td>${roleControl}</td>
+            <td><span class="admin-team-role-value">${roleControl}</span></td>
             <td><span class="admin-team-status ${admin.status}">${escapeSubscriptionValue(admin.status)}</span></td>
             <td>${admin.createdAt ? new Date(admin.createdAt).toLocaleDateString("en-GB") : "—"}</td>
             <td>${canManage ? `<button type="button" class="btn outline admin-team-access" data-email="${escapeSubscriptionValue(admin.email)}" data-action="${admin.status === "revoked" ? "restore" : "revoke"}">${admin.status === "revoked" ? "Restore access" : "Revoke access"}</button><button type="button" class="btn danger admin-team-delete" data-email="${escapeSubscriptionValue(admin.email)}">Delete</button>` : isCurrent ? "You cannot change your own access." : "Protected"}</td>

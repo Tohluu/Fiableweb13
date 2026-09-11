@@ -1551,6 +1551,14 @@
   margin: 0;
 }
 
+.admin-team-role-value {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  min-block-size: 38px;
+  text-align: start;
+}
+
 .admin-team-table td:nth-child(2) > .admin-team-role,
 .admin-team-table td:nth-child(2) {
   line-height: 1.4;
@@ -1616,6 +1624,10 @@
     inline-size: auto;
     min-inline-size: 112px;
     justify-self: start;
+  }
+
+  .admin-team-role-value {
+    min-block-size: 38px;
   }
 
   .admin-team-table td:nth-child(2) {
