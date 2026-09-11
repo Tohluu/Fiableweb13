@@ -1541,6 +1541,15 @@
   font-size: 11px;
 }
 
+.admin-team-table td:nth-child(2) {
+  vertical-align: middle;
+}
+
+.admin-team-table .admin-team-role {
+  inline-size: 112px;
+  margin: 0;
+}
+
 @media (max-width: 700px) {
   .admin-team-table {
     min-inline-size: 0;
@@ -1586,7 +1595,7 @@
     text-transform: uppercase;
   }
 
-  .admin-team-table td:nth-child(1)::before { content: "Admin"; }
+  .admin-team-table td:nth-child(1)::before { content: "Email"; }
   .admin-team-table td:nth-child(2)::before { content: "Role"; }
   .admin-team-table td:nth-child(3)::before { content: "Status"; }
   .admin-team-table td:nth-child(4)::before { content: "Added"; }
