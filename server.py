@@ -2588,6 +2588,7 @@ class FiableHandler(SimpleHTTPRequestHandler):
 
                 new_email = clean(payload.get("email"), 160).lower()
                 new_role = clean(payload.get("role"), 40).lower() or "staff"
+                initial_password = clean(payload.get("password"), 128)
 
                 if not valid_email(new_email):
                     self._json_response(400, {"error": "Enter a valid email address."})
@@ -2595,6 +2596,13 @@ class FiableHandler(SimpleHTTPRequestHandler):
 
                 if new_role not in ("staff", "admin"):
                     self._json_response(400, {"error": "Invalid role."})
+                    return
+
+                if len(initial_password) < 8:
+                    self._json_response(
+                        400,
+                        {"error": "Initial password must be at least 8 characters."}
+                    )
                     return
 
                 admins = load_admin_credentials()
@@ -2613,7 +2621,7 @@ class FiableHandler(SimpleHTTPRequestHandler):
                     "id": next_id,
                     "email": new_email,
                     "name": clean(payload.get("name"), 120) or new_email.split("@")[0],
-                    "passwordHash": password_hash(secrets.token_urlsafe(24), salt),
+                    "passwordHash": password_hash(initial_password, salt),
                     "salt": salt,
                     "role": new_role,
                     "status": "active",
@@ -2624,13 +2632,10 @@ class FiableHandler(SimpleHTTPRequestHandler):
                 admins.append(new_admin)
                 save_admin_credentials(admins)
 
-                reset_token = create_reset_token(new_email)
-
                 self._json_response(
                     201,
                     {
                         "message": "Admin added successfully.",
-                        "resetLink": f"/admin-login.html?reset={reset_token}",
                         "admin": {
                             "id": new_admin["id"],
                             "email": new_admin["email"],

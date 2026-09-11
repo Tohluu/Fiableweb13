@@ -670,9 +670,10 @@ if (logoutBtn) {
       const data = await teamRequest("/api/admin/team/add", {
         name: document.getElementById("newAdminName").value.trim(),
         email: document.getElementById("newAdminEmail").value.trim(),
+        password: document.getElementById("newAdminPassword").value,
         role: document.getElementById("newAdminRole").value
       });
-      addAdminMessage.textContent = `Admin added. Share this first-login link: ${data.resetLink}`;
+      addAdminMessage.textContent = "Admin added. Share the email and initial password securely.";
       loadAdminTeam();
     } catch (error) {
       addAdminMessage.textContent = error.message;
