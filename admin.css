@@ -1541,6 +1541,72 @@
   font-size: 11px;
 }
 
+@media (max-width: 700px) {
+  .admin-team-table {
+    min-inline-size: 0;
+  }
+
+  .admin-team-table thead {
+    display: none;
+  }
+
+  .admin-team-table,
+  .admin-team-table tbody,
+  .admin-team-table tr,
+  .admin-team-table td {
+    display: block;
+    inline-size: 100%;
+  }
+
+  .admin-team-table tr {
+    padding: 14px 0;
+    border-block-end: 1px solid var(--border);
+  }
+
+  .admin-team-table tr:last-child {
+    border-block-end: 0;
+  }
+
+  .admin-team-table td {
+    display: grid;
+    grid-template-columns: 130px minmax(0, 1fr);
+    gap: 12px;
+    align-items: center;
+    padding: 7px 0;
+    border: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .admin-team-table td::before {
+    color: var(--muted);
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+  }
+
+  .admin-team-table td:nth-child(1)::before { content: "Admin"; }
+  .admin-team-table td:nth-child(2)::before { content: "Role"; }
+  .admin-team-table td:nth-child(3)::before { content: "Status"; }
+  .admin-team-table td:nth-child(4)::before { content: "Added"; }
+  .admin-team-table td:nth-child(5)::before { content: "Actions"; }
+
+  .admin-team-table td:nth-child(5) {
+    align-items: start;
+  }
+
+  .admin-team-table .admin-team-role {
+    min-inline-size: 0;
+    inline-size: 100%;
+  }
+
+  .admin-team-table .admin-team-delete {
+    margin-block-start: 8px;
+    margin-inline-start: 0;
+  }
+}
+
 .subscription-revenue-panel {
   margin-block-end: 20px;
 }

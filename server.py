@@ -13,7 +13,7 @@ import os
 ROOT = Path(__file__).parent
 DATA_FILE = ROOT / "data" / "submissions.json"
 ACCOUNTS_FILE = ROOT / "data" / "accounts.json"
-PORT = int(os.environ.get("PORT", "8000"))
+PORT = int(os.environ.get("PORT", "8080"))
 
 # =========================================================
 # ADMIN AUTHENTICATION
