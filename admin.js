@@ -606,7 +606,7 @@ if (logoutBtn) {
         const canManage = data.isOwner && !isCurrent && admin.role !== "owner";
         const roleControl = admin.role === "owner"
           ? "Owner"
-          : `<span class="admin-team-role-control"><select class="admin-team-role admin-team-role-data" data-email="${escapeSubscriptionValue(admin.email)}" ${canManage ? "" : "disabled"}><option value="staff" ${admin.role === "staff" ? "selected" : ""}>Staff</option><option value="admin" ${admin.role === "admin" ? "selected" : ""}>Admin</option></select><button type="button" class="admin-role-trigger" ${canManage ? "" : "disabled"}>${escapeSubscriptionValue(admin.role)}</button><span class="admin-role-menu"><button type="button" data-role="staff">Staff</button><button type="button" data-role="admin">Admin</button></span></span>`;
+          : `<select class="admin-team-role" data-email="${escapeSubscriptionValue(admin.email)}" ${canManage ? "" : "disabled"}><option value="staff" ${admin.role === "staff" ? "selected" : ""}>Staff</option><option value="admin" ${admin.role === "admin" ? "selected" : ""}>Admin</option></select>`;
         return `
           <tr>
             <td><strong>${escapeSubscriptionValue(admin.email || "—")}</strong></td>
@@ -631,34 +631,6 @@ if (logoutBtn) {
         });
       });
 
-      tableBody.querySelectorAll(".admin-role-trigger").forEach(trigger => {
-        trigger.addEventListener("click", event => {
-          event.stopPropagation();
-          const menu = trigger.nextElementSibling;
-          tableBody.querySelectorAll(".admin-role-menu.open").forEach(item => {
-            if (item !== menu) item.classList.remove("open");
-          });
-          menu.classList.toggle("open");
-        });
-      });
-
-      tableBody.querySelectorAll(".admin-role-menu button").forEach(option => {
-        option.addEventListener("click", event => {
-          event.stopPropagation();
-          const menu = option.parentElement;
-          const wrapper = menu.parentElement;
-          const select = wrapper.querySelector(".admin-team-role");
-          const trigger = wrapper.querySelector(".admin-role-trigger");
-          select.value = option.dataset.role;
-          trigger.textContent = option.textContent;
-          menu.classList.remove("open");
-          select.dispatchEvent(new Event("change", { bubbles: true }));
-        });
-      });
-
-      document.addEventListener("click", () => {
-        tableBody.querySelectorAll(".admin-role-menu.open").forEach(menu => menu.classList.remove("open"));
-      }, { once: true });
 
       tableBody.querySelectorAll(".admin-team-access").forEach(button => {
         button.addEventListener("click", async () => {
