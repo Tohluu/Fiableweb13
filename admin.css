@@ -1585,6 +1585,35 @@
   transform: translateY(-65%) rotate(45deg);
 }
 
+.admin-team-role-control .admin-team-role {
+  min-block-size: 38px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #172033;
+  font-size: 13px;
+  font-weight: 600;
+  outline: none;
+  transition: border-color .18s ease, box-shadow .18s ease, background .18s ease;
+}
+
+.admin-team-role-control .admin-team-role:hover {
+  border-color: #246bfe;
+  background: #f8fbff;
+}
+
+.admin-team-role-control .admin-team-role:focus {
+  border-color: #246bfe;
+  box-shadow: 0 0 0 3px rgba(36, 107, 254, .12);
+}
+
+.admin-team-role-control .admin-team-role:disabled {
+  border-color: #e2e8f0;
+  background: #f8fafc;
+  color: #64748b;
+  cursor: not-allowed;
+}
+
 .admin-team-table td:nth-child(2) > .admin-team-role,
 .admin-team-table td:nth-child(2) {
   line-height: 1.4;
