@@ -1548,13 +1548,17 @@
 
 .admin-team-table .admin-team-role {
   inline-size: 112px;
+  padding-inline-start: 0;
+  padding-inline-end: 24px;
   margin: 0;
+  text-align: start;
 }
 
 .admin-team-role-value {
   display: inline-flex;
   align-items: center;
   justify-content: flex-start;
+  inline-size: 112px;
   min-block-size: 38px;
   text-align: start;
 }
@@ -1623,10 +1627,13 @@
     min-inline-size: 0;
     inline-size: auto;
     min-inline-size: 112px;
+    padding-inline-start: 0;
+    padding-inline-end: 24px;
     justify-self: start;
   }
 
   .admin-team-role-value {
+    inline-size: 112px;
     min-block-size: 38px;
   }
 
