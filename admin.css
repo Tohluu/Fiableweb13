@@ -1555,6 +1555,75 @@
   appearance: none;
   -webkit-appearance: none;
   background-image: none;
+  display: none;
+}
+
+.admin-role-trigger {
+  position: relative;
+  inline-size: 112px;
+  min-block-size: 38px;
+  padding: 8px 26px 8px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #172033;
+  font: inherit;
+  font-size: 13px;
+  text-align: start;
+  cursor: pointer;
+}
+
+.admin-role-trigger::after {
+  position: absolute;
+  inset-inline-end: 10px;
+  inset-block-start: 50%;
+  inline-size: 7px;
+  block-size: 7px;
+  border-inline-end: 2px solid currentColor;
+  border-block-end: 2px solid currentColor;
+  content: "";
+  pointer-events: none;
+  transform: translateY(-65%) rotate(45deg);
+}
+
+.admin-role-trigger:disabled {
+  background: #f8fafc;
+  color: #64748b;
+  cursor: not-allowed;
+}
+
+.admin-role-menu {
+  position: absolute;
+  inset-block-start: calc(100% + 4px);
+  inset-inline-start: 0;
+  z-index: 20;
+  display: none;
+  inline-size: 112px;
+  overflow: hidden;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, .14);
+}
+
+.admin-role-menu.open {
+  display: grid;
+}
+
+.admin-role-menu button {
+  padding: 9px 10px;
+  border: 0;
+  background: #ffffff;
+  color: #172033;
+  font: inherit;
+  font-size: 13px;
+  text-align: start;
+  cursor: pointer;
+}
+
+.admin-role-menu button:hover {
+  background: #eef4ff;
+  color: #246bfe;
 }
 
 .admin-team-role-value {
