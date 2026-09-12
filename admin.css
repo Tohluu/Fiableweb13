@@ -1549,9 +1549,12 @@
 .admin-team-table .admin-team-role {
   inline-size: 112px;
   padding-inline-start: 0;
-  padding-inline-end: 24px;
+  padding-inline-end: 0;
   margin: 0;
   text-align: start;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: none;
 }
 
 .admin-team-role-value {
@@ -1628,7 +1631,7 @@
     inline-size: auto;
     min-inline-size: 112px;
     padding-inline-start: 0;
-    padding-inline-end: 24px;
+    padding-inline-end: 0;
     justify-self: start;
   }
 
