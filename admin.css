@@ -1566,6 +1566,25 @@
   text-align: start;
 }
 
+.admin-team-role-control {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.admin-team-role-control::after {
+  position: absolute;
+  inset-inline-end: 8px;
+  inset-block-start: 50%;
+  inline-size: 7px;
+  block-size: 7px;
+  border-inline-end: 2px solid currentColor;
+  border-block-end: 2px solid currentColor;
+  content: "";
+  pointer-events: none;
+  transform: translateY(-65%) rotate(45deg);
+}
+
 .admin-team-table td:nth-child(2) > .admin-team-role,
 .admin-team-table td:nth-child(2) {
   line-height: 1.4;

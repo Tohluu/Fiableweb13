@@ -606,7 +606,7 @@ if (logoutBtn) {
         const canManage = data.isOwner && !isCurrent && admin.role !== "owner";
         const roleControl = admin.role === "owner"
           ? "Owner"
-          : `<select class="admin-team-role" data-email="${escapeSubscriptionValue(admin.email)}" ${canManage ? "" : "disabled"}><option value="staff" ${admin.role === "staff" ? "selected" : ""}>Staff</option><option value="admin" ${admin.role === "admin" ? "selected" : ""}>Admin</option></select>`;
+          : `<span class="admin-team-role-control"><select class="admin-team-role" data-email="${escapeSubscriptionValue(admin.email)}" ${canManage ? "" : "disabled"}><option value="staff" ${admin.role === "staff" ? "selected" : ""}>Staff</option><option value="admin" ${admin.role === "admin" ? "selected" : ""}>Admin</option></select></span>`;
         return `
           <tr>
             <td><strong>${escapeSubscriptionValue(admin.email || "—")}</strong></td>
