@@ -181,6 +181,25 @@ def estimate_delivery(pickup, dropoff, plan=None, priority="Standard"):
     }
 
 
+def validate_delivery_window(window):
+    valid_windows = {
+        "8:00 AM - 11:00 AM",
+        "12:00 PM - 3:00 PM",
+        "Express",
+        "Next Day Delivery",
+    }
+    if window not in valid_windows:
+        raise ValueError("Choose a valid delivery window.")
+
+    lagos_time = datetime.now(timezone(timedelta(hours=1)))
+    if window == "8:00 AM - 11:00 AM" and lagos_time.hour >= 11:
+        raise ValueError("The 8:00 AM - 11:00 AM delivery window has closed. Choose Express or Next Day Delivery.")
+    if window == "12:00 PM - 3:00 PM" and lagos_time.hour >= 15:
+        raise ValueError("The 12:00 PM - 3:00 PM delivery window has closed. Choose Express or Next Day Delivery.")
+
+    return "Next Day: 8:00 AM - 11:00 AM" if window == "Next Day Delivery" else window
+
+
 def batch_discount_rate(delivery_count):
     for minimum_count, rate in BATCH_DISCOUNT_TIERS:
         if delivery_count >= minimum_count:
@@ -3958,9 +3977,10 @@ class FiableHandler(SimpleHTTPRequestHandler):
                 recipient = clean(payload.get("recipientName"), 100)
                 recipientPhone = clean(payload.get("recipientPhone"), 40)
                 deliveryAddress = clean(payload.get("deliveryAddress"), 300)
-                packageType = clean(payload.get("packageType"), 40) or "General"
-                priority = clean(payload.get("priority"), 40) or "Standard"
-                window = clean(payload.get("deliveryWindow"), 40) or "Standard"
+                packageType = "General"
+                requested_window = clean(payload.get("deliveryWindow"), 40)
+                window = validate_delivery_window(requested_window)
+                priority = "Express" if requested_window == "Express" else "Standard"
                 packageDescription = clean(payload.get("packageDescription"), 300)
                 required_fields = {
                     "pickup": pickup,
@@ -3971,7 +3991,6 @@ class FiableHandler(SimpleHTTPRequestHandler):
                     "recipientName": recipient,
                     "recipientPhone": recipientPhone,
                     "deliveryAddress": deliveryAddress,
-                    "packageType": packageType,
                     "deliveryWindow": window,
                 }
                 missing_fields = [
@@ -4012,7 +4031,6 @@ class FiableHandler(SimpleHTTPRequestHandler):
                     "recipientPhone": recipientPhone,
                     "deliveryAddress": deliveryAddress,
                     "packageType": packageType,
-                    "priority": priority,
                     "deliveryWindow": window,
                     "packageDescription": packageDescription,
                     "pickupInstructions": clean(payload.get("pickupInstructions"), 300),

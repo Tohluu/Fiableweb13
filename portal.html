@@ -364,31 +364,12 @@
 
               <div class="form-grid">
                 <div>
-                  <label for="packageType">Package type</label>
-                  <select id="packageType" required>
-                    <option>General</option>
-                    <option>Fashion</option>
-                    <option>Food</option>
-                    <option>Electronics</option>
-                    <option>Beauty</option>
-                    <option>Documents</option>
-                    <option>Fragile</option>
-                  </select>
-                </div>
-                <div>
-                  <label for="priority">Priority</label>
-                  <select id="priority">
-                    <option>Standard</option>
-                    <option>Express</option>
-                    <option>Urgent</option>
-                  </select>
-                </div>
-                <div>
                   <label for="deliveryWindow">Delivery window</label>
                   <select id="deliveryWindow" required>
-                    <option>Standard</option>
-                    <option>8:00 AM - 11:00 AM</option>
-                    <option>12:00 PM - 3:00 PM</option>
+                    <option value="8:00 AM - 11:00 AM">8:00 AM - 11:00 AM</option>
+                    <option value="12:00 PM - 3:00 PM">12:00 PM - 3:00 PM</option>
+                    <option value="Express">Express</option>
+                    <option value="Next Day Delivery">Next Day Delivery (8:00 AM - 11:00 AM)</option>
                   </select>
                 </div>
               </div>
@@ -2148,7 +2129,6 @@ $("resetBackLoginBtn").addEventListener("click", () => {
           body:JSON.stringify({
             pickup,
             dropoff,
-            priority: $("priority").value,
             email: state.account?.email
           })
         });
@@ -2162,7 +2142,26 @@ $("resetBackLoginBtn").addEventListener("click", () => {
     }
     $("pickup").addEventListener("change", calculateRoute);
     $("dropoff").addEventListener("change", calculateRoute);
-    $("priority").addEventListener("change", calculateRoute);
+
+    function updateDeliveryWindowOptions() {
+      const deliveryWindow = $("deliveryWindow");
+      if (!deliveryWindow) return;
+      const lagosTime = new Intl.DateTimeFormat("en-GB", {
+        timeZone: "Africa/Lagos",
+        hour: "2-digit",
+        hourCycle: "h23"
+      }).formatToParts(new Date());
+      const hour = Number(lagosTime.find(part => part.type === "hour")?.value || 0);
+      const morning = deliveryWindow.querySelector('option[value="8:00 AM - 11:00 AM"]');
+      const afternoon = deliveryWindow.querySelector('option[value="12:00 PM - 3:00 PM"]');
+      if (morning) morning.disabled = hour >= 11;
+      if (afternoon) afternoon.disabled = hour >= 15;
+      if (deliveryWindow.selectedOptions[0]?.disabled) {
+        deliveryWindow.value = "Express";
+      }
+    }
+
+    updateDeliveryWindowOptions();
 
     $("deliveryForm").addEventListener("submit", async e => {
       e.preventDefault();
@@ -2180,8 +2179,6 @@ $("resetBackLoginBtn").addEventListener("click", () => {
         recipientName: $("recipientName").value.trim(),
         recipientPhone: $("recipientPhone").value.trim(),
         deliveryAddress: $("deliveryAddress").value.trim(),
-        packageType: $("packageType").value,
-        priority: $("priority").value,
         deliveryWindow: $("deliveryWindow").value,
         packageDescription: $("packageDescription").value.trim(),
         pickupInstructions: $("pickupInstructions").value.trim(),
@@ -2195,6 +2192,7 @@ $("resetBackLoginBtn").addEventListener("click", () => {
         renderRecent();
         renderDeliveries();
         e.target.reset();
+        updateDeliveryWindowOptions();
         $("routeUnits").textContent = "Select locations";
         $("routeCost").textContent = "—";
         $("routePreview").classList.remove("ready");
