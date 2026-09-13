@@ -366,6 +366,7 @@
                 <div>
                   <label for="deliveryWindow">Delivery window</label>
                   <select id="deliveryWindow" required>
+                    <option value="" selected disabled>Select delivery window</option>
                     <option value="8:00 AM - 11:00 AM">8:00 AM - 11:00 AM</option>
                     <option value="12:00 PM - 3:00 PM">12:00 PM - 3:00 PM</option>
                     <option value="Express">Express</option>
@@ -2156,8 +2157,11 @@ $("resetBackLoginBtn").addEventListener("click", () => {
       const afternoon = deliveryWindow.querySelector('option[value="12:00 PM - 3:00 PM"]');
       if (morning) morning.disabled = hour >= 11;
       if (afternoon) afternoon.disabled = hour >= 15;
-      if (deliveryWindow.selectedOptions[0]?.disabled) {
-        deliveryWindow.value = "Express";
+      if (
+        deliveryWindow.value &&
+        deliveryWindow.selectedOptions[0]?.disabled
+      ) {
+        deliveryWindow.value = "";
       }
     }
 
