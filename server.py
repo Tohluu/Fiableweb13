@@ -3927,7 +3927,9 @@ class FiableHandler(SimpleHTTPRequestHandler):
                     }
                     if not all(required_fields.values()):
                         raise ValueError("Complete all required details for every batch delivery.")
-                    priority = clean(request.get("priority"), 40) or "Standard"
+                    requested_window = clean(request.get("deliveryWindow"), 40)
+                    delivery_window = validate_delivery_window(requested_window)
+                    priority = "Express" if requested_window == "Express" else "Standard"
                     details = {
                         "pickupContactName": required_fields["pickupContactName"],
                         "pickupPhone": required_fields["pickupPhone"],
@@ -3935,9 +3937,9 @@ class FiableHandler(SimpleHTTPRequestHandler):
                         "recipientName": required_fields["recipientName"],
                         "recipientPhone": required_fields["recipientPhone"],
                         "deliveryAddress": required_fields["deliveryAddress"],
-                        "packageType": clean(request.get("packageType"), 40) or "General",
+                        "packageType": "General",
                         "priority": priority,
-                        "deliveryWindow": clean(request.get("deliveryWindow"), 40) or "Standard",
+                        "deliveryWindow": delivery_window,
                         "packageDescription": clean(request.get("packageDescription"), 300),
                         "pickupInstructions": clean(request.get("pickupInstructions"), 300),
                         "deliveryInstructions": clean(request.get("deliveryInstructions"), 300),

@@ -415,7 +415,7 @@
             <form id="batchDeliveryForm">
               <div class="form-grid batch-shared-details">
                 <div><label for="batchPickup">Pickup location</label><select id="batchPickup" required></select></div>
-                <div><label for="batchPriority">Priority</label><select id="batchPriority"><option>Standard</option><option>Express</option><option>Urgent</option></select></div>
+                <div><label for="batchDeliveryWindow">Delivery window</label><select id="batchDeliveryWindow" required><option value="" selected disabled>Select delivery window</option><option value="8:00 AM - 11:00 AM">8:00 AM - 11:00 AM</option><option value="12:00 PM - 3:00 PM">12:00 PM - 3:00 PM</option><option value="Express">Express</option><option value="Next Day Delivery">Next Day Delivery (8:00 AM - 11:00 AM)</option></select></div>
                 <div><label for="batchPickupContactName">Pickup contact name</label><input id="batchPickupContactName" required></div>
                 <div><label for="batchPickupPhone">Pickup phone</label><input id="batchPickupPhone" type="tel" required></div>
                 <div class="full-width"><label for="batchPickupAddress">Pickup address</label><input id="batchPickupAddress" required placeholder="House number, street, estate, landmark"></div>
@@ -2249,7 +2249,7 @@ $("resetBackLoginBtn").addEventListener("click", () => {
     function batchRequestsFromForm() {
       const shared = {
         pickup: $("batchPickup").value,
-        priority: $("batchPriority").value,
+        deliveryWindow: $("batchDeliveryWindow").value,
         pickupContactName: $("batchPickupContactName").value.trim(),
         pickupPhone: $("batchPickupPhone").value.trim(),
         pickupAddress: $("batchPickupAddress").value.trim()
@@ -2287,9 +2287,18 @@ $("resetBackLoginBtn").addEventListener("click", () => {
 
     $("addBatchDeliveryBtn").addEventListener("click", addBatchDeliveryRow);
     $("previewBatchQuoteBtn").addEventListener("click", previewBatchQuote);
-    ["batchPickup", "batchPriority", "batchPickupContactName", "batchPickupPhone", "batchPickupAddress"].forEach(id => {
+    ["batchPickup", "batchDeliveryWindow", "batchPickupContactName", "batchPickupPhone", "batchPickupAddress"].forEach(id => {
       $(id).addEventListener("change", hideBatchQuote);
     });
+    function updateBatchDeliveryWindowOptions() {
+      const deliveryWindow = $("batchDeliveryWindow");
+      const lagosTime = new Intl.DateTimeFormat("en-GB", { timeZone: "Africa/Lagos", hour: "2-digit", hourCycle: "h23" }).formatToParts(new Date());
+      const hour = Number(lagosTime.find(part => part.type === "hour")?.value || 0);
+      deliveryWindow.querySelector('option[value="8:00 AM - 11:00 AM"]').disabled = hour >= 11;
+      deliveryWindow.querySelector('option[value="12:00 PM - 3:00 PM"]').disabled = hour >= 15;
+      if (deliveryWindow.value && deliveryWindow.selectedOptions[0]?.disabled) deliveryWindow.value = "";
+    }
+    updateBatchDeliveryWindowOptions();
     [1, 2, 3].forEach(addBatchDeliveryRow);
 
     $("batchDeliveryForm").addEventListener("submit", async event => {
@@ -2313,6 +2322,7 @@ $("resetBackLoginBtn").addEventListener("click", () => {
         renderRecent();
         renderDeliveries();
         form.reset();
+        updateBatchDeliveryWindowOptions();
         $("batchDeliveryRows").innerHTML = "";
         [1, 2, 3].forEach(addBatchDeliveryRow);
         hideBatchQuote();
