@@ -1,0 +1,9 @@
+const toast = message => { const node = document.getElementById('toast'); node.textContent = message; node.classList.add('show'); setTimeout(() => node.classList.remove('show'), 3600); };
+const backToTop = document.getElementById('backToTop');
+window.addEventListener('scroll', () => backToTop.classList.toggle('visible', window.scrollY > 500));
+backToTop.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
+document.querySelector('.menu-btn').addEventListener('click', () => document.querySelector('.nav-links').classList.toggle('open'));
+document.querySelectorAll('.nav-links a').forEach(link => link.addEventListener('click', () => document.querySelector('.nav-links').classList.remove('open')));
+document.querySelectorAll('.password-toggle').forEach(toggle => toggle.addEventListener('click', () => { const input = toggle.parentElement.querySelector('input'); const visible = input.type === 'text'; input.type = visible ? 'password' : 'text'; toggle.setAttribute('aria-label', visible ? 'Show password' : 'Hide password'); toggle.setAttribute('aria-pressed', String(!visible)); }));
+const formValue = (form, selector) => form.querySelector(selector)?.value.trim() || '';
+const submitRequest = async (form, endpoint, payload, successMessage, onSuccess) => { const button = form.querySelector('button[type="submit"]'); if (button) button.disabled = true; try { const response = await fetch(endpoint, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) }); const result = await response.json(); if (!response.ok) throw new Error(result.error || 'Unable to send request'); form.reset(); if (form.id === 'vendorForm' && typeof updateServiceFields === 'function') updateServiceFields(); if (onSuccess) onSuccess(result); toast(successMessage); } catch (error) { toast(error.message); } finally { if (button) button.disabled = false; } };
