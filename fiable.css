@@ -73,6 +73,7 @@ nav { block-size:88px; display:flex; align-items:center; justify-content:space-b
 .btn-primary:hover { background:var(--blue-dark); transform:translateY(-2px); }
 .btn-outline { background:#fff; border:1px solid var(--line); color:var(--ink); }
 .btn-outline:hover { border-color:var(--blue); color:var(--blue); }
+.nav-links a.btn-primary:hover { color:#fff; }
 .menu-btn { display:none; border:0; background:none; font-size:24px; color:var(--ink); }
 .hero { background:linear-gradient(115deg,#f3f8ff 0%,#fff 64%); padding:78px 0 88px; overflow:hidden; }
 .hero-grid { display:grid; grid-template-columns:1.02fr .98fr; align-items:center; gap:56px; }

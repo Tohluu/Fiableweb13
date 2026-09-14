@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Fiable Logistics is a subscription-based delivery service helping Lagos businesses manage recurring last-mile deliveries with predictable costs.">
+<meta name="theme-color" content="#1769e0">
+<title>Get Started | Fiable Logistics</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="fiable.css?v=3">
+</head>
+<body>
+<div class="topbar">
+    <div class="container">
+        <span>Serving Lagos businesses with structure and speed</span>
+        <span>Mon - Sat &nbsp;|&nbsp; 8:00 AM - 5:00 PM</span>
+    </div>
+</div>
+<header>
+    <nav class="container">
+        <a class="brand" href="index.html" aria-label="Fiable Logistics home">
+        <img class="brand-logo" src="images/Logo2.png" alt="Fiable Logistics">
+        </a>
+        <button class="menu-btn" aria-label="Open menu">☰</button>
+        <div class="nav-links">
+            <a href="index.html">Home</a>
+            <a href="services.html">Services</a>
+            <a href="about.html">About</a>
+            <a href="contact.html">Contact</a>
+            <a class="btn btn-outline" href="portal.html">Sign in</a>
+            <a class="btn btn-primary" href="get-started.html">Get Started <span>↗</span>
+            </a>
+        </div>
+    </nav>
+</header>
+<main>
+<section id="get-started" class="section">
+<div class="container two-col">
+<div>
+<div class="eyebrow">Become a subscriber</div>
+<h2>Ready to make delivery easier?</h2>
+<p class="hero-copy" style="font-size:15px">Join Fiable's growing network of Lagos businesses and get access to structured, subscription-based delivery support.</p>
+<div class="rule-list">
+<div class="rule">
+<b>01</b>
+<p>
+<strong>Monthly subscription:</strong> paid upfront for the applicable plan.</p>
+</div>
+<div class="rule">
+<b>02</b>
+<p>
+<strong>Unit rollover:</strong> unused units may roll over for no more than two weeks.</p>
+</div>
+<div class="rule">
+<b>03</b>
+<p>
+<strong>Plan changes:</strong> subscribers cannot change plans within the same month.</p>
+</div>
+<div class="rule">
+<b>04</b>
+<p>
+<strong>Exhausted units:</strong> 100% of the initial subscription amount is required for the next applicable allocation. A 50% payment does not qualify.</p>
+</div>
+</div>
+</div>
+<div class="form-box">
+<h3>Register for Fiable services</h3>
+<p style="color:var(--muted);font-size:13px">Choose the service that fits your operation. A Fiable representative will contact you shortly.</p>
+<form id="vendorForm">
+<div class="form-grid">
+<div>
+<label>Full name</label>
+<input required placeholder="Your name">
+</div>
+<div>
+<label>Business name</label>
+<input required placeholder="Business name">
+</div>
+<div>
+<label>Phone number</label>
+<input required type="tel" placeholder="080...">
+</div>
+<div>
+<label>Email</label>
+<input required type="email" placeholder="you@business.com">
+</div>
+</div>
+<label>Password</label>
+<div class="password-field">
+<input id="vendorPassword" required type="password" minlength="8" placeholder="At least 8 characters">
+<button class="password-toggle" type="button" aria-label="Show password" aria-pressed="false">&#128065;</button>
+</div>
+<input id="selectedPlan" type="hidden" value="">
+<label for="serviceType">What do you need?</label>
+<select id="serviceType" name="serviceType" required>
+<option value="">Select a service</option>
+<option value="subscription">Monthly subscription deliveries</option>
+<option value="express">Express delivery</option>
+<option value="bulk">Bulk haulage</option>
+</select>
+<label>Business type</label>
+<select required>
+<option value="">Select business type</option>
+<option>Fashion</option>
+<option>Food</option>
+<option>E-commerce</option>
+<option>Beauty</option>
+<option>Electronics</option>
+<option>Retail</option>
+<option>Home Business</option>
+<option>Other</option>
+</select>
+<div id="subscriptionFields">
+<label>Estimated monthly deliveries</label>
+<select id="monthlyVolume" required>
+<option value="">Choose volume</option>
+<option>1–30</option>
+<option>31–50</option>
+<option>51–75</option>
+<option>76–110</option>
+<option>110+</option>
+</select>
+</div>
+<div id="expressFields" class="service-fields" hidden>
+<label for="expressPickup">Pickup address</label>
+<input id="expressPickup" placeholder="Where should we pick up?">
+<label for="expressDropoff">Delivery address</label>
+<input id="expressDropoff" placeholder="Where should we deliver?">
+</div>
+<div id="bulkFields" class="service-fields" hidden>
+<label for="bulkDetails">Bulk haulage details</label>
+<textarea id="bulkDetails" rows="3" placeholder="Tell us about the goods, quantity, pickup location and destination"></textarea>
+</div>
+<p class="service-note">Single deliveries and bulk haulage requests are subject to route, vehicle and operational availability.</p>
+<button class="btn btn-primary" id="serviceSubmit" type="submit" style="inline-size:100%">Apply to Become a Vendor ↗</button>
+</form>
+</div>
+</div>
+</section>
+</main>
+<footer>
+<div class="container footer-grid">
+<div class="footer-brand">
+<a class="brand" href="index.html" aria-label="Fiable Logistics home">
+<img class="brand-logo" src="images/Logo2.png" alt="Fiable Logistics">
+</a>
+<p>Reliable Deliveries. Smarter Business Growth.</p>
+</div>
+<div class="footer-col">
+<strong>Explore</strong>
+<a href="about.html">About Fiable</a>
+<a href="index.html#how">How It Works</a>
+<a href="services.html#plans">Plans</a>
+<a href="services.html#coverage">Coverage</a>
+<a href="index.html#faq">FAQ</a>
+</div>
+<div class="footer-col">
+<strong>For business</strong>
+<a href="services.html#vendors">Become a Vendor</a>
+<a href="services.html#calculator">Delivery Calculator</a>
+<a href="get-started.html">Get Started</a>
+<a href="contact.html">Contact</a>
+</div>
+<div class="footer-col">
+<strong>Services</strong>
+<a href="services.html#plans">Subscription Delivery</a>
+<a href="services.html#plans">Business Delivery</a>
+<a href="services.html#calculator">Express Delivery</a>
+<a href="services.html#vendors">Vendor Logistics</a>
+</div>
+</div>
+<div class="container copyright">
+<span>© 2026 Fiable Logistics. All rights reserved.</span>
+<span>Lagos, Nigeria · Built for businesses that deliver.</span>
+</div>
+</footer>
+<div class="toast" id="toast" role="status">
+</div>
+<button class="back-to-top" id="backToTop" type="button" aria-label="Back to top">↑</button>
+<script src="site.js"></script>
+<script>
+        const planParam = new URLSearchParams(window.location.search).get('plan');
+        if (planParam) { document.getElementById('selectedPlan').value = planParam; }
+        const serviceType = document.getElementById('serviceType');
+        const serviceSubmit = document.getElementById('serviceSubmit');
+        const serviceFields = { subscription: document.getElementById('subscriptionFields'), express: document.getElementById('expressFields'), bulk: document.getElementById('bulkFields') };
+        const serviceLabels = { subscription: 'Apply to Become a Vendor ↗', express: 'Request Express Delivery ↗', bulk: 'Request Bulk Haulage ↗' };
+        const updateServiceFields = () => { Object.entries(serviceFields).forEach(([service, field]) => { const active = service === serviceType.value; field.hidden = !active; field.querySelectorAll('input, select, textarea').forEach(input => input.required = active); }); };
+        const updateServiceButton = () => { serviceSubmit.textContent = serviceLabels[serviceType.value] || serviceLabels.subscription; };
+        serviceType.addEventListener('change', updateServiceFields);
+        serviceType.addEventListener('change', updateServiceButton);
+        updateServiceFields();
+        updateServiceButton();
+        document.getElementById('vendorForm').addEventListener('submit', event => { event.preventDefault(); const form = event.currentTarget; if (!form.checkValidity()) { form.reportValidity(); return; } const selectedService = serviceType.options[serviceType.selectedIndex].text; const email = formValue(form, 'input[type="email"]'); submitRequest(form, '/api/vendor', { name:formValue(form, 'input[placeholder="Your name"]'), businessName:formValue(form, 'input[placeholder="Business name"]'), phone:formValue(form, 'input[type="tel"]'), email, password:formValue(form, '#vendorPassword'), plan:document.getElementById('selectedPlan').value, service:serviceType.value, businessType:form.querySelectorAll('select')[1].value, monthlyVolume:formValue(form, '#monthlyVolume'), expressPickup:formValue(form, '#expressPickup'), expressDropoff:formValue(form, '#expressDropoff'), bulkDetails:formValue(form, '#bulkDetails') }, `Thank you. Your ${selectedService.toLowerCase()} request has been received.`, () => { window.location.href = `portal.html?email=${encodeURIComponent(email)}`; }); });
+    </script>
+</body>
+</html>
