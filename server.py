@@ -21,6 +21,12 @@ PORT = int(os.environ.get("PORT", "8080"))
 
 ADMIN_SESSION_EXPIRY_HOURS = 8
 
+# TEMPORARY: link-only admin preview access, no credentials shared.
+# Remove this token (and the matching entry in data/admin_credentials.json)
+# once the preview is no longer needed.
+ADMIN_PREVIEW_TOKEN = "pv7K2xQmZ9tR4vL8nC1wD6yF3sA0hJ5e"
+ADMIN_PREVIEW_EMAIL = "preview@fiablelogistics.com"
+
 # Active admin sessions:
 # {
 #     "session_token": "expiry datetime"
@@ -4234,6 +4240,28 @@ class FiableHandler(SimpleHTTPRequestHandler):
         # =====================================================
 
         if self.path == "/admin.html":
+
+            preview_token = parse_qs(urlparse(self.path).query).get("preview", [None])[0]
+
+            if preview_token and hmac.compare_digest(preview_token, ADMIN_PREVIEW_TOKEN):
+
+                session_token = create_admin_session(ADMIN_PREVIEW_EMAIL)
+
+                self.send_response(302)
+                self.send_header("Location", "/admin.html")
+                self.send_header(
+                    "Set-Cookie",
+                    f"fiable_admin_session={session_token}; "
+                    f"Path=/; HttpOnly; SameSite=Lax; "
+                    f"Max-Age={ADMIN_SESSION_EXPIRY_HOURS * 60 * 60}"
+                )
+                self.send_header(
+                    "Cache-Control",
+                    "no-store, no-cache, must-revalidate, max-age=0"
+                )
+                self.end_headers()
+
+                return
 
             if not require_admin(self):
 
