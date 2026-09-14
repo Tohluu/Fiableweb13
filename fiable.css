@@ -58,6 +58,8 @@ nav { block-size:88px; display:flex; align-items:center; justify-content:space-b
     font-weight:600; 
 }
 .nav-links a:hover { color:var(--blue); }
+.nav-links a:not(.btn) { padding-block-end:4px; border-block-end:2px solid transparent; }
+.nav-links a.active { color:var(--blue); border-block-end-color:var(--blue); }
 .btn { 
     border:0; 
     border-radius:8px; 
