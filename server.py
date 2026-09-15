@@ -13,6 +13,10 @@ import io
 from datetime import datetime, timezone, timedelta
 import os
 
+# Deploy marker (no functional change) - used once to force a Railway
+# redeploy while verifying persistent-storage behavior across restarts.
+_DEPLOY_VERIFICATION_MARKER = "storage-persistence-check-1"
+
 ROOT = Path(__file__).parent
 
 # =========================================================
