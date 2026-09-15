@@ -179,11 +179,61 @@ document.addEventListener("DOMContentLoaded", async () => {
     return { label, className };
   }
 
+  function renderOrderTimeline(timeline) {
+    if (!Array.isArray(timeline) || !timeline.length) {
+      return '<p class="empty-state">No timeline history is available for this order.</p>';
+    }
+    const exceptionStatuses = new Set(["failed", "cancelled", "returned"]);
+    return `<ul class="order-timeline">${timeline.map(event => {
+      const meta = getOrderStatusMeta(event.status);
+      const at = event.at ? new Date(event.at).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
+      const actor = event.actorName || (event.actorType ? event.actorType.charAt(0).toUpperCase() + event.actorType.slice(1) : "System");
+      return `
+        <li class="${exceptionStatuses.has(event.status) ? "exception" : ""}">
+          <span class="timeline-status">${meta.label}</span>
+          <span class="timeline-meta">${at} · ${actor}${event.note ? ` · ${event.note}` : ""}</span>
+        </li>
+      `;
+    }).join("")}</ul>`;
+  }
+
+  function renderProofOfDelivery(order) {
+    const proof = order.proofOfDelivery;
+    if (!proof) {
+      return '<p class="empty-state">No proof of delivery has been captured yet.</p>';
+    }
+    const otpBadge = order.otpState
+      ? `<span class="otp-state-badge ${order.otpState}">${order.otpState.replace(/_/g, " ")}</span>`
+      : "";
+    return `
+      <div class="proof-of-delivery-grid">
+        <div class="vendor-detail-item">
+          <span>Recipient Name</span>
+          <strong>${proof.recipientName || "—"}</strong>
+        </div>
+        <div class="vendor-detail-item">
+          <span>Delivered At</span>
+          <strong>${proof.deliveredAt ? new Date(proof.deliveredAt).toLocaleString("en-GB") : "—"}</strong>
+        </div>
+        <div class="vendor-detail-item">
+          <span>OTP Verification</span>
+          <strong>${otpBadge || "Not required"}</strong>
+        </div>
+        <div class="vendor-detail-item">
+          <span>GPS Location</span>
+          <strong>${proof.gps ? `${proof.gps.lat}, ${proof.gps.lng}` : "Not captured"}</strong>
+        </div>
+        ${proof.photoPath ? `<div class="vendor-detail-item"><span>Delivery Photo</span><img class="proof-of-delivery-photo" src="/api/proof/${proof.photoPath}" alt="Delivery photo"></div>` : ""}
+        ${proof.signaturePath ? `<div class="vendor-detail-item"><span>Signature</span><img class="proof-of-delivery-photo" src="/api/proof/${proof.signaturePath}" alt="Recipient signature"></div>` : ""}
+      </div>
+    `;
+  }
+
   function showPasswordGateBanner() {
     if (document.getElementById("passwordGateBanner")) return;
     const banner = document.createElement("div");
     banner.id = "passwordGateBanner";
-    banner.style.cssText = "position:fixed;top:0;left:0;right:0;z-index:99998;background:#b45309;color:#fff;padding:12px 20px;font-size:14px;font-weight:600;text-align:center";
+    banner.style.cssText = "position:fixed;inset-block-start:0;inset-inline-start:0;inset-inline-end:0;z-index:99998;background:#b45309;color:#fff;padding:12px 20px;font-size:14px;font-weight:600;text-align:center";
     banner.textContent = "You're using a temporary password. Change it below to unlock the rest of the admin portal.";
     document.body.prepend(banner);
   }
@@ -276,6 +326,13 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       if (viewName === "admin-vendors") {
         loadAdminVendors();
+      }
+      if (viewName === "admin-tickets") {
+        loadAdminTickets();
+      }
+      if (viewName === "admin-audit-log") {
+        auditCurrentPage = 1;
+        loadAdminAuditLog();
       }
 
     });
@@ -3670,22 +3727,7 @@ if (logoutBtn) {
       order.orderRef || "Order";
 
 
-    const statusLabel =
-      order.status === "in-transit"
-        ? "In Transit"
-        : order.status === "picked-up"
-          ? "Picked Up"
-          : order.status === "requested"
-            ? "Requested"
-            : order.status === "assigned"
-              ? "Assigned"
-              : order.status === "delivered"
-                ? "Delivered"
-                : order.status === "failed"
-                  ? "Failed"
-                  : order.status === "cancelled"
-                    ? "Cancelled"
-                    : order.status || "—";
+    const statusLabel = getOrderStatusMeta(order.status).label;
 
 
     const createdDate = order.createdAt
@@ -3908,24 +3950,16 @@ if (logoutBtn) {
             `
             : order.status === "assigned"
               ? `
+                <p class="muted" style="margin-block-start:16px">Waiting for the rider to accept this assignment.</p>
                 <div
                   style="
-                    margin-block-start: 16px;
+                    margin-block-start: 8px;
                     display: flex;
                     gap: 12px;
                     flex-wrap: wrap;
                     align-items: center;
                   "
                 >
-
-                  <button
-                    type="button"
-                    class="btn primary"
-                    id="startDeliveryBtn"
-                    data-order-id="${order.id}"
-                  >
-                    Start Delivery
-                  </button>
 
                   <select
                     id="reassignRiderSelect"
@@ -3948,40 +3982,43 @@ if (logoutBtn) {
 
                 </div>
               `
-              : order.status === "on_delivery"
-                ? `
-                  <div
-                    style="
-                      margin-block-start: 16px;
-                      display: flex;
-                      gap: 12px;
-                      flex-wrap: wrap;
-                    "
-                  >
-
-                    <button
-                      type="button"
-                      class="btn primary"
-                      id="markDeliveredBtn"
-                      data-order-id="${order.id}"
-                    >
-                      Mark Delivered
-                    </button>
-
-                    <button
-                      type="button"
-                      class="btn outline"
-                      id="markFailedBtn"
-                      data-order-id="${order.id}"
-                    >
-                      Mark Failed
-                    </button>
-
-                  </div>
-                `
-                : ""
+              : ""
         }
 
+        ${
+          !["delivered", "failed", "cancelled", "returned"].includes(order.status)
+            ? `
+              <div style="margin-block-start:16px;display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+                <select id="orderExceptionSelect" class="form-control" style="min-inline-size:180px">
+                  <option value="failed">Mark Failed</option>
+                  <option value="cancelled">Mark Cancelled</option>
+                  <option value="returned">Mark Returned</option>
+                </select>
+                <input type="text" id="orderExceptionNote" class="form-control" placeholder="Reason (optional)" style="min-inline-size:220px">
+                <button type="button" class="btn outline" id="applyOrderExceptionBtn" data-order-id="${order.id}">Apply</button>
+              </div>
+            `
+            : ""
+        }
+
+      </div>
+
+      <div class="vendor-detail-section">
+        <h3>Tracking</h3>
+        <div class="tracking-code-row">
+          <code id="orderTrackingCodeValue">${order.trackingCode || "—"}</code>
+          ${order.trackingCode ? `<button type="button" class="btn outline" id="copyTrackingCodeBtn" data-code="${order.trackingCode}">Copy</button>` : ""}
+        </div>
+      </div>
+
+      <div class="vendor-detail-section">
+        <h3>Delivery Timeline</h3>
+        ${renderOrderTimeline(order.timeline)}
+      </div>
+
+      <div class="vendor-detail-section">
+        <h3>Proof of Delivery</h3>
+        ${renderProofOfDelivery(order)}
       </div>
 
 
@@ -4011,6 +4048,35 @@ if (logoutBtn) {
       </div>
 
     `;
+
+    document.getElementById("copyTrackingCodeBtn")?.addEventListener("click", event => {
+      const code = event.currentTarget.dataset.code;
+      navigator.clipboard?.writeText(code).then(() => showAdminToast("Tracking code copied."));
+    });
+
+    document.getElementById("applyOrderExceptionBtn")?.addEventListener("click", async event => {
+      const button = event.currentTarget;
+      const newStatus = document.getElementById("orderExceptionSelect")?.value;
+      const note = document.getElementById("orderExceptionNote")?.value || "";
+      button.disabled = true;
+      try {
+        const response = await fetch("/api/admin/orders/update-status", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify({ orderId: button.dataset.orderId, status: newStatus, note })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Unable to update order.");
+        showAdminToast("Order updated.");
+        orderDetailsModal.classList.remove("show");
+        await loadAdminOrders();
+        await loadAdminRiders();
+      } catch (error) {
+        showAdminToast(error.message, "error");
+        button.disabled = false;
+      }
+    });
 
 
     orderDetailsModal.classList.add("show");
@@ -4394,6 +4460,24 @@ if (logoutBtn) {
 
       </div>
 
+      <div class="vendor-detail-section">
+        <h3>Manual Unit Adjustment</h3>
+        <p class="muted">Adjustments are never silent - every change requires a reason and is permanently recorded.</p>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-block-end:12px">
+          <input type="number" id="unitAdjustmentAmount" placeholder="+/- units, e.g. -5 or 10" style="max-inline-size:180px">
+          <input type="text" id="unitAdjustmentReason" placeholder="Reason (required)" style="flex:1;min-inline-size:220px">
+          <button type="button" class="btn outline" id="previewUnitAdjustmentBtn" data-email="${vendor.email}">Preview</button>
+        </div>
+        <div id="unitAdjustmentPreview" class="hidden" style="padding:14px;border:1px solid var(--border);border-radius:10px;margin-block-end:12px">
+          <div class="vendor-detail-grid">
+            <div class="vendor-detail-item"><span>Current Balance</span><strong id="unitAdjustmentCurrent">—</strong></div>
+            <div class="vendor-detail-item"><span>Adjustment</span><strong id="unitAdjustmentDelta">—</strong></div>
+            <div class="vendor-detail-item"><span>Resulting Balance</span><strong id="unitAdjustmentResult">—</strong></div>
+          </div>
+          <button type="button" class="btn primary" id="confirmUnitAdjustmentBtn" data-email="${vendor.email}" style="margin-block-start:12px">Confirm Adjustment</button>
+        </div>
+        <div id="unitAdjustmentHistory"><p class="muted">Loading adjustment history...</p></div>
+      </div>
 
       <div class="vendor-detail-section">
 
@@ -4447,14 +4531,81 @@ if (logoutBtn) {
 
     `;
 
+    document.getElementById("previewUnitAdjustmentBtn")?.addEventListener("click", () => {
+      const amount = parseInt(document.getElementById("unitAdjustmentAmount").value, 10);
+      if (!amount) {
+        showAdminToast("Enter a non-zero whole number of units.", "error");
+        return;
+      }
+      const current = vendor.unitsRemaining ?? 0;
+      document.getElementById("unitAdjustmentCurrent").textContent = current;
+      document.getElementById("unitAdjustmentDelta").textContent = amount > 0 ? `+${amount}` : amount;
+      document.getElementById("unitAdjustmentResult").textContent = current + amount;
+      document.getElementById("unitAdjustmentPreview").classList.remove("hidden");
+    });
+
+    document.getElementById("confirmUnitAdjustmentBtn")?.addEventListener("click", async event => {
+      const amount = parseInt(document.getElementById("unitAdjustmentAmount").value, 10);
+      const reason = document.getElementById("unitAdjustmentReason").value.trim();
+      if (!reason) {
+        showAdminToast("A reason is required for every unit adjustment.", "error");
+        return;
+      }
+      if (!window.confirm(`Apply a ${amount > 0 ? "+" : ""}${amount} unit adjustment? This is permanent and will be logged.`)) {
+        return;
+      }
+      try {
+        await teamRequest("/api/admin/vendors/adjust-units", {
+          email: event.currentTarget.dataset.email,
+          units: amount,
+          reason
+        });
+        showAdminToast("Units adjusted successfully.");
+        closeVendorDetailsModal();
+        loadAdminVendors();
+      } catch (error) {
+        showAdminToast(error.message, "error");
+      }
+    });
+
+    loadUnitAdjustmentHistory(vendor.email);
 
     vendorDetailsModal.classList.add("show");
     vendorDetailsModal.setAttribute("aria-hidden", "false");
   }
 
+  async function loadUnitAdjustmentHistory(email) {
+    const container = document.getElementById("unitAdjustmentHistory");
+    if (!container) return;
+    try {
+      const data = await api(`/api/admin/unit-adjustments?email=${encodeURIComponent(email)}`);
+      const entries = data.adjustments || [];
+      if (!entries.length) {
+        container.innerHTML = '<p class="muted">No manual unit adjustments have been made for this vendor.</p>';
+        return;
+      }
+      container.innerHTML = `
+        <table class="admin-table">
+          <thead><tr><th>Date</th><th>Adjustment</th><th>Reason</th><th>Admin</th><th>Prev → New</th></tr></thead>
+          <tbody>
+            ${entries.map(entry => `
+              <tr>
+                <td>${entry.at ? new Date(entry.at).toLocaleString("en-GB") : "—"}</td>
+                <td>${entry.unitsDelta > 0 ? "+" : ""}${entry.unitsDelta}</td>
+                <td>${entry.reason || "—"}</td>
+                <td>${entry.adminEmail || "—"}</td>
+                <td>${entry.previousBalance} → ${entry.newBalance}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      `;
+    } catch (error) {
+      container.innerHTML = `<p class="muted">${error.message}</p>`;
+    }
+  }
 
   function closeVendorDetailsModal() {
-
     if (!vendorDetailsModal) {
       return;
     }
@@ -4840,7 +4991,312 @@ if (logoutBtn) {
     5000
   );
 
+  /* =======================================================
+     SUPPORT TICKETS
+  ======================================================= */
 
+  const TICKET_CATEGORY_LABELS = {
+    delayed_delivery: "Delayed Delivery",
+    rider_issue: "Rider Issue",
+    package_damaged: "Package Damaged",
+    package_missing: "Package Missing",
+    incorrect_units_charge: "Incorrect Units/Charge",
+    payment_issue: "Payment Issue",
+    subscription_issue: "Subscription Issue",
+    other: "Other",
+  };
+
+  let adminTickets = [];
+
+  async function loadAdminTickets() {
+    const tableBody = document.getElementById("adminTicketsBody");
+    if (!tableBody) return;
+
+    const search = document.getElementById("ticketsSearchInput")?.value.trim() || "";
+    const status = document.getElementById("ticketsStatusFilter")?.value || "";
+    const category = document.getElementById("ticketsCategoryFilter")?.value || "";
+
+    const params = new URLSearchParams();
+    if (search) params.set("search", search);
+    if (status) params.set("status", status);
+    if (category) params.set("category", category);
+
+    try {
+      const data = await api(`/api/admin/tickets?${params.toString()}`);
+      adminTickets = data.tickets || [];
+
+      if (!adminTickets.length) {
+        tableBody.innerHTML = '<tr><td colspan="8" class="empty-state">No support tickets found.</td></tr>';
+        return;
+      }
+
+      tableBody.innerHTML = adminTickets.map(ticket => `
+        <tr>
+          <td><strong>${ticket.id}</strong></td>
+          <td>${ticket.vendorName || ticket.vendorEmail || "—"}</td>
+          <td>${TICKET_CATEGORY_LABELS[ticket.category] || ticket.category}</td>
+          <td><span class="ticket-priority-badge ${ticket.priority}">${ticket.priority}</span></td>
+          <td><span class="ticket-status-badge ${ticket.status}">${(ticket.status || "").replace(/_/g, " ")}</span></td>
+          <td>${ticket.assignedTo || "Unassigned"}</td>
+          <td>${ticket.updatedAt ? new Date(ticket.updatedAt).toLocaleDateString("en-GB") : "—"}</td>
+          <td><button type="button" class="btn outline open-ticket-btn" data-ticket-id="${ticket.id}">View</button></td>
+        </tr>
+      `).join("");
+
+      tableBody.querySelectorAll(".open-ticket-btn").forEach(button => {
+        button.addEventListener("click", () => {
+          const ticket = adminTickets.find(t => t.id === button.dataset.ticketId);
+          if (ticket) openTicketDetails(ticket);
+        });
+      });
+
+    } catch (error) {
+      tableBody.innerHTML = `<tr><td colspan="8" class="empty-state">${error.message}</td></tr>`;
+    }
+  }
+
+  document.getElementById("ticketsSearchInput")?.addEventListener("input", () => {
+    clearTimeout(window.__ticketSearchDebounce);
+    window.__ticketSearchDebounce = setTimeout(loadAdminTickets, 350);
+  });
+  document.getElementById("ticketsStatusFilter")?.addEventListener("change", loadAdminTickets);
+  document.getElementById("ticketsCategoryFilter")?.addEventListener("change", loadAdminTickets);
+
+  const ticketDetailsModal = document.getElementById("ticketDetailsModal");
+  const ticketDetailsBody = document.getElementById("ticketDetailsBody");
+  const ticketDetailsTitle = document.getElementById("ticketDetailsTitle");
+
+  function closeTicketDetails() {
+    ticketDetailsModal?.classList.remove("show");
+    ticketDetailsModal?.setAttribute("aria-hidden", "true");
+  }
+  document.getElementById("closeTicketDetails")?.addEventListener("click", closeTicketDetails);
+  document.getElementById("ticketDetailsBackdrop")?.addEventListener("click", closeTicketDetails);
+
+  function openTicketDetails(ticket) {
+    if (!ticketDetailsModal || !ticketDetailsBody) return;
+    ticketDetailsTitle.textContent = `${ticket.id} — ${TICKET_CATEGORY_LABELS[ticket.category] || ticket.category}`;
+
+    const replies = (ticket.replies || []).map(reply => `
+      <div class="ticket-message ${reply.from === "admin" ? "admin-reply" : "vendor-reply"}">
+        <div class="message-meta">${reply.from === "admin" ? (reply.authorEmail || "Admin") : "Vendor"} · ${reply.at ? new Date(reply.at).toLocaleString("en-GB") : ""}</div>
+        <div>${reply.message}</div>
+      </div>
+    `).join("");
+
+    const internalNotes = (ticket.internalNotes || []).map(note => `
+      <div class="ticket-message internal-note">
+        <div class="message-meta">Internal note · ${note.authorEmail || "Admin"} · ${note.at ? new Date(note.at).toLocaleString("en-GB") : ""}</div>
+        <div>${note.note}</div>
+      </div>
+    `).join("");
+
+    ticketDetailsBody.innerHTML = `
+      <div class="vendor-detail-grid">
+        <div class="vendor-detail-item"><span>Vendor</span><strong>${ticket.vendorName || ticket.vendorEmail}</strong></div>
+        <div class="vendor-detail-item"><span>Related Order</span><strong>${ticket.orderId ? `#${ticket.orderId}` : "—"}</strong></div>
+        <div class="vendor-detail-item"><span>Created</span><strong>${ticket.createdAt ? new Date(ticket.createdAt).toLocaleString("en-GB") : "—"}</strong></div>
+        <div class="vendor-detail-item"><span>Updated</span><strong>${ticket.updatedAt ? new Date(ticket.updatedAt).toLocaleString("en-GB") : "—"}</strong></div>
+      </div>
+
+      <div class="vendor-detail-section">
+        <h3>Description</h3>
+        <p>${ticket.description || "—"}</p>
+      </div>
+
+      <div class="vendor-detail-section">
+        <h3>Manage Ticket</h3>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+          <select id="ticketStatusSelect">
+            ${["open", "in_progress", "resolved", "closed"].map(s => `<option value="${s}" ${ticket.status === s ? "selected" : ""}>${s.replace(/_/g, " ")}</option>`).join("")}
+          </select>
+          <button type="button" class="btn outline" id="applyTicketStatusBtn" data-ticket-id="${ticket.id}">Update Status</button>
+          <input type="text" id="ticketAssigneeInput" placeholder="Assign to (admin email)" value="${ticket.assignedTo || ""}">
+          <button type="button" class="btn outline" id="applyTicketAssignBtn" data-ticket-id="${ticket.id}">Assign</button>
+        </div>
+      </div>
+
+      <div class="vendor-detail-section">
+        <h3>Conversation (visible to vendor)</h3>
+        ${replies || '<p class="empty-state">No replies yet.</p>'}
+        <div style="display:flex;gap:8px;margin-block-start:10px">
+          <input type="text" id="ticketReplyInput" placeholder="Write a reply the vendor will see..." style="flex:1">
+          <button type="button" class="btn primary" id="sendTicketReplyBtn" data-ticket-id="${ticket.id}">Send</button>
+        </div>
+      </div>
+
+      <div class="vendor-detail-section">
+        <h3>Internal Notes (never shown to vendor)</h3>
+        ${internalNotes || '<p class="empty-state">No internal notes yet.</p>'}
+        <div style="display:flex;gap:8px;margin-block-start:10px">
+          <input type="text" id="ticketNoteInput" placeholder="Add an internal note..." style="flex:1">
+          <button type="button" class="btn outline" id="addTicketNoteBtn" data-ticket-id="${ticket.id}">Add Note</button>
+        </div>
+      </div>
+    `;
+
+    document.getElementById("applyTicketStatusBtn")?.addEventListener("click", async event => {
+      try {
+        await teamRequest("/api/admin/tickets/status", {
+          ticketId: event.currentTarget.dataset.ticketId,
+          status: document.getElementById("ticketStatusSelect").value
+        });
+        showAdminToast("Ticket status updated.");
+        closeTicketDetails();
+        loadAdminTickets();
+      } catch (error) {
+        showAdminToast(error.message, "error");
+      }
+    });
+
+    document.getElementById("applyTicketAssignBtn")?.addEventListener("click", async event => {
+      try {
+        await teamRequest("/api/admin/tickets/assign", {
+          ticketId: event.currentTarget.dataset.ticketId,
+          assigneeEmail: document.getElementById("ticketAssigneeInput").value.trim()
+        });
+        showAdminToast("Ticket assigned.");
+        closeTicketDetails();
+        loadAdminTickets();
+      } catch (error) {
+        showAdminToast(error.message, "error");
+      }
+    });
+
+    document.getElementById("sendTicketReplyBtn")?.addEventListener("click", async event => {
+      const message = document.getElementById("ticketReplyInput").value.trim();
+      if (!message) return;
+      try {
+        const data = await teamRequest("/api/admin/tickets/respond", {
+          ticketId: event.currentTarget.dataset.ticketId,
+          message
+        });
+        showAdminToast("Reply sent to vendor.");
+        openTicketDetails(data.ticket);
+      } catch (error) {
+        showAdminToast(error.message, "error");
+      }
+    });
+
+    document.getElementById("addTicketNoteBtn")?.addEventListener("click", async event => {
+      const note = document.getElementById("ticketNoteInput").value.trim();
+      if (!note) return;
+      try {
+        const data = await teamRequest("/api/admin/tickets/note", {
+          ticketId: event.currentTarget.dataset.ticketId,
+          note
+        });
+        showAdminToast("Internal note added.");
+        openTicketDetails(data.ticket);
+      } catch (error) {
+        showAdminToast(error.message, "error");
+      }
+    });
+
+    ticketDetailsModal.classList.add("show");
+    ticketDetailsModal.setAttribute("aria-hidden", "false");
+  }
+
+  /* =======================================================
+     AUDIT LOG
+  ======================================================= */
+
+  let auditCurrentPage = 1;
+  let auditPagination = { page: 1, totalPages: 1 };
+
+  async function loadAdminAuditLog() {
+    const tableBody = document.getElementById("adminAuditLogBody");
+    if (!tableBody) return;
+
+    const params = new URLSearchParams({ page: String(auditCurrentPage), pageSize: "50" });
+
+    try {
+      const data = await api(`/api/admin/audit-log?${params.toString()}`);
+      let entries = data.entries || [];
+      auditPagination = data.pagination || { page: 1, totalPages: 1 };
+
+      const search = document.getElementById("auditSearchInput")?.value.trim().toLowerCase();
+      const dateFrom = document.getElementById("auditDateFrom")?.value;
+      const dateTo = document.getElementById("auditDateTo")?.value;
+
+      if (search) {
+        entries = entries.filter(entry =>
+          JSON.stringify(entry).toLowerCase().includes(search)
+        );
+      }
+      if (dateFrom) entries = entries.filter(entry => entry.at >= dateFrom);
+      if (dateTo) entries = entries.filter(entry => entry.at <= `${dateTo}T23:59:59`);
+
+      const paginationInfo = document.getElementById("auditPaginationInfo");
+      if (paginationInfo) paginationInfo.textContent = `Page ${auditPagination.page} of ${auditPagination.totalPages}`;
+      document.getElementById("auditPrevPage").disabled = auditPagination.page <= 1;
+      document.getElementById("auditNextPage").disabled = auditPagination.page >= auditPagination.totalPages;
+
+      if (!entries.length) {
+        tableBody.innerHTML = '<tr><td colspan="6" class="empty-state">No audit log entries found.</td></tr>';
+        return;
+      }
+
+      tableBody.innerHTML = entries.map(entry => `
+        <tr>
+          <td>${entry.at ? new Date(entry.at).toLocaleString("en-GB") : "—"}</td>
+          <td>${entry.actorEmail || "—"}</td>
+          <td>${(entry.action || "").replace(/_/g, " ")}</td>
+          <td>${entry.targetType || "—"}${entry.targetId ? ` #${entry.targetId}` : ""}</td>
+          <td>${entry.previousValue !== undefined && entry.previousValue !== null ? JSON.stringify(entry.previousValue) : "—"}</td>
+          <td>${entry.newValue !== undefined && entry.newValue !== null ? JSON.stringify(entry.newValue) : "—"}</td>
+        </tr>
+      `).join("");
+    } catch (error) {
+      tableBody.innerHTML = `<tr><td colspan="6" class="empty-state">${error.message}</td></tr>`;
+    }
+  }
+
+  document.getElementById("auditSearchInput")?.addEventListener("input", () => {
+    clearTimeout(window.__auditSearchDebounce);
+    window.__auditSearchDebounce = setTimeout(loadAdminAuditLog, 350);
+  });
+  document.getElementById("auditDateFrom")?.addEventListener("change", loadAdminAuditLog);
+  document.getElementById("auditDateTo")?.addEventListener("change", loadAdminAuditLog);
+  document.getElementById("auditPrevPage")?.addEventListener("click", () => {
+    if (auditCurrentPage > 1) { auditCurrentPage -= 1; loadAdminAuditLog(); }
+  });
+  document.getElementById("auditNextPage")?.addEventListener("click", () => {
+    if (auditCurrentPage < auditPagination.totalPages) { auditCurrentPage += 1; loadAdminAuditLog(); }
+  });
+
+  /* =======================================================
+     CSV EXPORTS - triggers a real browser download from the
+     existing backend endpoints; no export logic is reimplemented here.
+  ======================================================= */
+
+  document.querySelectorAll(".export-btn").forEach(button => {
+    button.addEventListener("click", async () => {
+      const kind = button.dataset.export;
+      button.disabled = true;
+      try {
+        const response = await fetch(`/api/admin/export/${kind}`, { credentials: "same-origin" });
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          throw new Error(data.error || "Export failed.");
+        }
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `${kind}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+        showAdminToast("Export downloaded.");
+      } catch (error) {
+        showAdminToast(error.message, "error");
+      } finally {
+        button.disabled = false;
+      }
+    });
+  });
 
   /* =======================================================
      INITIAL LOAD

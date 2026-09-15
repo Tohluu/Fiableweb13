@@ -103,6 +103,33 @@
 
         <button
           class="nav-item"
+          data-admin-view="admin-tickets"
+          type="button"
+        >
+          <span>☎</span>
+          Support Tickets
+        </button>
+
+        <button
+          class="nav-item"
+          data-admin-view="admin-audit-log"
+          type="button"
+        >
+          <span>▤</span>
+          Audit Log
+        </button>
+
+        <button
+          class="nav-item"
+          data-admin-view="admin-reports"
+          type="button"
+        >
+          <span>⇩</span>
+          Reports
+        </button>
+
+        <button
+          class="nav-item"
           data-admin-view="admin-settings"
           type="button"
         >
@@ -1370,11 +1397,180 @@
                 <option value="analyst">Analyst — read-only reporting</option>
               </select>
               <p class="muted" style="font-size:12px;margin:-4px 0 4px">The new admin must change this password on first login.</p>
+              <div class="role-description-list">
+                <div><strong>Super Admin</strong> — full system administration.</div>
+                <div><strong>Operations Manager</strong> — orders, riders, vendors, operational reporting.</div>
+                <div><strong>Dispatcher</strong> — delivery queue and rider assignment only.</div>
+                <div><strong>Finance</strong> — subscriptions, payments, rider payouts, financial reporting.</div>
+                <div><strong>Customer Support</strong> — support tickets and the vendor/order info needed to resolve them.</div>
+                <div><strong>Analyst</strong> — authorised read-only reporting.</div>
+              </div>
               <div id="addAdminMessage" class="admin-team-message" aria-live="polite"></div>
               <button type="submit" class="btn primary">Add Admin</button>
             </form>
           </div>
         </div>
+
+        <!-- =========================
+             SUPPORT TICKETS
+        ========================== -->
+        <section class="view" id="view-admin-tickets">
+          <div class="section-title">
+            <div>
+              <div class="eyebrow">Support</div>
+              <h1>Support Tickets</h1>
+              <p class="muted">Vendor-reported issues and requests.</p>
+            </div>
+          </div>
+
+          <article class="panel">
+            <div class="admin-filter-bar">
+              <input type="search" id="ticketsSearchInput" placeholder="Search by ticket ID, vendor, description...">
+              <select id="ticketsStatusFilter">
+                <option value="">All statuses</option>
+                <option value="open">Open</option>
+                <option value="in_progress">In Progress</option>
+                <option value="resolved">Resolved</option>
+                <option value="closed">Closed</option>
+              </select>
+              <select id="ticketsCategoryFilter">
+                <option value="">All categories</option>
+                <option value="delayed_delivery">Delayed Delivery</option>
+                <option value="rider_issue">Rider Issue</option>
+                <option value="package_damaged">Package Damaged</option>
+                <option value="package_missing">Package Missing</option>
+                <option value="incorrect_units_charge">Incorrect Units/Charge</option>
+                <option value="payment_issue">Payment Issue</option>
+                <option value="subscription_issue">Subscription Issue</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div class="admin-table-wrap">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>Ticket ID</th>
+                    <th>Vendor</th>
+                    <th>Category</th>
+                    <th>Priority</th>
+                    <th>Status</th>
+                    <th>Assigned To</th>
+                    <th>Updated</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="adminTicketsBody">
+                  <tr><td colspan="8" class="empty-state">Loading tickets...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+
+        <div class="modal" id="ticketDetailsModal" aria-hidden="true">
+          <div class="modal-backdrop" id="ticketDetailsBackdrop"></div>
+          <div class="modal-dialog" role="dialog" aria-modal="true">
+            <div class="modal-header">
+              <div>
+                <div class="eyebrow">Support Ticket</div>
+                <h2 id="ticketDetailsTitle">Ticket</h2>
+              </div>
+              <button class="modal-close" id="closeTicketDetails" aria-label="Close ticket details">×</button>
+            </div>
+            <div class="modal-body" id="ticketDetailsBody"></div>
+          </div>
+        </div>
+
+        <!-- =========================
+             AUDIT LOG
+        ========================== -->
+        <section class="view" id="view-admin-audit-log">
+          <div class="section-title">
+            <div>
+              <div class="eyebrow">Compliance</div>
+              <h1>Audit Log</h1>
+              <p class="muted">Read-only record of administrative actions. Nothing here can be edited or deleted.</p>
+            </div>
+          </div>
+
+          <article class="panel">
+            <div class="admin-filter-bar">
+              <input type="search" id="auditSearchInput" placeholder="Search by admin, action, target...">
+              <input type="date" id="auditDateFrom">
+              <input type="date" id="auditDateTo">
+            </div>
+            <div class="admin-table-wrap">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>Timestamp</th>
+                    <th>Admin</th>
+                    <th>Action</th>
+                    <th>Target</th>
+                    <th>Previous</th>
+                    <th>New</th>
+                  </tr>
+                </thead>
+                <tbody id="adminAuditLogBody">
+                  <tr><td colspan="6" class="empty-state">Loading audit log...</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="admin-pagination" id="auditPagination">
+              <button type="button" class="btn outline" id="auditPrevPage">← Previous</button>
+              <span id="auditPaginationInfo">Page 1 of 1</span>
+              <button type="button" class="btn outline" id="auditNextPage">Next →</button>
+            </div>
+          </article>
+        </section>
+
+        <!-- =========================
+             REPORTS / EXPORTS
+        ========================== -->
+        <section class="view" id="view-admin-reports">
+          <div class="section-title">
+            <div>
+              <div class="eyebrow">Reporting</div>
+              <h1>Reports &amp; Exports</h1>
+              <p class="muted">Download CSV exports. Only data you're authorised to view is available for export.</p>
+            </div>
+          </div>
+
+          <article class="panel">
+            <div class="export-grid" id="adminExportGrid">
+              <div class="export-card">
+                <h3>Orders</h3>
+                <p class="muted">All delivery orders and their current status.</p>
+                <button type="button" class="btn outline export-btn" data-export="orders">Export CSV</button>
+              </div>
+              <div class="export-card">
+                <h3>Vendors</h3>
+                <p class="muted">Vendor accounts and plan information.</p>
+                <button type="button" class="btn outline export-btn" data-export="vendors">Export CSV</button>
+              </div>
+              <div class="export-card">
+                <h3>Subscriptions</h3>
+                <p class="muted">Subscription billing history.</p>
+                <button type="button" class="btn outline export-btn" data-export="subscriptions">Export CSV</button>
+              </div>
+              <div class="export-card">
+                <h3>Payments</h3>
+                <p class="muted">Vendor payment status and history.</p>
+                <button type="button" class="btn outline export-btn" data-export="payments">Export CSV</button>
+              </div>
+              <div class="export-card">
+                <h3>Rider Payments</h3>
+                <p class="muted">Rider payout records.</p>
+                <button type="button" class="btn outline export-btn" data-export="rider-payments">Export CSV</button>
+              </div>
+              <div class="export-card">
+                <h3>Delivery Performance</h3>
+                <p class="muted">Per-rider delivery performance summary.</p>
+                <button type="button" class="btn outline export-btn" data-export="performance">Export CSV</button>
+              </div>
+            </div>
+          </article>
+        </section>
 
         <!-- =========================
             ADMIN SETTINGS
