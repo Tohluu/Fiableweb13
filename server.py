@@ -15,6 +15,22 @@ import os
 
 ROOT = Path(__file__).parent
 
+# =========================================================
+# PERSISTENT STORAGE ROOT
+# =========================================================
+# Every persistent runtime file (vendor/rider/order/ticket/audit/proof data)
+# resolves from this single directory. Locally it defaults to <project>/data
+# (based on this file's real location, NOT the process's current working
+# directory, so `python server.py` behaves the same regardless of which
+# shell folder you launched it from). In production, set the DATA_DIR
+# environment variable to the path where your persistent volume is
+# mounted (e.g. Railway: Settings > Volumes) so runtime writes survive
+# restarts/redeploys instead of living in the ephemeral container filesystem.
+DATA_DIR = Path(os.environ.get("DATA_DIR") or (ROOT / "data")).resolve()
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+APP_ENV = os.environ.get("APP_ENV", "development").strip().lower()
+
 # Static-file paths that must never be served, even though they live
 # under the project root that SimpleHTTPRequestHandler serves from.
 BLOCKED_STATIC_PREFIXES = (
@@ -27,8 +43,8 @@ BLOCKED_STATIC_PREFIXES = (
     "/Procfile",
     "/railway.toml",
 )
-DATA_FILE = ROOT / "data" / "submissions.json"
-ACCOUNTS_FILE = ROOT / "data" / "accounts.json"
+DATA_FILE = DATA_DIR / "submissions.json"
+ACCOUNTS_FILE = DATA_DIR / "accounts.json"
 PORT = int(os.environ.get("PORT", "8080"))
 
 # =========================================================
@@ -92,15 +108,15 @@ PLANS = {
     "Business": {"units": 110},
 }
 
-DELIVERIES_FILE = ROOT / "data" / "deliveries.json"
-RIDERS_FILE = ROOT / "data" / "riders.json"
+DELIVERIES_FILE = DATA_DIR / "deliveries.json"
+RIDERS_FILE = DATA_DIR / "riders.json"
 RIDER_NOTIFICATIONS_FILE = (
-    ROOT / "data" / "rider_notifications.json"
+    DATA_DIR / "rider_notifications.json"
 )
-RIDER_PAYMENTS_FILE = ROOT / "data" / "rider_payments.json"
-ADMIN_CREDENTIALS_FILE = ROOT / "data" / "admin_credentials.json"
-RESET_TOKENS_FILE = ROOT / "data" / "reset_tokens.json"
-SUBSCRIPTIONS_FILE = ROOT / "data" / "subscriptions.json"
+RIDER_PAYMENTS_FILE = DATA_DIR / "rider_payments.json"
+ADMIN_CREDENTIALS_FILE = DATA_DIR / "admin_credentials.json"
+RESET_TOKENS_FILE = DATA_DIR / "reset_tokens.json"
+SUBSCRIPTIONS_FILE = DATA_DIR / "subscriptions.json"
 RESET_TOKEN_EXPIRY_MINUTES = 60
 
 LOCATION_ZONES = {
@@ -509,6 +525,67 @@ def bootstrap_admin_from_environment():
     admin["status"] = "active"
     save_admin_credentials(admins)
     purge_admin_sessions(email)
+
+
+def check_storage_health():
+    """Verify persistent storage is reachable and writable.
+
+    Returns a dict with booleans only -- never a filesystem path -- so it is
+    safe to expose through a public endpoint. Detailed diagnostics (the
+    actual resolved path) are logged server-side only, via log_startup_state().
+    """
+    try:
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        probe = DATA_DIR / ".storage_healthcheck.tmp"
+        probe.write_text("ok", encoding="utf-8")
+        readable = probe.read_text(encoding="utf-8") == "ok"
+        probe.unlink(missing_ok=True)
+        return {"reachable": True, "writable": readable}
+    except OSError:
+        return {"reachable": False, "writable": False}
+
+
+def log_startup_state():
+    """Print safe, non-sensitive diagnostics to the server console/log stream.
+
+    Never logs passwords, hashes, session tokens, CSRF tokens, OTP values,
+    or other secrets. The resolved storage path is safe to log here because
+    this only reaches server-side logs (e.g. the Railway dashboard), never
+    an HTTP response body.
+    """
+    print(f"[startup] APP_ENV={APP_ENV}")
+    print(f"[startup] Storage directory resolved: {DATA_DIR}")
+
+    health = check_storage_health()
+    if health["reachable"] and health["writable"]:
+        print("[startup] Persistent storage available (reachable + writable)")
+    elif health["reachable"]:
+        print("[startup] WARNING: storage directory reachable but not writable")
+    else:
+        print("[startup] WARNING: storage directory is not reachable")
+
+    required_files = {
+        "accounts": ACCOUNTS_FILE,
+        "deliveries": DELIVERIES_FILE,
+        "riders": RIDERS_FILE,
+        "admin_credentials": ADMIN_CREDENTIALS_FILE,
+        "support_tickets": SUPPORT_TICKETS_FILE,
+        "audit_log": AUDIT_LOG_FILE,
+        "unit_adjustments": UNIT_ADJUSTMENTS_FILE,
+        "subscriptions": SUBSCRIPTIONS_FILE,
+        "rider_payments": RIDER_PAYMENTS_FILE,
+        "rider_notifications": RIDER_NOTIFICATIONS_FILE,
+        "reset_tokens": RESET_TOKENS_FILE,
+        "submissions": DATA_FILE,
+    }
+    present = [name for name, path in required_files.items() if path.exists()]
+    missing = [name for name, path in required_files.items() if not path.exists()]
+    print(f"[startup] Required data files loaded: {', '.join(present) if present else '(none yet)'}")
+    if missing:
+        print(f"[startup] Data files not yet present (will be created empty on first write): {', '.join(missing)}")
+
+    PROOF_DIR.mkdir(parents=True, exist_ok=True)
+    print("[startup] Proof storage available")
 
 
 def create_account(email, name, password, plan=None):
@@ -1232,6 +1309,8 @@ def load_rider_notifications():
 
 def save_rider_notifications(notifications):
 
+    RIDER_NOTIFICATIONS_FILE.parent.mkdir(parents=True, exist_ok=True)
+
     RIDER_NOTIFICATIONS_FILE.write_text(
         json.dumps(
             notifications,
@@ -1810,10 +1889,10 @@ PROOF_OF_DELIVERY_REQUIREMENTS = {
     "requireGps": False,
 }
 
-PROOF_DIR = ROOT / "data" / "proof"
-AUDIT_LOG_FILE = ROOT / "data" / "audit_log.json"
-UNIT_ADJUSTMENTS_FILE = ROOT / "data" / "unit_adjustments.json"
-SUPPORT_TICKETS_FILE = ROOT / "data" / "support_tickets.json"
+PROOF_DIR = DATA_DIR / "proof"
+AUDIT_LOG_FILE = DATA_DIR / "audit_log.json"
+UNIT_ADJUSTMENTS_FILE = DATA_DIR / "unit_adjustments.json"
+SUPPORT_TICKETS_FILE = DATA_DIR / "support_tickets.json"
 
 
 def now_iso():
@@ -5496,7 +5575,13 @@ class FiableHandler(SimpleHTTPRequestHandler):
                 self.end_headers()
                 return
         if self.path == "/api/health":
-            self._json_response(200, {"status": "ok"})
+            health = check_storage_health()
+            if health["reachable"] and health["writable"]:
+                self._json_response(200, {"status": "healthy", "storage": "available"})
+            elif health["reachable"]:
+                self._json_response(200, {"status": "degraded", "storage": "read-only"})
+            else:
+                self._json_response(503, {"status": "unhealthy", "storage": "unavailable"})
             return
         if self.path.startswith("/api/account/subscriptions"):
             email = get_logged_in_vendor_email(self)
@@ -6349,6 +6434,7 @@ class FiableHandler(SimpleHTTPRequestHandler):
 
 
 if __name__ == "__main__":
+    log_startup_state()
     migrate_subscriber_ids()
     migrate_deliveries()
     bootstrap_admin_from_environment()

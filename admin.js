@@ -4968,7 +4968,23 @@ if (logoutBtn) {
 
   /* =======================================================
     AUTO REFRESH ADMIN DATA
+    Role-aware: only refreshes sections the logged-in admin can
+    actually view (per NAV_VIEW_PERMISSIONS), and only polls
+    operational data (orders) on the fast interval. Team/vendor/
+    finance/rider data refresh on a slower interval since they
+    change far less often and were causing needless load + noisy
+    403s for roles without access.
   ======================================================= */
+
+  function adminCanView(permission) {
+    if (!currentAdmin) return false;
+    if (!permission) return true;
+    const permissions = new Set(currentAdmin.permissions || []);
+    return permissions.has("*") || permissions.has(permission);
+  }
+
+  const ADMIN_FAST_REFRESH_MS = 5000;
+  const ADMIN_SLOW_REFRESH_MS = 30000;
 
   setInterval(
     () => {
@@ -4978,18 +4994,33 @@ if (logoutBtn) {
         !passwordChangeRequired()
       ) {
         loadAdminDashboard();
-        loadAdminOrders();
-        loadAdminRecentOrders();
-        loadAdminVendors();
-        loadAdminSubscriptions();
-        loadAdminRiders();
-        loadAdminRiderPayments();
-        loadAdminTeam();
+        if (adminCanView("view_orders")) {
+          loadAdminOrders();
+          loadAdminRecentOrders();
+        }
       }
 
     },
-    5000
+    ADMIN_FAST_REFRESH_MS
   );
+
+  setInterval(
+    () => {
+
+      if (
+        document.visibilityState === "visible" &&
+        !passwordChangeRequired()
+      ) {
+        if (adminCanView("view_vendors")) loadAdminVendors();
+        if (adminCanView("view_finance")) loadAdminSubscriptions();
+        if (adminCanView("view_riders")) loadAdminRiders();
+        if (adminCanView("view_team")) loadAdminTeam();
+      }
+
+    },
+    ADMIN_SLOW_REFRESH_MS
+  );
+
 
   /* =======================================================
      SUPPORT TICKETS
