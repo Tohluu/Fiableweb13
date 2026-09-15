@@ -1177,5 +1177,23 @@
       "email": "toluwaloseoyinloye@gmail.com",
       "token": "kQ7CvAH-18BQgCQrlxO6UBonXzgVQtlq7WsQgMZ3F-cL9TLQR3y1GGmaBokLxl0m"
     }
+  },
+  {
+    "id": 132,
+    "type": "vendor",
+    "createdAt": "2026-09-14T23:48:00.489709+00:00",
+    "data": {
+      "email": "test-batch2-vendorA@fiable.local",
+      "name": "Test Vendor A"
+    }
+  },
+  {
+    "id": 133,
+    "type": "vendor",
+    "createdAt": "2026-09-14T23:48:00.827510+00:00",
+    "data": {
+      "email": "test-batch2-vendorB@fiable.local",
+      "name": "Test Vendor B"
+    }
   }
 ]

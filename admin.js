@@ -72,17 +72,24 @@ document.addEventListener("DOMContentLoaded", async () => {
     Business: 143000
   };
 
+  let currentAdmin = null;
+
   try {
 
-    const response = await fetch("/api/admin/summary", {
+    const response = await fetch("/api/admin/account", {
       credentials: "same-origin",
       cache: "no-store"
     });
+
+    const accountData = await response.json().catch(() => ({}));
 
     if (!response.ok) {
       window.location.replace("/admin-login.html");
       return;
     }
+
+    currentAdmin = accountData;
+    window.currentAdmin = accountData;
 
     document.body.classList.remove("admin-page-loading");
 
@@ -143,12 +150,80 @@ document.addEventListener("DOMContentLoaded", async () => {
     return data;
   }
 
+  /* =======================================================
+     HARD PASSWORD-CHANGE GATE
+     While mustChangePassword is true, only the Settings view
+     (where the change-password form lives) is reachable - the
+     backend enforces this too, this just matches the UI to it.
+  ======================================================= */
+
+  function passwordChangeRequired() {
+    return Boolean(currentAdmin && currentAdmin.mustChangePassword);
+  }
+
+  const ORDER_STATUS_META = {
+    requested: ["Pending", "status-requested"],
+    assigned: ["Assigned", "status-assigned"],
+    rider_accepted: ["Rider Accepted", "status-assigned"],
+    arriving_at_pickup: ["Arriving at Pickup", "status-assigned"],
+    picked_up: ["Picked Up", "status-assigned"],
+    on_delivery: ["In Transit", "status-on-delivery"],
+    delivered: ["Delivered", "status-delivered"],
+    failed: ["Failed", "status-failed"],
+    cancelled: ["Cancelled", "status-cancelled"],
+    returned: ["Returned", "status-failed"],
+  };
+
+  function getOrderStatusMeta(status) {
+    const [label, className] = ORDER_STATUS_META[status] || [status || "—", ""];
+    return { label, className };
+  }
+
+  function showPasswordGateBanner() {
+    if (document.getElementById("passwordGateBanner")) return;
+    const banner = document.createElement("div");
+    banner.id = "passwordGateBanner";
+    banner.style.cssText = "position:fixed;top:0;left:0;right:0;z-index:99998;background:#b45309;color:#fff;padding:12px 20px;font-size:14px;font-weight:600;text-align:center";
+    banner.textContent = "You're using a temporary password. Change it below to unlock the rest of the admin portal.";
+    document.body.prepend(banner);
+  }
+
+  /* =======================================================
+     ROLE-AWARE NAVIGATION (UX only - backend is authoritative)
+  ======================================================= */
+
+  const NAV_VIEW_PERMISSIONS = {
+    "admin-vendors": "view_vendors",
+    "admin-orders": "view_orders",
+    "admin-subscriptions": "view_finance",
+    "admin-riders": "view_riders",
+    "admin-team": "view_team",
+    "admin-tickets": "view_tickets",
+    "admin-audit-log": "view_audit_log",
+    "admin-reports": "export_data",
+  };
+
+  function applyRoleAwareNavigation() {
+    if (!currentAdmin) return;
+    const permissions = new Set(currentAdmin.permissions || []);
+    const hasAll = permissions.has("*");
+    navItems.forEach(item => {
+      const required = NAV_VIEW_PERMISSIONS[item.dataset.adminView];
+      const allowed = !required || hasAll || permissions.has(required);
+      item.classList.toggle("nav-item-hidden", !allowed);
+    });
+  }
 
   /* =======================================================
      VIEW SWITCHING
   ======================================================= */
 
   function showAdminView(viewName) {
+
+    if (passwordChangeRequired() && viewName !== "admin-settings") {
+      showAdminToast("Change your temporary password before continuing.", "error");
+      viewName = "admin-settings";
+    }
 
     views.forEach(view => {
       view.classList.remove("active");
@@ -587,6 +662,18 @@ if (logoutBtn) {
     return data;
   }
 
+  const ADMIN_ROLE_LABELS = {
+    super_admin: "Super Admin", operations_manager: "Operations Manager",
+    dispatcher: "Dispatcher", finance: "Finance",
+    customer_support: "Customer Support", analyst: "Analyst (Read Only)",
+    owner: "Super Admin", staff: "Operations Manager",
+  };
+  const ADMIN_ASSIGNABLE_ROLES = [
+    ["super_admin", "Super Admin"], ["operations_manager", "Operations Manager"],
+    ["dispatcher", "Dispatcher"], ["finance", "Finance"],
+    ["customer_support", "Customer Support"], ["analyst", "Analyst (Read Only)"],
+  ];
+
   async function loadAdminTeam() {
     const tableBody = document.getElementById("adminTeamBody");
     if (!tableBody) return;
@@ -603,15 +690,20 @@ if (logoutBtn) {
       const admins = data.admins || [];
       tableBody.innerHTML = admins.length ? admins.map(admin => {
         const isCurrent = admin.email.toLowerCase() === (data.currentAdminEmail || "").toLowerCase();
-        const canManage = data.isOwner && !isCurrent && admin.role !== "owner";
-        const roleControl = admin.role === "owner"
-          ? "Owner"
-          : `<select class="admin-team-role" data-email="${escapeSubscriptionValue(admin.email)}" ${canManage ? "" : "disabled"}><option value="staff" ${admin.role === "staff" ? "selected" : ""}>Staff</option><option value="admin" ${admin.role === "admin" ? "selected" : ""}>Admin</option></select>`;
+        const isProtectedOwner = admin.role === "owner" || admin.role === "super_admin";
+        const canManage = data.isOwner && !isCurrent && !isProtectedOwner;
+        const roleControl = isProtectedOwner
+          ? (admin.roleLabel || ADMIN_ROLE_LABELS[admin.role] || admin.role)
+          : `<select class="admin-team-role" data-email="${escapeSubscriptionValue(admin.email)}" ${canManage ? "" : "disabled"}>${ADMIN_ASSIGNABLE_ROLES.map(([value, label]) => `<option value="${value}" ${admin.role === value ? "selected" : ""}>${label}</option>`).join("")}</select>`;
+        const badges = [
+          admin.mustChangePassword ? '<span class="admin-team-status revoked" title="Must change password before using the dashboard">Temp password</span>' : "",
+          admin.mfaEnabled ? '<span class="admin-team-status active">MFA on</span>' : "",
+        ].join(" ");
         return `
           <tr>
-            <td><strong>${escapeSubscriptionValue(admin.email || "—")}</strong></td>
+            <td><strong>${escapeSubscriptionValue(admin.email || "—")}</strong><div class="muted" style="font-size:12px">${escapeSubscriptionValue(admin.name || "")}</div></td>
             <td><span class="admin-team-role-value">${roleControl}</span></td>
-            <td><span class="admin-team-status ${admin.status}">${escapeSubscriptionValue(admin.status)}</span></td>
+            <td><span class="admin-team-status ${admin.status}">${escapeSubscriptionValue(admin.status)}</span> ${badges}</td>
             <td>${admin.createdAt ? new Date(admin.createdAt).toLocaleDateString("en-GB") : "—"}</td>
             <td>${canManage ? `<button type="button" class="btn outline admin-team-access" data-email="${escapeSubscriptionValue(admin.email)}" data-action="${admin.status === "revoked" ? "restore" : "revoke"}">${admin.status === "revoked" ? "Restore access" : "Revoke access"}</button><button type="button" class="btn danger admin-team-delete" data-email="${escapeSubscriptionValue(admin.email)}">Delete</button>` : isCurrent ? "You cannot change your own access." : "Protected"}</td>
           </tr>
@@ -2227,6 +2319,9 @@ if (logoutBtn) {
     LOAD ADMIN ORDERS
   ======================================================= */
 
+  let ordersCurrentPage = 1;
+  let ordersPagination = { page: 1, pageSize: 50, total: 0, totalPages: 1 };
+
   async function loadAdminOrders() {
 
     const tableBody =
@@ -2236,8 +2331,19 @@ if (logoutBtn) {
 
     try {
 
+      const search = document.getElementById("ordersSearchInput")?.value.trim() || "";
+      const status = document.getElementById("ordersStatusFilter")?.value || "";
+      const pageSize = document.getElementById("ordersPageSize")?.value || "50";
+
+      const params = new URLSearchParams({
+        page: String(ordersCurrentPage),
+        pageSize,
+      });
+      if (search) params.set("search", search);
+      if (status) params.set("status", status);
+
       const response = await fetch(
-        "/api/admin/orders",
+        `/api/admin/orders?${params.toString()}`,
         {
           credentials: "same-origin"
         }
@@ -2252,6 +2358,16 @@ if (logoutBtn) {
       }
 
       adminOrders = data.orders || [];
+      ordersPagination = data.pagination || { page: 1, pageSize: 50, total: adminOrders.length, totalPages: 1 };
+
+      const paginationInfo = document.getElementById("ordersPaginationInfo");
+      const prevBtn = document.getElementById("ordersPrevPage");
+      const nextBtn = document.getElementById("ordersNextPage");
+      if (paginationInfo) {
+        paginationInfo.textContent = `Page ${ordersPagination.page} of ${ordersPagination.totalPages} (${ordersPagination.total} orders)`;
+      }
+      if (prevBtn) prevBtn.disabled = ordersPagination.page <= 1;
+      if (nextBtn) nextBtn.disabled = ordersPagination.page >= ordersPagination.totalPages;
 
       const orders = adminOrders;
 
@@ -2284,37 +2400,7 @@ if (logoutBtn) {
           : "—";
 
 
-        const statusLabel =
-          order.status === "in-transit"
-            ? "In Transit"
-            : order.status === "picked-up"
-              ? "Picked Up"
-              : order.status === "requested"
-                ? "Requested"
-                : order.status === "assigned"
-                  ? "Assigned"
-                  : order.status === "delivered"
-                    ? "Delivered"
-                    : order.status === "failed"
-                      ? "Failed"
-                      : order.status === "cancelled"
-                        ? "Cancelled"
-                        : order.status || "—";
-
-        const statusClass =
-          order.status === "requested"
-            ? "status-requested"
-            : order.status === "assigned"
-              ? "status-assigned"
-              : order.status === "on_delivery"
-                ? "status-on-delivery"
-                : order.status === "delivered"
-                  ? "status-delivered"
-                  : order.status === "failed"
-                    ? "status-failed"
-                    : order.status === "cancelled"
-                      ? "status-cancelled"
-                      : "";
+        const { label: statusLabel, className: statusClass } = getOrderStatusMeta(order.status);
 
 
         const account =
@@ -2423,6 +2509,39 @@ if (logoutBtn) {
     }
 
   }
+
+  /* ---------------------------------------------------
+     ORDERS SEARCH / FILTER / PAGINATION WIRING
+  --------------------------------------------------- */
+
+  let ordersSearchDebounce = null;
+  document.getElementById("ordersSearchInput")?.addEventListener("input", () => {
+    clearTimeout(ordersSearchDebounce);
+    ordersSearchDebounce = setTimeout(() => {
+      ordersCurrentPage = 1;
+      loadAdminOrders();
+    }, 350);
+  });
+  document.getElementById("ordersStatusFilter")?.addEventListener("change", () => {
+    ordersCurrentPage = 1;
+    loadAdminOrders();
+  });
+  document.getElementById("ordersPageSize")?.addEventListener("change", () => {
+    ordersCurrentPage = 1;
+    loadAdminOrders();
+  });
+  document.getElementById("ordersPrevPage")?.addEventListener("click", () => {
+    if (ordersCurrentPage > 1) {
+      ordersCurrentPage -= 1;
+      loadAdminOrders();
+    }
+  });
+  document.getElementById("ordersNextPage")?.addEventListener("click", () => {
+    if (ordersCurrentPage < ordersPagination.totalPages) {
+      ordersCurrentPage += 1;
+      loadAdminOrders();
+    }
+  });
 
   /* ========================================================
      BULK ASSIGNMENT FUNCTIONS
@@ -2671,37 +2790,7 @@ if (logoutBtn) {
               : "—";
 
 
-          const statusLabel =
-            order.status === "in-transit"
-              ? "In Transit"
-              : order.status === "picked-up"
-                ? "Picked Up"
-                : order.status === "requested"
-                  ? "Requested"
-                  : order.status === "assigned"
-                    ? "Assigned"
-                    : order.status === "delivered"
-                      ? "Delivered"
-                      : order.status === "failed"
-                        ? "Failed"
-                        : order.status === "cancelled"
-                          ? "Cancelled"
-                          : order.status || "—";
-
-          const statusClass =
-            order.status === "requested"
-              ? "status-requested"
-              : order.status === "assigned"
-                ? "status-assigned"
-                : order.status === "on_delivery"
-                  ? "status-on-delivery"
-                  : order.status === "delivered"
-                    ? "status-delivered"
-                    : order.status === "failed"
-                      ? "status-failed"
-                      : order.status === "cancelled"
-                        ? "status-cancelled"
-                        : "";
+          const { label: statusLabel, className: statusClass } = getOrderStatusMeta(order.status);
 
 
 
@@ -4565,6 +4654,11 @@ if (logoutBtn) {
           "Admin password changed successfully."
         );
 
+        if (passwordChangeRequired()) {
+          // Reload so the hard gate lifts and normal navigation/data loads resume.
+          window.location.reload();
+          return;
+        }
 
         document.getElementById(
           "currentPassword"
@@ -4729,7 +4823,8 @@ if (logoutBtn) {
     () => {
 
       if (
-        document.visibilityState === "visible"
+        document.visibilityState === "visible" &&
+        !passwordChangeRequired()
       ) {
         loadAdminDashboard();
         loadAdminOrders();
@@ -4751,16 +4846,24 @@ if (logoutBtn) {
      INITIAL LOAD
   ======================================================= */
 
-  showAdminView("admin-dashboard");
+  applyRoleAwareNavigation();
 
-  loadAdminDashboard();
-  loadAdminOrders();
-  loadAdminRecentOrders();
-  loadAdminSubscriptions();
-  loadAdminRiders();
-  loadAdminSettings();
-  loadAdminTeam();
-  loadAdminNotificationSettings();
+  if (passwordChangeRequired()) {
+    showPasswordGateBanner();
+    showAdminView("admin-settings");
+    loadAdminSettings();
+  } else {
+    showAdminView("admin-dashboard");
+
+    loadAdminDashboard();
+    loadAdminOrders();
+    loadAdminRecentOrders();
+    loadAdminSubscriptions();
+    loadAdminRiders();
+    loadAdminSettings();
+    loadAdminTeam();
+    loadAdminNotificationSettings();
+  }
 
 });
 

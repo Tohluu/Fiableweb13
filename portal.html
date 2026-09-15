@@ -665,6 +665,7 @@
     </main>
   </div>
 
+  <script src="csrf.js"></script>
   <script>
     const LOCATIONS = [
       ["agege","Agege"],["ajeromi-ifelodun","Ajeromi-Ifelodun"],["egbeda","Egbeda"],["shasha","Shasha"],
@@ -711,6 +712,9 @@
     }
 
     function setLoggedIn(email) {
+      // Session identity now lives entirely in the fiable_vendor_session
+      // cookie (HttpOnly); this is kept only as a non-authoritative display
+      // hint so the UI can show something before the first API response.
       localStorage.setItem("fiableVendorEmail", email);
     }
 
@@ -777,7 +781,7 @@
       const history = $("subscriptionHistory");
       if (!history) return;
       try {
-        const data = await api(`/api/account/subscriptions?email=${encodeURIComponent(email)}`);
+        const data = await api(`/api/account/subscriptions`);
         const subscriptions = data.subscriptions || [];
         history.innerHTML = subscriptions.length
           ? subscriptions.map(subscription => `
@@ -824,7 +828,7 @@
       container.classList.remove("hidden");
       container.innerHTML = '<p class="muted">Loading deliveries for this subscription...</p>';
       try {
-        const data = await api(`/api/account/subscriptions?email=${encodeURIComponent(email)}&subscriptionId=${encodeURIComponent(subscriptionId)}`);
+        const data = await api(`/api/account/subscriptions?subscriptionId=${encodeURIComponent(subscriptionId)}`);
         const deliveries = data.deliveries || [];
         container.innerHTML = `<h4>Deliveries for ${escapeHtml(selectedButton.querySelector("strong").textContent)}</h4>` +
           (deliveries.length ? `<div class="subscription-delivery-list">${deliveries.map(delivery => `
@@ -1693,13 +1697,13 @@
 
         state.account =
           await api(
-            `/api/account/summary?email=${encodeURIComponent(email)}`
+            `/api/account/summary`
           );
 
         state.deliveries =
           (
             await api(
-              `/api/account/deliveries?email=${encodeURIComponent(email)}`
+              `/api/account/deliveries`
             )
           ).deliveries || [];
 
@@ -1839,24 +1843,20 @@
   }
 
     async function refreshAccount() {
-    const email = localStorage.getItem("fiableVendorEmail");
 
-    if (resetToken) {
-      clearInterval(sessionTimer);
-      sessionTimer = null;
-      clearInterval(vendorRefreshInterval);
-      vendorRefreshInterval = null;
-      showResetPassword();
-      return;
-    }
-
-    if (!email) {
-        showLogin();
+      if (resetToken) {
+        clearInterval(sessionTimer);
+        sessionTimer = null;
+        clearInterval(vendorRefreshInterval);
+        vendorRefreshInterval = null;
+        showResetPassword();
         return;
-    }
+      }
+
       try {
-        state.account = await api(`/api/account/summary?email=${encodeURIComponent(email)}`);
-        state.deliveries = (await api(`/api/account/deliveries?email=${encodeURIComponent(email)}`)).deliveries || [];
+        state.account = await api(`/api/account/summary`);
+        state.deliveries = (await api(`/api/account/deliveries`)).deliveries || [];
+        setLoggedIn(state.account.email);
         startSessionTimer();
         startVendorAutoRefresh();
         showPortal();
@@ -1867,7 +1867,6 @@
       } catch (error) {
         clearSession();
         showLogin();
-        toast(error.message);
       }
     }
 
@@ -1920,7 +1919,7 @@
       setLoggedIn(account.email);
       state.account = account;
       startSessionTimer();
-      state.deliveries = (await api(`/api/account/deliveries?email=${encodeURIComponent(account.email)}`)).deliveries || [];
+      state.deliveries = (await api(`/api/account/deliveries`)).deliveries || [];
       startVendorAutoRefresh();
       loadSubscriptionHistory(account.email);
       showPortal();
@@ -1949,6 +1948,7 @@
         localStorage.removeItem("fiableVendorEmail");
         state.account = null;
         state.deliveries = [];
+        api("/api/logout", { method: "POST" }).catch(() => {});
         window.history.replaceState({}, document.title, "/portal.html");
         showLogin();
         setTimeout(() => {
@@ -2109,7 +2109,12 @@ $("resetBackLoginBtn").addEventListener("click", () => {
       $("mobileOverlay").classList.remove("show");
     });
 
-    $("logoutBtn").addEventListener("click", () => {
+    $("logoutBtn").addEventListener("click", async () => {
+      try {
+        await api("/api/logout", { method: "POST" });
+      } catch (error) {
+        console.error("LOGOUT ERROR:", error);
+      }
       clearSession();
       window.location.replace("portal.html");
     });
@@ -2413,7 +2418,7 @@ $("resetBackLoginBtn").addEventListener("click", () => {
         state.account = await api("/api/account/payment", {
           method:"POST",
           body:JSON.stringify({ email:state.account.email })
-        }).then(async () => api(`/api/account/summary?email=${encodeURIComponent(state.account.email)}`));
+        }).then(async () => api(`/api/account/summary`));
         updateAccountUI();
         loadSubscriptionHistory(state.account.email);
         toast("Payment recorded and subscription activated.");

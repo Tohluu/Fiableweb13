@@ -437,6 +437,28 @@
               </div>
             </div>
 
+            <div class="admin-filter-bar">
+              <input type="search" id="ordersSearchInput" placeholder="Search by order ref, tracking code, vendor, rider...">
+              <select id="ordersStatusFilter">
+                <option value="">All statuses</option>
+                <option value="requested">Pending</option>
+                <option value="assigned">Assigned</option>
+                <option value="rider_accepted">Rider Accepted</option>
+                <option value="arriving_at_pickup">Arriving at Pickup</option>
+                <option value="picked_up">Picked Up</option>
+                <option value="on_delivery">In Transit</option>
+                <option value="delivered">Delivered</option>
+                <option value="failed">Failed</option>
+                <option value="cancelled">Cancelled</option>
+                <option value="returned">Returned</option>
+              </select>
+              <select id="ordersPageSize">
+                <option value="25">25 / page</option>
+                <option value="50" selected>50 / page</option>
+                <option value="100">100 / page</option>
+              </select>
+            </div>
+
             <div class="admin-table-wrap">
 
               <table class="admin-table admin-orders-table">
@@ -467,6 +489,12 @@
 
               </table>
 
+            </div>
+
+            <div class="admin-pagination" id="ordersPagination">
+              <button type="button" class="btn outline" id="ordersPrevPage">← Previous</button>
+              <span id="ordersPaginationInfo">Page 1 of 1</span>
+              <button type="button" class="btn outline" id="ordersNextPage">Next →</button>
             </div>
 
           </article>
@@ -1334,9 +1362,14 @@
               <input id="newAdminPassword" type="password" minlength="8" required placeholder="At least 8 characters">
               <label for="newAdminRole">Role</label>
               <select id="newAdminRole">
-                <option value="staff">Staff</option>
-                <option value="admin">Admin</option>
+                <option value="super_admin">Super Admin — full system access</option>
+                <option value="operations_manager" selected>Operations Manager — orders, riders, vendors, reporting</option>
+                <option value="dispatcher">Dispatcher — delivery queue and rider assignment</option>
+                <option value="finance">Finance — subscriptions, payments, rider payouts</option>
+                <option value="customer_support">Customer Support — support tickets</option>
+                <option value="analyst">Analyst — read-only reporting</option>
               </select>
+              <p class="muted" style="font-size:12px;margin:-4px 0 4px">The new admin must change this password on first login.</p>
               <div id="addAdminMessage" class="admin-team-message" aria-live="polite"></div>
               <button type="submit" class="btn primary">Add Admin</button>
             </form>
@@ -1852,6 +1885,7 @@
   </div>
 
   <!-- Admin JavaScript -->
+  <script src="csrf.js"></script>
   <script src="admin.js?v=18"></script>
 
   <!-- =====================================================

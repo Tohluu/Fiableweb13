@@ -6,11 +6,27 @@ import re
 import hashlib
 import hmac
 import secrets
+import base64
 import math
+import csv
+import io
 from datetime import datetime, timezone, timedelta
 import os
 
 ROOT = Path(__file__).parent
+
+# Static-file paths that must never be served, even though they live
+# under the project root that SimpleHTTPRequestHandler serves from.
+BLOCKED_STATIC_PREFIXES = (
+    "/data/",
+    "/.git",
+    "/.venv",
+    "/__pycache__",
+    "/server.py",
+    "/README.md",
+    "/Procfile",
+    "/railway.toml",
+)
 DATA_FILE = ROOT / "data" / "submissions.json"
 ACCOUNTS_FILE = ROOT / "data" / "accounts.json"
 PORT = int(os.environ.get("PORT", "8080"))
@@ -20,12 +36,6 @@ PORT = int(os.environ.get("PORT", "8080"))
 # =========================================================
 
 ADMIN_SESSION_EXPIRY_HOURS = 8
-
-# TEMPORARY: link-only admin preview access, no credentials shared.
-# Remove this token (and the matching entry in data/admin_credentials.json)
-# once the preview is no longer needed.
-ADMIN_PREVIEW_TOKEN = "pv7K2xQmZ9tR4vL8nC1wD6yF3sA0hJ5e"
-ADMIN_PREVIEW_EMAIL = "preview@fiablelogistics.com"
 
 # Active admin sessions:
 # {
@@ -47,6 +57,18 @@ RIDER_SESSION_EXPIRY_HOURS = 8
 #     }
 # }
 RIDER_SESSIONS = {}
+
+# =========================================================
+# VENDOR AUTHENTICATION
+# =========================================================
+# NOTE: pre-existing /api/account/* endpoints identify the vendor purely by
+# an "email" query/body parameter with no session check at all. This session
+# mechanism is an additive hardening layer: when a vendor session cookie is
+# present, its email must match the requested email. Older frontend calls
+# that don't yet send the cookie keep working unchanged. See final report
+# for the recommendation to migrate portal.js to rely on this exclusively.
+VENDOR_SESSION_EXPIRY_HOURS = 8
+VENDOR_SESSIONS = {}
 
 PLAN_UNIT_PRICES = {
     "Basic": 1500,
@@ -417,6 +439,12 @@ def load_admin_credentials():
         admin.setdefault("role", "staff")
         admin.setdefault("status", "active")
         admin.setdefault("createdAt", datetime.now(timezone.utc).isoformat())
+        # MFA readiness - no provider is wired up yet, these fields exist so
+        # future MFA activation doesn't need another schema migration.
+        admin.setdefault("mfaEnabled", False)
+        admin.setdefault("mfaMethod", None)
+        admin.setdefault("mfaSecret", None)
+        admin.setdefault("mfaRecoveryCodesHash", [])
         next_id = max(next_id, int(admin.get("id") or 0) + 1)
 
     return data
@@ -439,7 +467,7 @@ def get_current_admin(handler):
 
 def require_owner(handler):
     admin = get_current_admin(handler)
-    return bool(admin) and admin.get("role") == "owner"
+    return bool(admin) and admin.get("role") in ("owner", "super_admin")
 
 
 def purge_admin_sessions(email):
@@ -790,6 +818,7 @@ def create_delivery(account_email, pickup, dropoff, units, details=None, order_r
     record = {
         "id": new_id,
         "orderRef": order_ref or f"FL-{new_id:04d}",
+        "trackingCode": generate_tracking_code(),
         "accountEmail": account_email.lower(),
         "pickup": pickup,
         "dropoff": dropoff,
@@ -806,6 +835,18 @@ def create_delivery(account_email, pickup, dropoff, units, details=None, order_r
         "createdAt": datetime.now(timezone.utc).isoformat(),
         "updatedAt": datetime.now(timezone.utc).isoformat(),
         "details": details or {},
+        "timeline": [{
+            "status": "requested",
+            "label": DELIVERY_STATUS_LABELS["requested"],
+            "at": now_iso(),
+            "actorType": "vendor",
+            "actorId": account_email.lower(),
+            "actorName": None,
+            "note": None,
+        }],
+        "proofOfDelivery": None,
+        "deliveryOtp": None,
+        "otpState": "not_generated",
     }
     if pricing:
         record["pricing"] = dict(pricing)
@@ -828,6 +869,44 @@ def update_delivery_status(delivery_id, status):
 def deliveries_for_account(email):
     email_n = (email or "").lower()
     return [d for d in load_deliveries() if d.get("accountEmail") == email_n]
+
+
+def migrate_deliveries():
+    """Backfill trackingCode/timeline/proofOfDelivery on records created
+    before those fields existed. Never overwrites existing values."""
+    deliveries = load_deliveries()
+    changed = False
+    for delivery in deliveries:
+        if not delivery.get("trackingCode"):
+            delivery["trackingCode"] = generate_tracking_code()
+            changed = True
+        if not delivery.get("timeline"):
+            delivery["timeline"] = [{
+                "status": delivery.get("status", "requested"),
+                "label": DELIVERY_STATUS_LABELS.get(delivery.get("status", "requested"), delivery.get("status", "requested")),
+                "at": delivery.get("createdAt") or now_iso(),
+                "actorType": "system",
+                "actorId": None,
+                "actorName": "Migrated record",
+                "note": "Backfilled - detailed history unavailable for orders created before the timeline feature.",
+            }]
+            changed = True
+        if "proofOfDelivery" not in delivery:
+            delivery["proofOfDelivery"] = None
+            changed = True
+        if "deliveryOtp" not in delivery:
+            delivery["deliveryOtp"] = None
+            changed = True
+        if "otpState" not in delivery:
+            if (delivery.get("proofOfDelivery") or {}).get("otpVerified"):
+                delivery["otpState"] = "verified"
+            elif delivery.get("deliveryOtp"):
+                delivery["otpState"] = "generated"
+            else:
+                delivery["otpState"] = "not_generated"
+            changed = True
+    if changed:
+        save_deliveries(deliveries)
 
 
 def rider_payment_for_delivery(delivery, account_plan=None):
@@ -1306,8 +1385,10 @@ def clear_admin_session(handler):
 
 def require_admin(handler):
     session = get_admin_session(handler)
-
-    return bool(session)
+    if not session:
+        return False
+    admin = get_current_admin(handler)
+    return bool(admin) and admin.get("status") == "active"
 
 def parse_iso_date(value):
     try:
@@ -1359,15 +1440,6 @@ def get_rider_session(handler):
             cookies[key] = value
 
     token = cookies.get("fiable_rider_session")
-    print(
-        "RIDER SESSION COOKIE:",
-        token
-    )
-
-    print(
-        "RIDER SESSIONS:",
-        RIDER_SESSIONS
-    )
 
     if not token:
         return None
@@ -1445,9 +1517,57 @@ def get_logged_in_rider(handler):
     return rider
 
 
+# =========================================================
+# VENDOR SESSION HELPERS
+# =========================================================
+
+def create_vendor_session(email):
+    token = secrets.token_urlsafe(48)
+    VENDOR_SESSIONS[token] = {
+        "email": (email or "").strip().lower(),
+        "expiresAt": datetime.now(timezone.utc) + timedelta(hours=VENDOR_SESSION_EXPIRY_HOURS),
+    }
+    return token
+
+
+def _parse_cookies(handler):
+    cookie_header = handler.headers.get("Cookie", "")
+    cookies = {}
+    for part in cookie_header.split(";"):
+        if "=" in part:
+            key, value = part.strip().split("=", 1)
+            cookies[key] = value
+    return cookies
+
+
+def get_vendor_session(handler):
+    token = _parse_cookies(handler).get("fiable_vendor_session")
+    if not token:
+        return None
+    session = VENDOR_SESSIONS.get(token)
+    if not session:
+        return None
+    if session.get("expiresAt", datetime.min.replace(tzinfo=timezone.utc)) <= datetime.now(timezone.utc):
+        VENDOR_SESSIONS.pop(token, None)
+        return None
+    return session
+
+
+def get_logged_in_vendor_email(handler):
+    session = get_vendor_session(handler)
+    return session.get("email") if session else None
+
+
+def clear_vendor_session(handler):
+    token = _parse_cookies(handler).get("fiable_vendor_session")
+    if token:
+        VENDOR_SESSIONS.pop(token, None)
+
+
 def summary_for_account(account):
     plan = account.get("plan") if account.get("plan") in PLANS else None
     units_allocated = PLANS[plan]["units"] if plan else 0
+    units_allocated += int(account.get("manualUnitAdjustment", 0) or 0)
     units_used = units_used_for_account(account["email"])
     units_remaining = max(units_allocated - units_used, 0)
     payment_status = account.get("paymentStatus", "pending")
@@ -1636,6 +1756,508 @@ def saved_plan_for_email(email):
             return plan
     return None
 
+
+# =========================================================
+# DELIVERY LIFECYCLE
+# =========================================================
+# Linear happy-path flow. Existing records already use
+# "requested"/"assigned"/"on_delivery"/"delivered" so those values are
+# kept as-is (no data migration needed); the new intermediate statuses
+# are inserted between "assigned" and "on_delivery".
+DELIVERY_STATUS_FLOW = [
+    "requested",
+    "assigned",
+    "rider_accepted",
+    "arriving_at_pickup",
+    "picked_up",
+    "on_delivery",
+    "delivered",
+]
+DELIVERY_EXCEPTION_STATUSES = {"failed", "cancelled", "returned"}
+DELIVERY_STATUS_LABELS = {
+    "requested": "Pending",
+    "assigned": "Assigned",
+    "rider_accepted": "Rider Accepted",
+    "arriving_at_pickup": "Arriving at Pickup",
+    "picked_up": "Picked Up",
+    "on_delivery": "In Transit",
+    "delivered": "Delivered",
+    "failed": "Failed",
+    "cancelled": "Cancelled",
+    "returned": "Returned",
+}
+# Safe subset of the flow surfaced on the public tracking page.
+PUBLIC_TRACKING_STATUS_MAP = {
+    "requested": "Order Received",
+    "assigned": "Rider Assigned",
+    "rider_accepted": "Rider Assigned",
+    "arriving_at_pickup": "Rider Assigned",
+    "picked_up": "Picked Up",
+    "on_delivery": "In Transit",
+    "delivered": "Delivered",
+    "failed": "Delivery Issue",
+    "cancelled": "Cancelled",
+    "returned": "Returned",
+}
+
+# Which proof-of-delivery methods Fiable currently requires. Toggle here;
+# no other code changes are needed to relax/tighten requirements.
+PROOF_OF_DELIVERY_REQUIREMENTS = {
+    "requireRecipientName": True,
+    "requireOtp": False,
+    "requirePhoto": True,
+    "requireSignature": False,
+    "requireGps": False,
+}
+
+PROOF_DIR = ROOT / "data" / "proof"
+AUDIT_LOG_FILE = ROOT / "data" / "audit_log.json"
+UNIT_ADJUSTMENTS_FILE = ROOT / "data" / "unit_adjustments.json"
+SUPPORT_TICKETS_FILE = ROOT / "data" / "support_tickets.json"
+
+
+def now_iso():
+    return datetime.now(timezone.utc).isoformat()
+
+
+def next_delivery_status(current):
+    try:
+        index = DELIVERY_STATUS_FLOW.index(current)
+    except ValueError:
+        return None
+    if index + 1 < len(DELIVERY_STATUS_FLOW):
+        return DELIVERY_STATUS_FLOW[index + 1]
+    return None
+
+
+def append_delivery_event(order, status, actor_type, actor_id=None, actor_name=None, note=None):
+    """Append a status change to the delivery's permanent timeline (never overwritten)."""
+    order.setdefault("timeline", [])
+    order["timeline"].append({
+        "status": status,
+        "label": DELIVERY_STATUS_LABELS.get(status, status),
+        "at": now_iso(),
+        "actorType": actor_type,
+        "actorId": actor_id,
+        "actorName": actor_name,
+        "note": note,
+    })
+
+
+def generate_tracking_code():
+    return secrets.token_hex(5).upper()
+
+
+def ensure_tracking_code(order):
+    if not order.get("trackingCode"):
+        order["trackingCode"] = generate_tracking_code()
+    return order["trackingCode"]
+
+
+def generate_delivery_otp():
+    return f"{secrets.randbelow(1_000_000):06d}"
+
+
+ALLOWED_PROOF_MIME_TYPES = {
+    "image/png": ".png",
+    "image/jpeg": ".jpg",
+    "image/jpg": ".jpg",
+    "image/webp": ".webp",
+}
+MAX_PROOF_FILE_BYTES = 5 * 1024 * 1024
+
+
+def save_proof_file(order_id, kind, data_url):
+    """Decode+validate a base64 data URL and store it under data/proof/,
+    a path that is never reachable through static file serving."""
+    if not isinstance(data_url, str) or not data_url.startswith("data:"):
+        raise ValueError(f"Invalid {kind} upload.")
+    try:
+        header, encoded = data_url.split(",", 1)
+    except ValueError:
+        raise ValueError(f"Invalid {kind} upload.")
+    mime = header.split(";")[0].replace("data:", "").strip().lower()
+    extension = ALLOWED_PROOF_MIME_TYPES.get(mime)
+    if not extension:
+        raise ValueError(f"Unsupported {kind} file type.")
+    try:
+        raw = base64.b64decode(encoded, validate=True)
+    except Exception:
+        raise ValueError(f"Could not decode {kind} upload.")
+    if not raw:
+        raise ValueError(f"{kind.capitalize()} upload is empty.")
+    if len(raw) > MAX_PROOF_FILE_BYTES:
+        raise ValueError(f"{kind.capitalize()} file is too large (max 5MB).")
+    PROOF_DIR.mkdir(parents=True, exist_ok=True)
+    filename = f"{int(order_id)}-{kind}-{secrets.token_hex(8)}{extension}"
+    (PROOF_DIR / filename).write_bytes(raw)
+    return filename
+
+
+def load_json_list(path):
+    if not path.exists():
+        return []
+    try:
+        content = path.read_text(encoding="utf-8").strip()
+        if not content:
+            return []
+        data = json.loads(content)
+        return data if isinstance(data, list) else []
+    except (json.JSONDecodeError, OSError):
+        return []
+
+
+def save_json_list(path, data):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+
+
+# =========================================================
+# AUDIT LOG (append-only; no admin-facing edit/delete endpoint)
+# =========================================================
+
+def append_audit_log(actor_email, actor_role, action, target_type=None, target_id=None, previous=None, new=None, note=None):
+    log = load_json_list(AUDIT_LOG_FILE)
+    entry = {
+        "id": secrets.token_urlsafe(12),
+        "at": now_iso(),
+        "actorEmail": actor_email,
+        "actorRole": actor_role,
+        "action": action,
+        "targetType": target_type,
+        "targetId": target_id,
+        "previousValue": previous,
+        "newValue": new,
+        "note": note,
+    }
+    log.append(entry)
+    save_json_list(AUDIT_LOG_FILE, log)
+    return entry
+
+
+def audit_admin_action(handler, action, target_type=None, target_id=None, previous=None, new=None, note=None):
+    admin = get_current_admin(handler)
+    append_audit_log(
+        actor_email=admin.get("email") if admin else None,
+        actor_role=admin.get("role") if admin else None,
+        action=action,
+        target_type=target_type,
+        target_id=target_id,
+        previous=previous,
+        new=new,
+        note=note,
+    )
+
+
+# =========================================================
+# ROLE-BASED ADMIN PERMISSIONS
+# =========================================================
+# "owner"/"staff" are the original two roles and are kept for backward
+# compatibility with existing admin_credentials.json records. New admins
+# can be created directly with one of the granular roles below.
+ADMIN_ROLE_LABELS = {
+    "super_admin": "Super Admin",
+    "operations_manager": "Operations Manager",
+    "dispatcher": "Dispatcher",
+    "finance": "Finance",
+    "customer_support": "Customer Support",
+    "analyst": "Analyst (Read Only)",
+    "owner": "Super Admin",
+    "staff": "Operations Manager",
+}
+
+# Roles that can be assigned to a NEW admin via the team-management
+# endpoints. "owner" is the legacy bootstrap role and is not reassignable
+# here; use "super_admin" for equivalent full access instead.
+ADMIN_ASSIGNABLE_ROLES = {
+    "super_admin", "operations_manager", "dispatcher", "finance",
+    "customer_support", "analyst", "staff",
+}
+
+ADMIN_PERMISSIONS = {
+    "super_admin": {"*"},
+    "owner": {"*"},
+    "operations_manager": {
+        "view_orders", "manage_orders", "view_riders", "manage_riders",
+        "view_vendors", "manage_vendors", "view_tickets", "manage_tickets",
+        "view_reports", "export_data", "view_audit_log", "view_team",
+    },
+    "staff": {
+        "view_orders", "manage_orders", "view_riders", "manage_riders",
+        "view_vendors", "manage_vendors", "view_tickets", "manage_tickets",
+        "view_reports", "export_data",
+    },
+    "dispatcher": {"view_orders", "manage_orders", "view_riders", "view_reports"},
+    "finance": {
+        "view_finance", "manage_finance", "view_vendors", "view_reports",
+        "export_data",
+    },
+    "customer_support": {
+        "view_tickets", "manage_tickets", "view_orders", "view_vendors",
+        "view_reports",
+    },
+    "analyst": {
+        "view_orders", "view_riders", "view_vendors", "view_finance",
+        "view_tickets", "view_reports", "export_data",
+    },
+}
+
+
+def admin_has_permission(admin, permission):
+    if not admin or admin.get("status") != "active":
+        return False
+    perms = ADMIN_PERMISSIONS.get(admin.get("role", ""), set())
+    return "*" in perms or permission in perms
+
+
+def require_permission(handler, permission):
+    """Returns the current admin if they hold `permission`, else None. Always
+    enforced server-side - the frontend hiding a button is not authorization."""
+    admin = get_current_admin(handler)
+    if not admin_has_permission(admin, permission):
+        return None
+    return admin
+
+
+# =========================================================
+# HARD PASSWORD-CHANGE GATE
+# =========================================================
+# While mustChangePassword is true, an admin/rider may only reach these
+# endpoints. Everything else under /api/admin/ or /api/rider/ is blocked -
+# static pages/assets are untouched so the change-password screen can load.
+ADMIN_PASSWORD_GATE_ALLOWLIST = {
+    "/api/admin/change-password", "/api/admin/logout", "/api/admin/account",
+}
+RIDER_PASSWORD_GATE_ALLOWLIST = {
+    "/api/rider/change-password", "/api/rider/logout", "/api/rider/account",
+}
+
+
+def password_change_gate(handler, path):
+    """Returns an error message if this request must be blocked because the
+    signed-in admin/rider still has a temporary password, else None."""
+    if path.startswith("/api/admin/") and path not in ADMIN_PASSWORD_GATE_ALLOWLIST:
+        admin = get_current_admin(handler)
+        if admin and admin.get("mustChangePassword"):
+            return "You must change your temporary password before continuing."
+    if path.startswith("/api/rider/") and path not in RIDER_PASSWORD_GATE_ALLOWLIST:
+        rider = get_logged_in_rider(handler)
+        if rider and rider.get("mustChangePassword"):
+            return "You must change your temporary password before continuing."
+    return None
+
+
+# =========================================================
+# COOKIE SECURITY
+# =========================================================
+
+def is_secure_request(handler):
+    """True when the original client request was HTTPS. Railway (and most
+    hosts) terminate TLS and forward via X-Forwarded-Proto, so the app
+    server itself sees plain HTTP - check that header rather than the
+    handler's own scheme. FORCE_SECURE_COOKIES=1 can force it on for any
+    other reverse-proxy setup; local `python server.py` over http:// is
+    unaffected either way."""
+    if os.environ.get("FORCE_SECURE_COOKIES") == "1":
+        return True
+    return handler.headers.get("X-Forwarded-Proto", "").lower() == "https"
+
+
+def session_cookie(handler, name, value, max_age_seconds):
+    secure = "; Secure" if is_secure_request(handler) else ""
+    return f"{name}={value}; Path=/; HttpOnly; SameSite=Lax; Max-Age={max_age_seconds}{secure}"
+
+
+# =========================================================
+# CSRF PROTECTION (double-submit cookie)
+# =========================================================
+# On every successful login (admin/rider/vendor) a second cookie,
+# `fiable_csrf`, is issued alongside the session cookie. Unlike the session
+# cookie it is NOT HttpOnly, so front-end JS can read it and echo it back
+# as an `X-CSRF-Token` header on every state-changing (POST) request -
+# see csrf.js. A request is rejected if the header is missing or doesn't
+# match the cookie. Requests with no session cookie at all (login, signup,
+# password reset, public tracking) are exempt since there is no session to
+# forge a request against yet.
+def generate_csrf_token():
+    return secrets.token_urlsafe(32)
+
+
+def csrf_cookie(handler, value, max_age_seconds):
+    secure = "; Secure" if is_secure_request(handler) else ""
+    return f"fiable_csrf={value}; Path=/; SameSite=Lax; Max-Age={max_age_seconds}{secure}"
+
+
+def validate_csrf(handler):
+    has_session = bool(
+        get_admin_session(handler)
+        or get_rider_session(handler)
+        or get_vendor_session(handler)
+    )
+    if not has_session:
+        return True
+    cookie_token = _parse_cookies(handler).get("fiable_csrf", "")
+    header_token = handler.headers.get("X-CSRF-Token", "")
+    return bool(cookie_token) and bool(header_token) and hmac.compare_digest(cookie_token, header_token)
+
+
+# =========================================================
+# LOGIN RATE LIMITING (in-memory sliding window per IP+endpoint)
+# =========================================================
+LOGIN_ATTEMPT_WINDOW_MINUTES = 15
+LOGIN_ATTEMPT_MAX = 8
+LOGIN_ATTEMPTS = {}
+
+
+def rate_limit_key(handler, scope):
+    ip = handler.client_address[0] if getattr(handler, "client_address", None) else "unknown"
+    return f"{scope}:{ip}"
+
+
+def is_login_rate_limited(key):
+    now = datetime.now(timezone.utc)
+    window_start = now - timedelta(minutes=LOGIN_ATTEMPT_WINDOW_MINUTES)
+    attempts = [t for t in LOGIN_ATTEMPTS.get(key, []) if t > window_start]
+    LOGIN_ATTEMPTS[key] = attempts
+    return len(attempts) >= LOGIN_ATTEMPT_MAX
+
+
+def record_login_failure(key):
+    LOGIN_ATTEMPTS.setdefault(key, []).append(datetime.now(timezone.utc))
+
+
+def clear_login_attempts(key):
+    LOGIN_ATTEMPTS.pop(key, None)
+
+
+# =========================================================
+# SUPPORT TICKETS
+# =========================================================
+SUPPORT_TICKET_CATEGORIES = {
+    "delayed_delivery", "rider_issue", "package_damaged", "package_missing",
+    "incorrect_units_charge", "payment_issue", "subscription_issue", "other",
+}
+SUPPORT_TICKET_PRIORITIES = {"low", "normal", "high", "urgent"}
+SUPPORT_TICKET_STATUSES = {"open", "in_progress", "resolved", "closed"}
+
+
+def vendor_safe_ticket(ticket):
+    """Strip admin-only internal notes before returning a ticket to a vendor."""
+    safe = dict(ticket)
+    safe.pop("internalNotes", None)
+    return safe
+
+
+def next_ticket_id(tickets):
+    numbers = []
+    for ticket in tickets:
+        try:
+            numbers.append(int(str(ticket.get("id", "")).replace("TCK-", "")))
+        except ValueError:
+            continue
+    return f"TCK-{(max(numbers, default=0) + 1):05d}"
+
+
+# =========================================================
+# CSV EXPORTS
+# =========================================================
+# Fields that must never appear in an export, regardless of source record.
+EXPORT_FORBIDDEN_FIELDS = {
+    "passwordhash", "salt", "password", "token", "sessiontoken",
+    "resettoken", "otp", "deliveryotp",
+}
+
+
+def csv_safe_row(row):
+    return {
+        key: value for key, value in row.items()
+        if key.lower() not in EXPORT_FORBIDDEN_FIELDS
+    }
+
+
+def rows_to_csv(rows):
+    if not rows:
+        return ""
+    fieldnames = sorted({key for row in rows for key in row.keys()})
+    buffer = io.StringIO()
+    writer = csv.DictWriter(buffer, fieldnames=fieldnames, extrasaction="ignore")
+    writer.writeheader()
+    for row in rows:
+        writer.writerow(row)
+    return buffer.getvalue()
+
+
+def build_export_csv(kind):
+    if kind == "orders":
+        accounts = load_accounts()
+        vendor_names = {a.get("email", "").lower(): a.get("name", "") for a in accounts}
+        rows = []
+        for d in load_deliveries():
+            rows.append(csv_safe_row({
+                "orderRef": d.get("orderRef"),
+                "trackingCode": d.get("trackingCode"),
+                "vendorEmail": d.get("accountEmail"),
+                "vendorName": vendor_names.get(str(d.get("accountEmail", "")).lower(), ""),
+                "pickup": d.get("pickup"),
+                "dropoff": d.get("dropoff"),
+                "status": d.get("status"),
+                "units": d.get("units"),
+                "cost": d.get("cost"),
+                "riderName": d.get("riderName"),
+                "createdAt": d.get("createdAt"),
+                "updatedAt": d.get("updatedAt"),
+            }))
+        return rows_to_csv(rows)
+
+    if kind == "vendors":
+        rows = [
+            csv_safe_row({
+                "email": a.get("email"), "name": a.get("name"),
+                "subscriberId": a.get("subscriberId"), "plan": a.get("plan"),
+                "paymentStatus": a.get("paymentStatus"), "createdAt": a.get("createdAt"),
+            })
+            for a in load_accounts()
+        ]
+        return rows_to_csv(rows)
+
+    if kind == "subscriptions":
+        rows = [csv_safe_row(s) for s in load_subscriptions()]
+        return rows_to_csv(rows)
+
+    if kind == "payments":
+        rows = [
+            csv_safe_row({
+                "subscriberId": a.get("subscriberId"), "email": a.get("email"),
+                "plan": a.get("plan"), "paymentStatus": a.get("paymentStatus"),
+                "paidAt": a.get("paidAt"),
+            })
+            for a in load_accounts()
+        ]
+        return rows_to_csv(rows)
+
+    if kind == "rider-payments":
+        rows = [csv_safe_row(p) for p in load_rider_payments()]
+        return rows_to_csv(rows)
+
+    if kind == "performance":
+        riders = load_riders()
+        deliveries = load_deliveries()
+        rows = []
+        for rider in riders:
+            rider_id = str(rider.get("id", ""))
+            rider_deliveries = [d for d in deliveries if str(d.get("riderId", "")) == rider_id]
+            delivered = [d for d in rider_deliveries if d.get("status") == "delivered"]
+            failed = [d for d in rider_deliveries if d.get("status") in ("failed", "returned")]
+            rows.append(csv_safe_row({
+                "riderRef": rider.get("riderRef"), "name": rider.get("name"),
+                "totalDeliveries": len(rider_deliveries), "delivered": len(delivered),
+                "failed": len(failed), "vehicle": rider.get("vehicle"),
+            }))
+        return rows_to_csv(rows)
+
+    return None
+
+
 class FiableHandler(SimpleHTTPRequestHandler):
     def _json_response(self, status, body):
         encoded = json.dumps(body).encode("utf-8")
@@ -1655,6 +2277,15 @@ class FiableHandler(SimpleHTTPRequestHandler):
     def do_POST(self):
         path = urlparse(self.path).path
 
+        gate_message = password_change_gate(self, path)
+        if gate_message:
+            self._json_response(403, {"error": gate_message, "mustChangePassword": True})
+            return
+
+        if not validate_csrf(self):
+            self._json_response(403, {"error": "Invalid or missing CSRF token. Please refresh and try again."})
+            return
+
         try:
             payload = self._read_json()
             if not isinstance(payload, dict):
@@ -1663,6 +2294,11 @@ class FiableHandler(SimpleHTTPRequestHandler):
             # RIDER LOGIN
             # =====================================================
             if path == "/api/rider/login":
+
+                rate_key = rate_limit_key(self, "rider-login")
+                if is_login_rate_limited(rate_key):
+                    self._json_response(429, {"error": "Too many login attempts. Please try again later."})
+                    return
 
                 email = clean(
                     payload.get("email"),
@@ -1703,6 +2339,8 @@ class FiableHandler(SimpleHTTPRequestHandler):
 
                 if not rider:
 
+                    record_login_failure(rate_key)
+
                     self._json_response(
                         401,
                         {
@@ -1740,6 +2378,8 @@ class FiableHandler(SimpleHTTPRequestHandler):
 
                 if not valid_password:
 
+                    record_login_failure(rate_key)
+
                     self._json_response(
                         401,
                         {
@@ -1751,6 +2391,8 @@ class FiableHandler(SimpleHTTPRequestHandler):
 
                 if rider.get("status") == "inactive":
                     rider["status"] = "available"
+
+                clear_login_attempts(rate_key)
 
                 rider["lastLoginAt"] = datetime.now(
                     timezone.utc
@@ -1772,7 +2414,8 @@ class FiableHandler(SimpleHTTPRequestHandler):
                         "email": rider.get("email", ""),
                         "phone": rider.get("phone", ""),
                         "vehicle": rider.get("vehicle", ""),
-                        "status": rider.get("status", "available")
+                        "status": rider.get("status", "available"),
+                        "mustChangePassword": bool(rider.get("mustChangePassword", False))
                     }
                 }).encode("utf-8")
 
@@ -1786,9 +2429,12 @@ class FiableHandler(SimpleHTTPRequestHandler):
 
                 self.send_header(
                     "Set-Cookie",
-                    f"fiable_rider_session={session_token}; "
-                    f"Path=/; HttpOnly; SameSite=Lax; "
-                    f"Max-Age={RIDER_SESSION_EXPIRY_HOURS * 60 * 60}"
+                    session_cookie(self, "fiable_rider_session", session_token, RIDER_SESSION_EXPIRY_HOURS * 60 * 60)
+                )
+
+                self.send_header(
+                    "Set-Cookie",
+                    csrf_cookie(self, generate_csrf_token(), RIDER_SESSION_EXPIRY_HOURS * 60 * 60)
                 )
 
                 self.send_header(
@@ -1830,6 +2476,7 @@ class FiableHandler(SimpleHTTPRequestHandler):
                 stored_rider["salt"] = salt
                 stored_rider["passwordHash"] = password_hash(new_password, salt)
                 stored_rider["passwordChangedAt"] = datetime.now(timezone.utc).isoformat()
+                stored_rider["mustChangePassword"] = False
                 save_riders(riders)
                 self._json_response(200, {"message": "Password changed successfully."})
                 return
@@ -1894,8 +2541,12 @@ class FiableHandler(SimpleHTTPRequestHandler):
 
                 self.send_header(
                     "Set-Cookie",
-                    "fiable_rider_session=; "
-                    "Path=/; HttpOnly; SameSite=Lax; Max-Age=0"
+                    session_cookie(self, "fiable_rider_session", "", 0)
+                )
+
+                self.send_header(
+                    "Set-Cookie",
+                    csrf_cookie(self, "", 0)
                 )
 
                 self.send_header(
@@ -1932,243 +2583,625 @@ class FiableHandler(SimpleHTTPRequestHandler):
                     40
                 ).strip().lower()
 
-
-                # -------------------------------------------------
-                # VALIDATE ORDER ID
-                # -------------------------------------------------
+                note = clean(payload.get("note"), 300) or None
 
                 try:
-
                     order_id = int(order_id)
-
                 except (TypeError, ValueError):
-
                     self._json_response(
                         400,
                         {
                             "error": "A valid order ID is required."
                         }
                     )
-
                     return
 
-
-                # -------------------------------------------------
-                # ONLY ALLOW RIDER ACTIONS
-                # -------------------------------------------------
-
-                allowed_statuses = {
+                # "delivered" requires proof of delivery - see
+                # /api/rider/delivery/complete. Accept/decline have their
+                # own dedicated endpoints too.
+                allowed_forward_statuses = {
+                    "arriving_at_pickup",
+                    "picked_up",
                     "on_delivery",
-                    "delivered"
                 }
+                allowed_exception_statuses = {"failed", "returned"}
 
-                if new_status not in allowed_statuses:
-
+                if new_status not in allowed_forward_statuses | allowed_exception_statuses:
                     self._json_response(
                         400,
                         {
                             "error": "Invalid delivery status."
                         }
                     )
-
                     return
-
 
                 deliveries = load_deliveries()
                 riders = load_riders()
 
-                rider_id = str(
-                    rider.get("id", "")
-                )
+                rider_id = str(rider.get("id", ""))
 
                 rider = next(
-                    (
-                        item
-                        for item in riders
-                        if str(item.get("id", "")) == rider_id
-                    ),
+                    (item for item in riders if str(item.get("id", "")) == rider_id),
                     None
                 )
 
                 if not rider:
-                    self._json_response(
-                        404,
-                        {
-                            "error": "Rider account not found."
-                        }
-                    )
+                    self._json_response(404, {"error": "Rider account not found."})
                     return
 
-
-                # -------------------------------------------------
-                # FIND ORDER
-                # -------------------------------------------------
-
                 order = next(
-                    (
-                        item
-                        for item in deliveries
-                        if str(
-                            item.get("id", "")
-                        ) == str(order_id)
-                    ),
+                    (item for item in deliveries if str(item.get("id", "")) == str(order_id)),
                     None
                 )
 
-
                 if not order:
-
-                    self._json_response(
-                        404,
-                        {
-                            "error": "Order not found."
-                        }
-                    )
-
+                    self._json_response(404, {"error": "Order not found."})
                     return
 
-
-                # -------------------------------------------------
-                # VERIFY RIDER OWNS THIS ORDER
-                # -------------------------------------------------
-
-                rider_id = str(
-                    rider.get("id", "")
-                )
-
-                order_rider_id = str(
-                    order.get("riderId", "")
-                )
-
+                order_rider_id = str(order.get("riderId", ""))
 
                 if order_rider_id != rider_id:
-
                     self._json_response(
                         403,
-                        {
-                            "error":
-                            "You are not assigned to this delivery."
-                        }
+                        {"error": "You are not assigned to this delivery."}
                     )
-
                     return
 
+                current_status = str(order.get("status", "")).strip().lower()
 
-                # -------------------------------------------------
-                # CURRENT STATUS
-                # -------------------------------------------------
+                is_forward_move = (
+                    new_status in allowed_forward_statuses
+                    and new_status == next_delivery_status(current_status)
+                )
+                is_exception_move = (
+                    new_status in allowed_exception_statuses
+                    and current_status not in (
+                        {"delivered"} | DELIVERY_EXCEPTION_STATUSES
+                    )
+                )
 
-                current_status = str(
-                    order.get("status", "")
-                ).strip().lower()
+                if not (is_forward_move or is_exception_move):
+                    self._json_response(
+                        400,
+                        {
+                            "error": "This delivery cannot move to that status from its current status."
+                        }
+                    )
+                    return
 
+                order["status"] = new_status
 
-                # -------------------------------------------------
-                # ASSIGNED → ON DELIVERY
-                # -------------------------------------------------
+                if new_status == "picked_up" and not order.get("deliveryOtp"):
+                    # Recipient OTP - shown to the vendor (who relays it to the
+                    # recipient) since no SMS provider is configured yet, so it
+                    # is never marked as automatically "sent".
+                    order["deliveryOtp"] = generate_delivery_otp()
+                    order["otpState"] = "generated"
 
                 if new_status == "on_delivery":
-
-                    if current_status != "assigned":
-
-                        self._json_response(
-                            400,
-                            {
-                                "error":
-                                "This delivery cannot be started in its current status."
-                            }
-                        )
-
-                        return
-
-
-                    order["status"] = "on_delivery"
-
                     rider["status"] = "on_delivery"
-
-
-                # -------------------------------------------------
-                # ON DELIVERY → DELIVERED
-                # -------------------------------------------------
-
-                elif new_status == "delivered":
-
-                    if current_status != "on_delivery":
-
-                        self._json_response(
-                            400,
-                            {
-                                "error":
-                                "This delivery cannot be completed in its current status."
-                            }
-                        )
-
-                        return
-
-
-                    order["status"] = "delivered"
-
+                elif new_status in allowed_exception_statuses:
                     has_queued_delivery = any(
                         str(delivery.get("riderId", "")) == rider_id
                         and str(delivery.get("status", "")).strip().lower()
-                        == "assigned"
+                        not in ({"delivered"} | DELIVERY_EXCEPTION_STATUSES)
+                        and delivery.get("id") != order.get("id")
                         for delivery in deliveries
                     )
-                    rider["status"] = (
-                        "assigned" if has_queued_delivery else "available"
-                    )
+                    rider["status"] = "assigned" if has_queued_delivery else "available"
+                    if new_status == "failed":
+                        rider["failedDeliveries"] = (
+                            int(rider.get("failedDeliveries", 0) or 0) + 1
+                        )
 
-
-                    rider["totalDeliveries"] = (
-                        int(
-                            rider.get(
-                                "totalDeliveries",
-                                0
-                            ) or 0
-                        ) + 1
-                    )
-
-
-                    rider["completedDeliveries"] = (
-                        int(
-                            rider.get(
-                                "completedDeliveries",
-                                0
-                            ) or 0
-                        ) + 1
-                    )
-
-
-                # -------------------------------------------------
-                # UPDATE TIMESTAMP
-                # -------------------------------------------------
-
-                order["updatedAt"] = datetime.now(
-                    timezone.utc
-                ).isoformat()
-
-
-                # -------------------------------------------------
-                # SAVE BOTH
-                # -------------------------------------------------
+                order["updatedAt"] = now_iso()
+                append_delivery_event(
+                    order,
+                    new_status,
+                    actor_type="rider",
+                    actor_id=rider.get("id"),
+                    actor_name=rider.get("name"),
+                    note=note,
+                )
 
                 save_deliveries(deliveries)
                 save_riders(riders)
 
-
                 self._json_response(
                     200,
                     {
-                        "message":
-                            "Delivery status updated successfully.",
-
+                        "message": "Delivery status updated successfully.",
                         "order": order,
-
                         "rider": rider
                     }
                 )
 
                 return
+
+            # =====================================================
+            # RIDER ACCEPT / DECLINE ASSIGNMENT
+            # =====================================================
+
+            if path == "/api/rider/delivery/accept":
+
+                rider = get_logged_in_rider(self)
+
+                if not rider:
+                    self._json_response(401, {"error": "Rider authentication required."})
+                    return
+
+                try:
+                    order_id = int(payload.get("orderId"))
+                except (TypeError, ValueError):
+                    self._json_response(400, {"error": "A valid order ID is required."})
+                    return
+
+                deliveries = load_deliveries()
+                riders = load_riders()
+                rider_id = str(rider.get("id", ""))
+
+                order = next(
+                    (item for item in deliveries if str(item.get("id", "")) == str(order_id)),
+                    None
+                )
+
+                if not order:
+                    self._json_response(404, {"error": "Order not found."})
+                    return
+
+                if str(order.get("riderId", "")) != rider_id:
+                    self._json_response(403, {"error": "You are not assigned to this delivery."})
+                    return
+
+                if str(order.get("status", "")).strip().lower() != "assigned":
+                    self._json_response(400, {"error": "This delivery is not awaiting acceptance."})
+                    return
+
+                order["status"] = "rider_accepted"
+                order["updatedAt"] = now_iso()
+                append_delivery_event(
+                    order, "rider_accepted", actor_type="rider",
+                    actor_id=rider.get("id"), actor_name=rider.get("name"),
+                )
+
+                save_deliveries(deliveries)
+
+                self._json_response(200, {"message": "Assignment accepted.", "order": order})
+                return
+
+            if path == "/api/rider/delivery/decline":
+
+                rider = get_logged_in_rider(self)
+
+                if not rider:
+                    self._json_response(401, {"error": "Rider authentication required."})
+                    return
+
+                try:
+                    order_id = int(payload.get("orderId"))
+                except (TypeError, ValueError):
+                    self._json_response(400, {"error": "A valid order ID is required."})
+                    return
+
+                reason = clean(payload.get("reason"), 300) or None
+
+                deliveries = load_deliveries()
+                riders = load_riders()
+                rider_id = str(rider.get("id", ""))
+
+                order = next(
+                    (item for item in deliveries if str(item.get("id", "")) == str(order_id)),
+                    None
+                )
+
+                if not order:
+                    self._json_response(404, {"error": "Order not found."})
+                    return
+
+                if str(order.get("riderId", "")) != rider_id:
+                    self._json_response(403, {"error": "You are not assigned to this delivery."})
+                    return
+
+                if str(order.get("status", "")).strip().lower() not in ("assigned", "rider_accepted"):
+                    self._json_response(400, {"error": "This delivery cannot be declined in its current status."})
+                    return
+
+                rider_record = next(
+                    (item for item in riders if str(item.get("id", "")) == rider_id),
+                    None
+                )
+
+                # Return the delivery to the assignment queue.
+                order["status"] = "requested"
+                order["riderId"] = None
+                order["riderRef"] = ""
+                order["riderName"] = ""
+                order["riderPhone"] = ""
+                order["updatedAt"] = now_iso()
+                append_delivery_event(
+                    order, "requested", actor_type="rider",
+                    actor_id=rider.get("id"), actor_name=rider.get("name"),
+                    note=f"Declined by rider: {reason}" if reason else "Declined by rider",
+                )
+
+                if rider_record:
+                    has_queued_delivery = any(
+                        str(delivery.get("riderId", "")) == rider_id
+                        and str(delivery.get("status", "")).strip().lower()
+                        not in ({"delivered"} | DELIVERY_EXCEPTION_STATUSES)
+                        and delivery.get("id") != order.get("id")
+                        for delivery in deliveries
+                    )
+                    rider_record["status"] = "assigned" if has_queued_delivery else "available"
+
+                save_deliveries(deliveries)
+                save_riders(riders)
+
+                append_audit_log(
+                    actor_email=rider.get("email"),
+                    actor_role="rider",
+                    action="delivery_declined",
+                    target_type="delivery",
+                    target_id=order.get("id"),
+                    note=reason,
+                )
+
+                self._json_response(200, {"message": "Assignment declined.", "order": order})
+                return
+
+            # =====================================================
+            # RIDER COMPLETE DELIVERY WITH PROOF OF DELIVERY
+            # =====================================================
+
+            if path == "/api/rider/delivery/complete":
+
+                rider = get_logged_in_rider(self)
+
+                if not rider:
+                    self._json_response(401, {"error": "Rider authentication required."})
+                    return
+
+                try:
+                    order_id = int(payload.get("orderId"))
+                except (TypeError, ValueError):
+                    self._json_response(400, {"error": "A valid order ID is required."})
+                    return
+
+                deliveries = load_deliveries()
+                riders = load_riders()
+                rider_id = str(rider.get("id", ""))
+
+                rider_record = next(
+                    (item for item in riders if str(item.get("id", "")) == rider_id),
+                    None
+                )
+
+                if not rider_record:
+                    self._json_response(404, {"error": "Rider account not found."})
+                    return
+
+                order = next(
+                    (item for item in deliveries if str(item.get("id", "")) == str(order_id)),
+                    None
+                )
+
+                if not order:
+                    self._json_response(404, {"error": "Order not found."})
+                    return
+
+                if str(order.get("riderId", "")) != rider_id:
+                    self._json_response(403, {"error": "You are not assigned to this delivery."})
+                    return
+
+                if str(order.get("status", "")).strip().lower() != "on_delivery":
+                    self._json_response(
+                        400,
+                        {"error": "This delivery cannot be completed in its current status."}
+                    )
+                    return
+
+                recipient_name = clean(payload.get("recipientName"), 120)
+                otp_input = clean(payload.get("otp"), 10)
+                photo_data_url = payload.get("photo")
+                signature_data_url = payload.get("signature")
+                gps = payload.get("gps") if isinstance(payload.get("gps"), dict) else None
+
+                requirements = PROOF_OF_DELIVERY_REQUIREMENTS
+                missing = []
+
+                if requirements.get("requireRecipientName") and not recipient_name:
+                    missing.append("recipient name")
+                if requirements.get("requireOtp"):
+                    if not otp_input:
+                        missing.append("delivery OTP")
+                    elif not order.get("deliveryOtp") or not hmac.compare_digest(otp_input, str(order.get("deliveryOtp"))):
+                        order["otpState"] = "failed"
+                        save_deliveries(deliveries)
+                        self._json_response(400, {"error": "The OTP entered does not match."})
+                        return
+                if requirements.get("requirePhoto") and not photo_data_url:
+                    missing.append("delivery photo")
+                if requirements.get("requireSignature") and not signature_data_url:
+                    missing.append("recipient signature")
+                if requirements.get("requireGps") and not (gps and gps.get("lat") is not None and gps.get("lng") is not None):
+                    missing.append("GPS location")
+
+                if missing:
+                    self._json_response(
+                        400,
+                        {"error": f"Proof of delivery incomplete: missing {', '.join(missing)}."}
+                    )
+                    return
+
+                photo_path = None
+                signature_path = None
+
+                try:
+                    if photo_data_url:
+                        photo_path = save_proof_file(order_id, "photo", photo_data_url)
+                    if signature_data_url:
+                        signature_path = save_proof_file(order_id, "signature", signature_data_url)
+                except ValueError as error:
+                    self._json_response(400, {"error": str(error)})
+                    return
+
+                order["status"] = "delivered"
+                order["updatedAt"] = now_iso()
+                if requirements.get("requireOtp") and otp_input:
+                    order["otpState"] = "verified"
+                order["proofOfDelivery"] = {
+                    "recipientName": recipient_name or None,
+                    "otpVerified": bool(requirements.get("requireOtp") and otp_input),
+                    "deliveredAt": order["updatedAt"],
+                    "photoPath": photo_path,
+                    "signaturePath": signature_path,
+                    "gps": {
+                        "lat": gps.get("lat"), "lng": gps.get("lng")
+                    } if gps and gps.get("lat") is not None and gps.get("lng") is not None else None,
+                    "capturedByRiderId": rider_record.get("id"),
+                }
+                append_delivery_event(
+                    order, "delivered", actor_type="rider",
+                    actor_id=rider_record.get("id"), actor_name=rider_record.get("name"),
+                    note="Proof of delivery captured",
+                )
+
+                has_queued_delivery = any(
+                    str(delivery.get("riderId", "")) == rider_id
+                    and str(delivery.get("status", "")).strip().lower()
+                    not in ({"delivered"} | DELIVERY_EXCEPTION_STATUSES)
+                    and delivery.get("id") != order.get("id")
+                    for delivery in deliveries
+                )
+                rider_record["status"] = "assigned" if has_queued_delivery else "available"
+                rider_record["totalDeliveries"] = int(rider_record.get("totalDeliveries", 0) or 0) + 1
+                rider_record["completedDeliveries"] = int(rider_record.get("completedDeliveries", 0) or 0) + 1
+
+                save_deliveries(deliveries)
+                save_riders(riders)
+
+                self._json_response(
+                    200,
+                    {
+                        "message": "Delivery completed with proof of delivery.",
+                        "order": order,
+                        "rider": rider_record
+                    }
+                )
+                return
+
+            # =====================================================
+            # SUPPORT TICKETS - VENDOR CREATE
+            # =====================================================
+            if path == "/api/tickets":
+                email = get_logged_in_vendor_email(self)
+                category = clean(payload.get("category"), 40).lower()
+                description = clean(payload.get("description"), 2000)
+                priority = clean(payload.get("priority"), 20).lower() or "normal"
+                order_id = payload.get("orderId")
+
+                if not email:
+                    self._json_response(401, {"error": "Please log in to create a ticket."})
+                    return
+                if category not in SUPPORT_TICKET_CATEGORIES:
+                    self._json_response(400, {"error": "Invalid ticket category."})
+                    return
+                if not description:
+                    self._json_response(400, {"error": "A description is required."})
+                    return
+                if priority not in SUPPORT_TICKET_PRIORITIES:
+                    priority = "normal"
+
+                account = next((a for a in load_accounts() if a.get("email", "").lower() == email), None)
+                if not account:
+                    self._json_response(404, {"error": "Vendor account not found."})
+                    return
+
+                try:
+                    order_id = int(order_id) if order_id not in (None, "") else None
+                except (TypeError, ValueError):
+                    order_id = None
+
+                if order_id is not None:
+                    related_order = next(
+                        (d for d in load_deliveries() if d.get("id") == order_id),
+                        None
+                    )
+                    if not related_order or str(related_order.get("accountEmail", "")).lower() != email:
+                        self._json_response(403, {"error": "You cannot link a ticket to another account's order."})
+                        return
+
+                tickets = load_json_list(SUPPORT_TICKETS_FILE)
+                ticket = {
+                    "id": next_ticket_id(tickets),
+                    "vendorEmail": email,
+                    "vendorName": account.get("name", ""),
+                    "orderId": order_id,
+                    "category": category,
+                    "description": description,
+                    "priority": priority,
+                    "status": "open",
+                    "assignedTo": None,
+                    "replies": [],
+                    "internalNotes": [],
+                    "createdAt": now_iso(),
+                    "updatedAt": now_iso(),
+                }
+                tickets.append(ticket)
+                save_json_list(SUPPORT_TICKETS_FILE, tickets)
+
+                self._json_response(201, {"message": "Ticket created.", "ticket": vendor_safe_ticket(ticket)})
+                return
+
+            if path == "/api/admin/tickets/assign":
+                admin = require_permission(self, "manage_tickets")
+                if not admin:
+                    self._json_response(403, {"error": "You do not have permission to assign tickets."})
+                    return
+                ticket_id = clean(payload.get("ticketId"), 20)
+                assignee_email = clean(payload.get("assigneeEmail"), 160).lower()
+                tickets = load_json_list(SUPPORT_TICKETS_FILE)
+                ticket = next((t for t in tickets if t.get("id") == ticket_id), None)
+                if not ticket:
+                    self._json_response(404, {"error": "Ticket not found."})
+                    return
+                previous = ticket.get("assignedTo")
+                ticket["assignedTo"] = assignee_email or None
+                ticket["updatedAt"] = now_iso()
+                save_json_list(SUPPORT_TICKETS_FILE, tickets)
+                audit_admin_action(self, "ticket_assigned", "ticket", ticket_id, previous, assignee_email)
+                self._json_response(200, {"message": "Ticket assigned.", "ticket": ticket})
+                return
+
+            if path == "/api/admin/tickets/respond":
+                admin = require_permission(self, "manage_tickets")
+                if not admin:
+                    self._json_response(403, {"error": "You do not have permission to respond to tickets."})
+                    return
+                ticket_id = clean(payload.get("ticketId"), 20)
+                message = clean(payload.get("message"), 2000)
+                if not message:
+                    self._json_response(400, {"error": "A response message is required."})
+                    return
+                tickets = load_json_list(SUPPORT_TICKETS_FILE)
+                ticket = next((t for t in tickets if t.get("id") == ticket_id), None)
+                if not ticket:
+                    self._json_response(404, {"error": "Ticket not found."})
+                    return
+                ticket.setdefault("replies", []).append({
+                    "from": "admin", "authorEmail": admin.get("email"),
+                    "message": message, "at": now_iso(),
+                })
+                ticket["updatedAt"] = now_iso()
+                save_json_list(SUPPORT_TICKETS_FILE, tickets)
+                audit_admin_action(self, "ticket_response_added", "ticket", ticket_id)
+                self._json_response(200, {"message": "Response added.", "ticket": ticket})
+                return
+
+            if path == "/api/admin/tickets/note":
+                admin = require_permission(self, "manage_tickets")
+                if not admin:
+                    self._json_response(403, {"error": "You do not have permission to add internal notes."})
+                    return
+                ticket_id = clean(payload.get("ticketId"), 20)
+                note = clean(payload.get("note"), 2000)
+                if not note:
+                    self._json_response(400, {"error": "A note is required."})
+                    return
+                tickets = load_json_list(SUPPORT_TICKETS_FILE)
+                ticket = next((t for t in tickets if t.get("id") == ticket_id), None)
+                if not ticket:
+                    self._json_response(404, {"error": "Ticket not found."})
+                    return
+                # Internal notes are never returned to vendor-facing endpoints (see vendor_safe_ticket).
+                ticket.setdefault("internalNotes", []).append({
+                    "authorEmail": admin.get("email"), "note": note, "at": now_iso(),
+                })
+                ticket["updatedAt"] = now_iso()
+                save_json_list(SUPPORT_TICKETS_FILE, tickets)
+                audit_admin_action(self, "ticket_internal_note_added", "ticket", ticket_id)
+                self._json_response(200, {"message": "Internal note added.", "ticket": ticket})
+                return
+
+            if path == "/api/admin/tickets/status":
+                admin = require_permission(self, "manage_tickets")
+                if not admin:
+                    self._json_response(403, {"error": "You do not have permission to update ticket status."})
+                    return
+                ticket_id = clean(payload.get("ticketId"), 20)
+                new_status = clean(payload.get("status"), 20).lower()
+                if new_status not in SUPPORT_TICKET_STATUSES:
+                    self._json_response(400, {"error": "Invalid ticket status."})
+                    return
+                tickets = load_json_list(SUPPORT_TICKETS_FILE)
+                ticket = next((t for t in tickets if t.get("id") == ticket_id), None)
+                if not ticket:
+                    self._json_response(404, {"error": "Ticket not found."})
+                    return
+                previous = ticket.get("status")
+                ticket["status"] = new_status
+                ticket["updatedAt"] = now_iso()
+                save_json_list(SUPPORT_TICKETS_FILE, tickets)
+                audit_admin_action(self, "ticket_status_changed", "ticket", ticket_id, previous, new_status)
+                self._json_response(200, {"message": "Ticket status updated.", "ticket": ticket})
+                return
+
+            # =====================================================
+            # MANUAL VENDOR UNIT ADJUSTMENT
+            # =====================================================
+            if path == "/api/admin/vendors/adjust-units":
+                admin = require_permission(self, "manage_vendors")
+                if not admin:
+                    self._json_response(403, {"error": "You do not have permission to adjust vendor units."})
+                    return
+
+                email = clean(payload.get("email"), 160).lower()
+                reason = clean(payload.get("reason"), 500)
+                try:
+                    delta = int(payload.get("units"))
+                except (TypeError, ValueError):
+                    self._json_response(400, {"error": "A whole-number unit adjustment is required."})
+                    return
+                if delta == 0:
+                    self._json_response(400, {"error": "The adjustment must be non-zero."})
+                    return
+                if not reason:
+                    self._json_response(400, {"error": "A reason is required for every unit adjustment."})
+                    return
+
+                accounts = load_accounts()
+                account = next((a for a in accounts if a.get("email", "").lower() == email), None)
+                if not account:
+                    self._json_response(404, {"error": "Vendor account not found."})
+                    return
+
+                previous_balance = int(account.get("manualUnitAdjustment", 0) or 0)
+                new_balance = previous_balance + delta
+                account["manualUnitAdjustment"] = new_balance
+                ACCOUNTS_FILE.write_text(json.dumps(accounts, indent=2), encoding="utf-8")
+
+                entries = load_json_list(UNIT_ADJUSTMENTS_FILE)
+                entry = {
+                    "id": secrets.token_urlsafe(10),
+                    "email": email,
+                    "unitsDelta": delta,
+                    "reason": reason,
+                    "adminEmail": admin.get("email"),
+                    "previousBalance": previous_balance,
+                    "newBalance": new_balance,
+                    "at": now_iso(),
+                }
+                entries.append(entry)
+                save_json_list(UNIT_ADJUSTMENTS_FILE, entries)
+
+                audit_admin_action(
+                    self, "manual_unit_adjustment", "vendor", email,
+                    previous=previous_balance, new=new_balance, note=reason,
+                )
+
+                self._json_response(200, {"message": "Units adjusted.", "adjustment": entry})
+                return
+
             if path == "/api/calculate":
                 email = clean(payload.get("email"), 160).lower()
                 account = next(
@@ -2206,6 +3239,11 @@ class FiableHandler(SimpleHTTPRequestHandler):
 
             if path == "/api/admin/login":
 
+                rate_key = rate_limit_key(self, "admin-login")
+                if is_login_rate_limited(rate_key):
+                    self._json_response(429, {"error": "Too many login attempts. Please try again later."})
+                    return
+
                 email = clean(
                     payload.get("email"),
                     160
@@ -2237,6 +3275,8 @@ class FiableHandler(SimpleHTTPRequestHandler):
                 matched_admin = find_admin_by_email(admins, email)
 
                 if not matched_admin:
+
+                    record_login_failure(rate_key)
 
                     self._json_response(
                         401,
@@ -2275,6 +3315,8 @@ class FiableHandler(SimpleHTTPRequestHandler):
 
                 if not valid_password_login:
 
+                    record_login_failure(rate_key)
+
                     self._json_response(
                         401,
                         {
@@ -2301,7 +3343,17 @@ class FiableHandler(SimpleHTTPRequestHandler):
                 # CREATE ADMIN SESSION
                 # -------------------------------------------------
 
+                clear_login_attempts(rate_key)
+
                 session_token = create_admin_session(matched_admin.get("email"))
+
+                append_audit_log(
+                    actor_email=matched_admin.get("email"),
+                    actor_role=matched_admin.get("role"),
+                    action="admin_login",
+                    target_type="admin",
+                    target_id=matched_admin.get("id"),
+                )
 
 
                 body = json.dumps({
@@ -2318,9 +3370,12 @@ class FiableHandler(SimpleHTTPRequestHandler):
 
                 self.send_header(
                     "Set-Cookie",
-                    f"fiable_admin_session={session_token}; "
-                    f"Path=/; HttpOnly; SameSite=Lax; "
-                    f"Max-Age={ADMIN_SESSION_EXPIRY_HOURS * 60 * 60}"
+                    session_cookie(self, "fiable_admin_session", session_token, ADMIN_SESSION_EXPIRY_HOURS * 60 * 60)
+                )
+
+                self.send_header(
+                    "Set-Cookie",
+                    csrf_cookie(self, generate_csrf_token(), ADMIN_SESSION_EXPIRY_HOURS * 60 * 60)
                 )
 
                 self.send_header(
@@ -2358,8 +3413,12 @@ class FiableHandler(SimpleHTTPRequestHandler):
 
                 self.send_header(
                     "Set-Cookie",
-                    "fiable_admin_session=; "
-                    "Path=/; HttpOnly; SameSite=Lax; Max-Age=0"
+                    session_cookie(self, "fiable_admin_session", "", 0)
+                )
+
+                self.send_header(
+                    "Set-Cookie",
+                    csrf_cookie(self, "", 0)
                 )
 
                 self.send_header(
@@ -2617,6 +3676,7 @@ class FiableHandler(SimpleHTTPRequestHandler):
                 )
 
                 target_admin["salt"] = new_salt
+                target_admin["mustChangePassword"] = False
 
 
                 save_admin_credentials(admins)
@@ -2653,7 +3713,7 @@ class FiableHandler(SimpleHTTPRequestHandler):
                     self._json_response(400, {"error": "Enter a valid email address."})
                     return
 
-                if new_role not in ("staff", "admin"):
+                if new_role not in ADMIN_ASSIGNABLE_ROLES:
                     self._json_response(400, {"error": "Invalid role."})
                     return
 
@@ -2685,6 +3745,7 @@ class FiableHandler(SimpleHTTPRequestHandler):
                     "role": new_role,
                     "status": "active",
                     "invitedBy": get_admin_email(self),
+                    "mustChangePassword": True,
                     "createdAt": datetime.now(timezone.utc).isoformat(),
                 }
 
@@ -2698,6 +3759,11 @@ class FiableHandler(SimpleHTTPRequestHandler):
                         {"error": "Admin account could not be saved."}
                     )
                     return
+
+                audit_admin_action(
+                    self, "admin_account_created", "admin", new_admin["id"],
+                    new=new_role,
+                )
 
                 self._json_response(
                     201,
@@ -2727,7 +3793,7 @@ class FiableHandler(SimpleHTTPRequestHandler):
                 target_email = clean(payload.get("email"), 160).lower()
                 new_role = clean(payload.get("role"), 40).lower()
 
-                if new_role not in ("staff", "admin"):
+                if new_role not in ADMIN_ASSIGNABLE_ROLES:
                     self._json_response(400, {"error": "Invalid role."})
                     return
 
@@ -2747,7 +3813,7 @@ class FiableHandler(SimpleHTTPRequestHandler):
                     self._json_response(404, {"error": "Admin not found."})
                     return
 
-                if target_admin.get("role") == "owner":
+                if target_admin.get("role") in ("owner", "super_admin"):
                     self._json_response(
                         400,
                         {"error": "The account owner's role cannot be changed."}
@@ -2756,6 +3822,11 @@ class FiableHandler(SimpleHTTPRequestHandler):
 
                 target_admin["role"] = new_role
                 save_admin_credentials(admins)
+
+                audit_admin_action(
+                    self, "admin_role_changed", "admin", target_email,
+                    previous=target_admin.get("role"), new=new_role,
+                )
 
                 self._json_response(200, {"message": "Role updated successfully."})
                 return
@@ -2799,6 +3870,12 @@ class FiableHandler(SimpleHTTPRequestHandler):
 
                 save_admin_credentials(admins)
                 purge_admin_sessions(target_email)
+
+                audit_admin_action(
+                    self,
+                    "admin_access_revoked" if path.endswith("revoke") else "admin_access_restored",
+                    "admin", target_email,
+                )
 
                 self._json_response(
                     200,
@@ -2853,6 +3930,8 @@ class FiableHandler(SimpleHTTPRequestHandler):
                 save_admin_credentials(admins)
                 purge_admin_sessions(target_email)
 
+                audit_admin_action(self, "admin_account_deleted", "admin", target_email)
+
                 self._json_response(200, {"message": "Admin removed successfully."})
                 return
 
@@ -2862,11 +3941,13 @@ class FiableHandler(SimpleHTTPRequestHandler):
 
             if path == "/api/admin/riders/update":
 
-                if not require_admin(self):
+                admin = require_permission(self, "manage_riders")
+
+                if not admin:
                     self._json_response(
-                        401,
+                        403,
                         {
-                            "error": "Admin authentication required."
+                            "error": "You do not have permission to manage riders."
                         }
                     )
                     return
@@ -2963,6 +4044,8 @@ class FiableHandler(SimpleHTTPRequestHandler):
 
                 save_riders(riders)
 
+                audit_admin_action(self, "rider_updated", "rider", rider_id, new={"status": status})
+
                 self._json_response(
                     200,
                     {
@@ -2979,11 +4062,13 @@ class FiableHandler(SimpleHTTPRequestHandler):
 
             if path == "/api/admin/rider-payments/mark-paid":
 
-                if not require_admin(self):
+                admin = require_permission(self, "manage_finance")
+
+                if not admin:
                     self._json_response(
-                        401,
+                        403,
                         {
-                            "error": "Admin authentication required."
+                            "error": "You do not have permission to record rider payments."
                         }
                     )
                     return
@@ -3027,6 +4112,8 @@ class FiableHandler(SimpleHTTPRequestHandler):
                 rider_payments.append(payment)
                 save_rider_payments(rider_payments)
 
+                audit_admin_action(self, "rider_payment_recorded", "rider", rider_id, new={"amount": amount, "month": month})
+
                 self._json_response(
                     200,
                     {
@@ -3043,11 +4130,13 @@ class FiableHandler(SimpleHTTPRequestHandler):
 
             if path == "/api/admin/orders/assign-rider":
 
-                if not require_admin(self):
+                admin = require_permission(self, "manage_orders")
+
+                if not admin:
                     self._json_response(
-                        401,
+                        403,
                         {
-                            "error": "Admin authentication required."
+                            "error": "You do not have permission to assign riders."
                         }
                     )
                     return
@@ -3146,12 +4235,30 @@ class FiableHandler(SimpleHTTPRequestHandler):
                 order["updatedAt"] = datetime.now(
                     timezone.utc
                 ).isoformat()
+                order["assignedAt"] = order["updatedAt"]
+                append_delivery_event(
+                    order,
+                    "assigned",
+                    actor_type="admin",
+                    actor_id=admin.get("email"),
+                    actor_name=admin.get("name"),
+                    note=f"Assigned to {rider.get('name', 'rider')}",
+                )
 
                 # Rider becomes assigned
                 rider["status"] = "assigned"
 
                 save_deliveries(deliveries)
                 save_riders(riders)
+
+                audit_admin_action(
+                    self,
+                    action="rider_assigned",
+                    target_type="delivery",
+                    target_id=order.get("id"),
+                    previous=None,
+                    new={"riderId": rider.get("id"), "riderName": rider.get("name")},
+                )
 
 
                 # -------------------------------------------------
@@ -3187,11 +4294,13 @@ class FiableHandler(SimpleHTTPRequestHandler):
 
             if path == "/api/admin/orders/bulk-assign":
 
-                if not require_admin(self):
+                admin = require_permission(self, "manage_orders")
+
+                if not admin:
                     self._json_response(
-                        401,
+                        403,
                         {
-                            "error": "Admin authentication required."
+                            "error": "You do not have permission to assign riders."
                         }
                     )
                     return
@@ -3307,6 +4416,15 @@ class FiableHandler(SimpleHTTPRequestHandler):
                     order["updatedAt"] = datetime.now(
                         timezone.utc
                     ).isoformat()
+                    order["assignedAt"] = order["updatedAt"]
+                    append_delivery_event(
+                        order,
+                        "assigned",
+                        actor_type="admin",
+                        actor_id=admin.get("email"),
+                        actor_name=admin.get("name"),
+                        note=f"Bulk-assigned to {rider.get('name', 'rider')}",
+                    )
 
                     assigned_count += 1
 
@@ -3328,6 +4446,14 @@ class FiableHandler(SimpleHTTPRequestHandler):
 
                 save_deliveries(deliveries)
                 save_riders(riders)
+
+                audit_admin_action(
+                    self,
+                    action="rider_bulk_assigned",
+                    target_type="delivery",
+                    target_id=order_ids,
+                    new={"riderId": rider.get("id"), "riderName": rider.get("name"), "count": assigned_count},
+                )
 
                 message = f"Successfully assigned {assigned_count} order(s)"
                 if failed_count > 0:
@@ -3351,11 +4477,13 @@ class FiableHandler(SimpleHTTPRequestHandler):
 
             if path == "/api/admin/orders/reassign-rider":
 
-                if not require_admin(self):
+                admin = require_permission(self, "manage_orders")
+
+                if not admin:
                     self._json_response(
-                        401,
+                        403,
                         {
-                            "error": "Admin authentication required."
+                            "error": "You do not have permission to reassign riders."
                         }
                     )
                     return
@@ -3489,12 +4617,29 @@ class FiableHandler(SimpleHTTPRequestHandler):
                 order["updatedAt"] = datetime.now(
                     timezone.utc
                 ).isoformat()
+                append_delivery_event(
+                    order,
+                    "assigned",
+                    actor_type="admin",
+                    actor_id=admin.get("email"),
+                    actor_name=admin.get("name"),
+                    note=f"Reassigned from {current_rider.get('name') if current_rider else 'unassigned'} to {new_rider.get('name', 'rider')}",
+                )
 
                 # New rider becomes assigned
                 new_rider["status"] = "assigned"
 
                 save_deliveries(deliveries)
                 save_riders(riders)
+
+                audit_admin_action(
+                    self,
+                    action="rider_reassigned",
+                    target_type="delivery",
+                    target_id=order.get("id"),
+                    previous={"riderId": current_rider.get("id") if current_rider else None, "riderName": current_rider.get("name") if current_rider else None},
+                    new={"riderId": new_rider.get("id"), "riderName": new_rider.get("name")},
+                )
 
                 self._json_response(
                     200,
@@ -3514,11 +4659,13 @@ class FiableHandler(SimpleHTTPRequestHandler):
 
             if path == "/api/admin/orders/update-status":
 
-                if not require_admin(self):
+                admin = require_permission(self, "manage_orders")
+
+                if not admin:
                     self._json_response(
-                        401,
+                        403,
                         {
-                            "error": "Admin authentication required."
+                            "error": "You do not have permission to update order status."
                         }
                     )
                     return
@@ -3528,6 +4675,7 @@ class FiableHandler(SimpleHTTPRequestHandler):
                     payload.get("status"),
                     40
                 ).lower()
+                note = clean(payload.get("note"), 300) or None
 
                 try:
                     order_id = int(order_id)
@@ -3539,16 +4687,6 @@ class FiableHandler(SimpleHTTPRequestHandler):
                         }
                     )
                     return
-
-                allowed_transitions = {
-                    "assigned": {
-                        "on_delivery"
-                    },
-                    "on_delivery": {
-                        "delivered",
-                        "failed"
-                    }
-                }
 
                 deliveries = load_deliveries()
                 riders = load_riders()
@@ -3575,16 +4713,36 @@ class FiableHandler(SimpleHTTPRequestHandler):
                     order.get("status", "")
                 ).strip().lower()
 
-                allowed_next_statuses = allowed_transitions.get(
-                    current_status,
-                    set()
+                # An admin may move an order forward one step in the normal
+                # flow, or divert it to an exception status at any active
+                # (non-final) point in its lifecycle.
+                forward_status = next_delivery_status(current_status)
+                is_forward_move = (
+                    current_status != "requested"
+                    and new_status == forward_status
+                    and forward_status is not None
+                )
+                is_exception_move = (
+                    new_status in DELIVERY_EXCEPTION_STATUSES
+                    and current_status not in (
+                        "delivered", "failed", "cancelled", "returned"
+                    )
                 )
 
-                if new_status not in allowed_next_statuses:
+                if not (is_forward_move or is_exception_move):
                     self._json_response(
                         400,
                         {
                             "error": "This order cannot be moved to that status."
+                        }
+                    )
+                    return
+
+                if new_status == "delivered":
+                    self._json_response(
+                        400,
+                        {
+                            "error": "Delivered can only be recorded by the rider, with proof of delivery."
                         }
                     )
                     return
@@ -3603,71 +4761,51 @@ class FiableHandler(SimpleHTTPRequestHandler):
                         None
                     )
 
-                # Assigned → On Delivery
-                if current_status == "assigned":
+                previous_status = current_status
+                order["status"] = new_status
 
-                    order["status"] = "on_delivery"
-
-                    if rider:
-                        rider["status"] = "on_delivery"
-
-                # On Delivery → Delivered
-                elif current_status == "on_delivery":
-
-                    order["status"] = new_status
-
-                    if rider:
-
+                if rider:
+                    if is_exception_move:
                         has_queued_delivery = any(
                             str(delivery.get("riderId", "")) ==
                             str(rider.get("id", ""))
                             and str(delivery.get("status", "")).strip().lower()
-                            == "assigned"
+                            not in ({"delivered"} | DELIVERY_EXCEPTION_STATUSES)
+                            and delivery.get("id") != order.get("id")
                             for delivery in deliveries
                         )
                         rider["status"] = (
-                            "assigned"
-                            if has_queued_delivery
-                            else "available"
+                            "assigned" if has_queued_delivery else "available"
                         )
-
-                        if new_status == "delivered":
-
-                            rider["totalDeliveries"] = (
-                                int(
-                                    rider.get(
-                                        "totalDeliveries",
-                                        0
-                                    ) or 0
-                                ) + 1
-                            )
-
-                            rider["completedDeliveries"] = (
-                                int(
-                                    rider.get(
-                                        "completedDeliveries",
-                                        0
-                                    ) or 0
-                                ) + 1
-                            )
-
-                        elif new_status == "failed":
-
+                        if new_status == "failed":
                             rider["failedDeliveries"] = (
-                                int(
-                                    rider.get(
-                                        "failedDeliveries",
-                                        0
-                                    ) or 0
-                                ) + 1
+                                int(rider.get("failedDeliveries", 0) or 0) + 1
                             )
+                    elif new_status == "on_delivery":
+                        rider["status"] = "on_delivery"
 
-                order["updatedAt"] = datetime.now(
-                    timezone.utc
-                ).isoformat()
+                order["updatedAt"] = now_iso()
+                append_delivery_event(
+                    order,
+                    new_status,
+                    actor_type="admin",
+                    actor_id=admin.get("email"),
+                    actor_name=admin.get("name"),
+                    note=note,
+                )
 
                 save_deliveries(deliveries)
                 save_riders(riders)
+
+                audit_admin_action(
+                    self,
+                    action="delivery_status_override",
+                    target_type="delivery",
+                    target_id=order.get("id"),
+                    previous=previous_status,
+                    new=new_status,
+                    note=note,
+                )
 
                 self._json_response(
                     200,
@@ -3686,11 +4824,13 @@ class FiableHandler(SimpleHTTPRequestHandler):
 
             if path == "/api/admin/riders":
 
-                if not require_admin(self):
+                admin = require_permission(self, "manage_riders")
+
+                if not admin:
                     self._json_response(
-                        401,
+                        403,
                         {
-                            "error": "Admin authentication required."
+                            "error": "You do not have permission to create riders."
                         }
                     )
                     return
@@ -3777,6 +4917,7 @@ class FiableHandler(SimpleHTTPRequestHandler):
                     "totalDeliveries": 0,
                     "completedDeliveries": 0,
                     "failedDeliveries": 0,
+                    "mustChangePassword": True,
                     "createdAt": datetime.now(
                         timezone.utc
                     ).isoformat(),
@@ -3785,6 +4926,8 @@ class FiableHandler(SimpleHTTPRequestHandler):
                 riders.append(rider)
 
                 save_riders(riders)
+
+                audit_admin_action(self, "rider_created", "rider", rider["id"])
 
                 self._json_response(
                     201,
@@ -3796,22 +4939,63 @@ class FiableHandler(SimpleHTTPRequestHandler):
 
                 return
             if path == "/api/login":
+                rate_key = rate_limit_key(self, "vendor-login")
+                if is_login_rate_limited(rate_key):
+                    self._json_response(429, {"error": "Too many login attempts. Please try again later."})
+                    return
                 email = clean(payload.get("email"), 160).lower()
                 password = clean(payload.get("password"), 128)
                 account = authenticate(email, password)
                 if not account:
+                    record_login_failure(rate_key)
                     self._json_response(401, {"error": "Invalid email or password"})
                     return
+                clear_login_attempts(rate_key)
                 summary = summary_for_account(account)
-                self._json_response(200, summary)
+                session_token = create_vendor_session(account["email"])
+                body = json.dumps(summary).encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.send_header(
+                    "Set-Cookie",
+                    session_cookie(self, "fiable_vendor_session", session_token, VENDOR_SESSION_EXPIRY_HOURS * 60 * 60)
+                )
+                self.send_header(
+                    "Set-Cookie",
+                    csrf_cookie(self, generate_csrf_token(), VENDOR_SESSION_EXPIRY_HOURS * 60 * 60)
+                )
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+                return
+
+            if path == "/api/logout":
+                clear_vendor_session(self)
+                body = json.dumps({"message": "Logged out."}).encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.send_header(
+                    "Set-Cookie",
+                    session_cookie(self, "fiable_vendor_session", "", 0)
+                )
+                self.send_header(
+                    "Set-Cookie",
+                    csrf_cookie(self, "", 0)
+                )
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
                 return
 
             if path == "/api/change-password":
-                email = clean(payload.get("email"), 160).lower()
+                email = get_logged_in_vendor_email(self)
+                if not email:
+                    self._json_response(401, {"error": "Please log in to change your password."})
+                    return
                 currentPassword = clean(payload.get("currentPassword"), 128)
                 newPassword = clean(payload.get("newPassword"), 128)
 
-                if not email or not currentPassword or not newPassword:
+                if not currentPassword or not newPassword:
                     self._json_response(
                         400,
                         {"error": "All password fields are required."}
@@ -3868,17 +5052,26 @@ class FiableHandler(SimpleHTTPRequestHandler):
                 )
                 return
             if path == "/api/account/plan":
-                email = clean(payload.get("email"), 160).lower()
+                email = get_logged_in_vendor_email(self)
+                if not email:
+                    self._json_response(401, {"error": "Please log in."})
+                    return
                 account = update_account(email, clean(payload.get("plan"), 40))
                 self._json_response(200, summary_for_account(account))
                 return
             if path == "/api/account/payment":
-                email = clean(payload.get("email"), 160).lower()
+                email = get_logged_in_vendor_email(self)
+                if not email:
+                    self._json_response(401, {"error": "Please log in."})
+                    return
                 account = mark_payment_complete(email)
                 self._json_response(200, {"paymentStatus": account["paymentStatus"], "message": "Payment recorded for local demo checkout."})
                 return
             if path == "/api/batch-delivery-quote":
-                email = clean(payload.get("email"), 160).lower()
+                email = get_logged_in_vendor_email(self)
+                if not email:
+                    self._json_response(401, {"error": "Please log in."})
+                    return
                 requests = payload.get("deliveries")
                 if not isinstance(requests, list):
                     raise ValueError("Batch deliveries must be provided as a list.")
@@ -3895,7 +5088,10 @@ class FiableHandler(SimpleHTTPRequestHandler):
                 )
                 return
             if path == "/api/batch-delivery-request":
-                email = clean(payload.get("email"), 160).lower()
+                email = get_logged_in_vendor_email(self)
+                if not email:
+                    self._json_response(401, {"error": "Please log in."})
+                    return
                 requests = payload.get("deliveries")
                 if not isinstance(requests, list):
                     raise ValueError("Batch deliveries must be provided as a list.")
@@ -3976,7 +5172,10 @@ class FiableHandler(SimpleHTTPRequestHandler):
                 })
                 return
             if path == "/api/delivery-request":
-                email = clean(payload.get("email"), 160).lower()
+                email = get_logged_in_vendor_email(self)
+                if not email:
+                    self._json_response(401, {"error": "Please log in."})
+                    return
                 pickup = clean(payload.get("pickup"), 120)
                 dropoff = clean(payload.get("dropoff"), 120)
                 contactName = clean(payload.get("pickupContactName"), 100)
@@ -4058,7 +5257,14 @@ class FiableHandler(SimpleHTTPRequestHandler):
                 return
             if path == "/api/delivery/status":
 
-                # update delivery status
+                # Vendor-initiated cancellation only - this endpoint used to
+                # accept ANY status for ANY delivery ID with no auth at all.
+                vendor_email = get_logged_in_vendor_email(self)
+
+                if not vendor_email:
+                    self._json_response(401, {"error": "Please log in to manage this delivery."})
+                    return
+
                 delivery_id = int(
                     payload.get("id") or 0
                 )
@@ -4068,15 +5274,7 @@ class FiableHandler(SimpleHTTPRequestHandler):
                     40
                 ).lower()
 
-                allowed = {
-                    "requested",
-                    "assigned",
-                    "in-transit",
-                    "delivered",
-                    "cancelled"
-                }
-
-                if status not in allowed:
+                if status != "cancelled":
                     raise ValueError(
                         "Invalid delivery status"
                     )
@@ -4092,6 +5290,10 @@ class FiableHandler(SimpleHTTPRequestHandler):
                     ),
                     None
                 )
+
+                if delivery and str(delivery.get("accountEmail", "")).lower() != vendor_email:
+                    self._json_response(403, {"error": "You cannot manage another account's delivery."})
+                    return
 
                 if not delivery:
                     self._json_response(
@@ -4236,32 +5438,24 @@ class FiableHandler(SimpleHTTPRequestHandler):
 
     def do_GET(self):
         # =====================================================
+        # BLOCK ACCESS TO SERVER INTERNALS / DATA FILES
+        # These must never be reachable through static file serving.
+        # =====================================================
+        request_path = urlparse(self.path).path
+        if ".." in request_path or request_path.startswith(BLOCKED_STATIC_PREFIXES):
+            self._json_response(404, {"error": "Not found"})
+            return
+
+        gate_message = password_change_gate(self, request_path)
+        if gate_message:
+            self._json_response(403, {"error": gate_message, "mustChangePassword": True})
+            return
+
+        # =====================================================
         # PROTECT ADMIN DASHBOARD
         # =====================================================
 
         if self.path == "/admin.html":
-
-            preview_token = parse_qs(urlparse(self.path).query).get("preview", [None])[0]
-
-            if preview_token and hmac.compare_digest(preview_token, ADMIN_PREVIEW_TOKEN):
-
-                session_token = create_admin_session(ADMIN_PREVIEW_EMAIL)
-
-                self.send_response(302)
-                self.send_header("Location", "/admin.html")
-                self.send_header(
-                    "Set-Cookie",
-                    f"fiable_admin_session={session_token}; "
-                    f"Path=/; HttpOnly; SameSite=Lax; "
-                    f"Max-Age={ADMIN_SESSION_EXPIRY_HOURS * 60 * 60}"
-                )
-                self.send_header(
-                    "Cache-Control",
-                    "no-store, no-cache, must-revalidate, max-age=0"
-                )
-                self.end_headers()
-
-                return
 
             if not require_admin(self):
 
@@ -4292,12 +5486,12 @@ class FiableHandler(SimpleHTTPRequestHandler):
             self._json_response(200, {"status": "ok"})
             return
         if self.path.startswith("/api/account/subscriptions"):
+            email = get_logged_in_vendor_email(self)
+            if not email:
+                self._json_response(401, {"error": "Please log in."})
+                return
             query = urlparse(self.path).query
             params = parse_qs(query)
-            email = params.get("email", [None])[0]
-            if not email:
-                self._json_response(400, {"error": "email query required"})
-                return
             account = next(
                 (item for item in load_accounts() if item["email"] == email.lower()),
                 None
@@ -4317,8 +5511,8 @@ class FiableHandler(SimpleHTTPRequestHandler):
             })
             return
         if self.path == "/api/admin/subscriptions":
-            if not require_admin(self):
-                self._json_response(401, {"error": "Admin authentication required."})
+            if not require_permission(self, "view_finance"):
+                self._json_response(403, {"error": "You do not have permission to view subscriptions."})
                 return
             records = []
             for account in load_accounts():
@@ -4335,8 +5529,8 @@ class FiableHandler(SimpleHTTPRequestHandler):
             })
             return
         if self.path.startswith("/api/admin/subscriptions/details"):
-            if not require_admin(self):
-                self._json_response(401, {"error": "Admin authentication required."})
+            if not require_permission(self, "view_finance"):
+                self._json_response(403, {"error": "You do not have permission to view subscriptions."})
                 return
             query = urlparse(self.path).query
             subscription_id = parse_qs(query).get("subscriptionId", [None])[0]
@@ -4358,32 +5552,28 @@ class FiableHandler(SimpleHTTPRequestHandler):
             return
         # dashboard and delivery listing endpoints
         if self.path.startswith("/api/account/deliveries"):
-            query = urlparse(self.path).query
-            params = parse_qs(query)
-            email = params.get("email", [None])[0]
+            email = get_logged_in_vendor_email(self)
             if not email:
-                self._json_response(400, {"error": "email query required"})
+                self._json_response(401, {"error": "Please log in."})
                 return
             items = deliveries_for_account(email)
             self._json_response(200, {"deliveries": items})
             return
         if self.path.startswith("/api/dashboard-stats"):
-            query = urlparse(self.path).query
-            params = parse_qs(query)
-            email = params.get("email", [None])[0]
+            email = get_logged_in_vendor_email(self)
             if not email:
-                self._json_response(400, {"error": "email query required"})
+                self._json_response(401, {"error": "Please log in."})
                 return
             stats = dashboard_stats_for_account(email)
             self._json_response(200, {"stats": stats})
             return
         if self.path == "/api/admin/summary":
 
-            if not require_admin(self):
+            if not require_permission(self, "view_reports"):
                 self._json_response(
-                    401,
+                    403,
                     {
-                        "error": "Admin authentication required."
+                        "error": "You do not have permission to view the dashboard summary."
                     }
                 )
                 return
@@ -4411,8 +5601,12 @@ class FiableHandler(SimpleHTTPRequestHandler):
                     "name": current_admin.get("name", "Administrator"),
                     "email": current_admin.get("email", ""),
                     "role": current_admin.get("role", "staff"),
+                    "roleLabel": ADMIN_ROLE_LABELS.get(current_admin.get("role", "staff"), current_admin.get("role", "staff")),
                     "status": current_admin.get("status", "active"),
-                    "isOwner": current_admin.get("role") == "owner"
+                    "isOwner": current_admin.get("role") in ("owner", "super_admin"),
+                    "mustChangePassword": bool(current_admin.get("mustChangePassword", False)),
+                    "mfaEnabled": bool(current_admin.get("mfaEnabled", False)),
+                    "permissions": sorted(ADMIN_PERMISSIONS.get(current_admin.get("role", ""), set()))
                 }
             )
             return
@@ -4421,10 +5615,10 @@ class FiableHandler(SimpleHTTPRequestHandler):
 
             current_admin = get_current_admin(self)
 
-            if not current_admin:
+            if not admin_has_permission(current_admin, "view_team"):
                 self._json_response(
-                    401,
-                    {"error": "Admin authentication required."}
+                    403,
+                    {"error": "You do not have permission to view the admin team."}
                 )
                 return
 
@@ -4434,8 +5628,11 @@ class FiableHandler(SimpleHTTPRequestHandler):
                     "name": admin.get("name", "Administrator"),
                     "email": admin.get("email", ""),
                     "role": admin.get("role", "staff"),
+                    "roleLabel": ADMIN_ROLE_LABELS.get(admin.get("role", "staff"), admin.get("role", "staff")),
                     "status": admin.get("status", "active"),
                     "createdAt": admin.get("createdAt"),
+                    "mustChangePassword": bool(admin.get("mustChangePassword", False)),
+                    "mfaEnabled": bool(admin.get("mfaEnabled", False)),
                 }
                 for admin in load_admin_credentials()
             ]
@@ -4445,18 +5642,18 @@ class FiableHandler(SimpleHTTPRequestHandler):
                 {
                     "admins": admins,
                     "currentAdminEmail": current_admin.get("email", ""),
-                    "isOwner": current_admin.get("role") == "owner"
+                    "isOwner": current_admin.get("role") in ("owner", "super_admin")
                 }
             )
             return
 
         if self.path == "/api/admin/riders":
 
-            if not require_admin(self):
+            if not require_permission(self, "view_riders"):
                 self._json_response(
-                    401,
+                    403,
                     {
-                        "error": "Admin authentication required."
+                        "error": "You do not have permission to view riders."
                     }
                 )
                 return
@@ -4529,11 +5726,8 @@ class FiableHandler(SimpleHTTPRequestHandler):
             return
 
         if self.path.startswith("/api/admin/rider-payments"):
-            if not require_admin(self):
-                self._json_response(
-                    401,
-                    {"error": "Admin authentication required."}
-                )
+            if not require_permission(self, "view_finance"):
+                self._json_response(403, {"error": "You do not have permission to view rider payments."})
                 return
 
             month = parse_qs(urlparse(self.path).query).get("month", [None])[0]
@@ -4563,11 +5757,11 @@ class FiableHandler(SimpleHTTPRequestHandler):
 
         if self.path == "/api/admin/vendors":
 
-            if not require_admin(self):
+            if not require_permission(self, "view_vendors"):
                 self._json_response(
-                    401,
+                    403,
                     {
-                        "error": "Admin authentication required."
+                        "error": "You do not have permission to view vendors."
                     }
                 )
                 return
@@ -4589,11 +5783,9 @@ class FiableHandler(SimpleHTTPRequestHandler):
             return
         
         if self.path.startswith("/api/account/summary"):
-            query = urlparse(self.path).query
-            params = parse_qs(query)
-            email = params.get("email", [None])[0]
+            email = get_logged_in_vendor_email(self)
             if not email:
-                self._json_response(400, {"error": "email query required"})
+                self._json_response(401, {"error": "Please log in."})
                 return
             account = next((item for item in load_accounts() if item["email"] == email.lower()), None)
             if not account:
@@ -4626,7 +5818,7 @@ class FiableHandler(SimpleHTTPRequestHandler):
             has_active_delivery = any(
                 str(delivery.get("riderId", "")) == str(rider.get("id", ""))
                 and str(delivery.get("status", "")).strip().lower()
-                in {"assigned", "on_delivery"}
+                not in ({"delivered"} | DELIVERY_EXCEPTION_STATUSES)
                 for delivery in deliveries
             )
 
@@ -4686,7 +5878,8 @@ class FiableHandler(SimpleHTTPRequestHandler):
                         "failedDeliveries": rider.get(
                             "failedDeliveries",
                             0
-                        )
+                        ),
+                        "mustChangePassword": bool(rider.get("mustChangePassword", False))
                     }
                 }
             )
@@ -4797,16 +5990,38 @@ class FiableHandler(SimpleHTTPRequestHandler):
         # ADMIN ORDERS
         # =====================================================
 
-        if self.path == "/api/admin/orders":
+        if self.path.startswith("/api/admin/orders") and not self.path.startswith("/api/admin/orders/"):
 
-            if not require_admin(self):
+            if not require_permission(self, "view_orders"):
                 self._json_response(
-                    401,
+                    403,
                     {
-                        "error": "Admin authentication required."
+                        "error": "You do not have permission to view orders."
                     }
                 )
                 return
+
+            query = parse_qs(urlparse(self.path).query)
+            search = clean((query.get("search", [""])[0]), 120).lower()
+            status_filter = clean((query.get("status", [""])[0]), 40).lower()
+            vendor_filter = clean((query.get("vendor", [""])[0]), 160).lower()
+            rider_filter = clean((query.get("rider", [""])[0]), 40)
+            pickup_filter = clean((query.get("pickup", [""])[0]), 80).lower()
+            dropoff_filter = clean((query.get("dropoff", [""])[0]), 80).lower()
+            date_from = parse_iso_date(query.get("dateFrom", [""])[0])
+            date_to = parse_iso_date(query.get("dateTo", [""])[0])
+
+            try:
+                page = max(1, int(query.get("page", ["1"])[0]))
+            except ValueError:
+                page = 1
+            try:
+                # Default kept generous (well above current order volume) since
+                # admin.js does not yet have pagination controls; callers that
+                # want a smaller page can still pass ?pageSize=.
+                page_size = min(500, max(1, int(query.get("pageSize", ["500"])[0])))
+            except ValueError:
+                page_size = 500
 
             deliveries = load_deliveries()
             accounts = load_accounts()
@@ -4822,16 +6037,30 @@ class FiableHandler(SimpleHTTPRequestHandler):
             for delivery in deliveries:
 
                 order = dict(delivery)
+                email = delivery.get("accountEmail", "").lower()
+                order["vendorName"] = vendor_names.get(email, "—")
 
-                email = (
-                    delivery.get("accountEmail", "")
-                    .lower()
-                )
-
-                order["vendorName"] = vendor_names.get(
-                    email,
-                    "—"
-                )
+                if status_filter and str(order.get("status", "")).lower() != status_filter:
+                    continue
+                if vendor_filter and vendor_filter not in email and vendor_filter not in order["vendorName"].lower():
+                    continue
+                if rider_filter and str(order.get("riderId", "")) != rider_filter:
+                    continue
+                if pickup_filter and pickup_filter not in str(order.get("pickup", "")).lower():
+                    continue
+                if dropoff_filter and dropoff_filter not in str(order.get("dropoff", "")).lower():
+                    continue
+                if search:
+                    haystack = " ".join(str(order.get(field, "")) for field in (
+                        "orderRef", "trackingCode", "accountEmail", "riderName", "vendorName"
+                    )).lower()
+                    if search not in haystack:
+                        continue
+                created_at = parse_iso_date(order.get("createdAt"))
+                if date_from and (not created_at or created_at < date_from):
+                    continue
+                if date_to and (not created_at or created_at > date_to):
+                    continue
 
                 orders.append(order)
 
@@ -4840,13 +6069,251 @@ class FiableHandler(SimpleHTTPRequestHandler):
                 reverse=True
             )
 
+            total = len(orders)
+            start = (page - 1) * page_size
+            page_items = orders[start:start + page_size]
+
             self._json_response(
                 200,
                 {
-                    "orders": orders
+                    "orders": page_items,
+                    "pagination": {
+                        "page": page,
+                        "pageSize": page_size,
+                        "total": total,
+                        "totalPages": max(1, math.ceil(total / page_size)),
+                    }
                 }
             )
 
+            return
+
+        # =====================================================
+        # PROTECTED PROOF-OF-DELIVERY FILE ACCESS
+        # (never reachable through the static file server)
+        # =====================================================
+        if self.path.startswith("/api/proof/"):
+            filename = urlparse(self.path).path.removeprefix("/api/proof/")
+
+            if "/" in filename or ".." in filename:
+                self._json_response(404, {"error": "Not found."})
+                return
+
+            deliveries = load_deliveries()
+            order = next(
+                (
+                    d for d in deliveries
+                    if (d.get("proofOfDelivery") or {}).get("photoPath") == filename
+                    or (d.get("proofOfDelivery") or {}).get("signaturePath") == filename
+                ),
+                None
+            )
+
+            if not order:
+                self._json_response(404, {"error": "Not found."})
+                return
+
+            admin = get_current_admin(self)
+            vendor_email = get_logged_in_vendor_email(self)
+            is_owning_vendor = (
+                vendor_email
+                and vendor_email == str(order.get("accountEmail", "")).lower()
+            )
+
+            if not admin and not is_owning_vendor:
+                self._json_response(403, {"error": "You are not authorized to view this file."})
+                return
+
+            file_path = PROOF_DIR / filename
+            if not file_path.exists():
+                self._json_response(404, {"error": "Not found."})
+                return
+
+            suffix = file_path.suffix.lower()
+            content_type = {
+                ".png": "image/png", ".jpg": "image/jpeg",
+                ".jpeg": "image/jpeg", ".webp": "image/webp",
+            }.get(suffix, "application/octet-stream")
+
+            data = file_path.read_bytes()
+            self.send_response(200)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("Cache-Control", "private, no-store")
+            self.end_headers()
+            self.wfile.write(data)
+            return
+
+        # =====================================================
+        # PUBLIC DELIVERY TRACKING (no authentication - safe fields only)
+        # =====================================================
+        if self.path.startswith("/api/track"):
+            code = clean(parse_qs(urlparse(self.path).query).get("code", [""])[0], 20).upper()
+
+            if not code:
+                self._json_response(400, {"error": "A tracking code is required."})
+                return
+
+            order = next(
+                (d for d in load_deliveries() if str(d.get("trackingCode", "")).upper() == code),
+                None
+            )
+
+            if not order:
+                self._json_response(404, {"error": "No delivery found for that tracking code."})
+                return
+
+            status = str(order.get("status", "")).lower()
+            safe_timeline = [
+                {
+                    "status": PUBLIC_TRACKING_STATUS_MAP.get(event.get("status"), None),
+                    "at": event.get("at"),
+                }
+                for event in order.get("timeline", [])
+                if PUBLIC_TRACKING_STATUS_MAP.get(event.get("status"))
+            ]
+
+            self._json_response(
+                200,
+                {
+                    "trackingCode": order.get("trackingCode"),
+                    "orderRef": order.get("orderRef"),
+                    "status": PUBLIC_TRACKING_STATUS_MAP.get(status, "Order Received"),
+                    "createdAt": order.get("createdAt"),
+                    "updatedAt": order.get("updatedAt"),
+                    "timeline": safe_timeline,
+                }
+            )
+            return
+
+        # =====================================================
+        # ADMIN AUDIT LOG (read-only; no edit/delete endpoint exists)
+        # =====================================================
+        if self.path.startswith("/api/admin/audit-log"):
+            if not require_permission(self, "view_audit_log"):
+                self._json_response(403, {"error": "You do not have permission to view the audit log."})
+                return
+
+            query = parse_qs(urlparse(self.path).query)
+            try:
+                page = max(1, int(query.get("page", ["1"])[0]))
+            except ValueError:
+                page = 1
+            try:
+                page_size = min(200, max(1, int(query.get("pageSize", ["50"])[0])))
+            except ValueError:
+                page_size = 50
+
+            entries = sorted(load_json_list(AUDIT_LOG_FILE), key=lambda e: e.get("at", ""), reverse=True)
+            total = len(entries)
+            start = (page - 1) * page_size
+
+            self._json_response(
+                200,
+                {
+                    "entries": entries[start:start + page_size],
+                    "pagination": {
+                        "page": page, "pageSize": page_size, "total": total,
+                        "totalPages": max(1, math.ceil(total / page_size)),
+                    }
+                }
+            )
+            return
+
+        # =====================================================
+        # UNIT ADJUSTMENT HISTORY
+        # =====================================================
+        if self.path.startswith("/api/admin/unit-adjustments"):
+            if not require_permission(self, "manage_vendors"):
+                self._json_response(403, {"error": "You do not have permission to view unit adjustments."})
+                return
+
+            email = clean(parse_qs(urlparse(self.path).query).get("email", [""])[0], 160).lower()
+            entries = load_json_list(UNIT_ADJUSTMENTS_FILE)
+            if email:
+                entries = [e for e in entries if str(e.get("email", "")).lower() == email]
+            entries.sort(key=lambda e: e.get("at", ""), reverse=True)
+
+            self._json_response(200, {"adjustments": entries})
+            return
+
+        # =====================================================
+        # SUPPORT TICKETS
+        # =====================================================
+        if self.path.startswith("/api/admin/tickets"):
+            if not require_permission(self, "view_tickets"):
+                self._json_response(403, {"error": "You do not have permission to view support tickets."})
+                return
+
+            query = parse_qs(urlparse(self.path).query)
+            status_filter = clean(query.get("status", [""])[0], 20).lower()
+            category_filter = clean(query.get("category", [""])[0], 40).lower()
+            search = clean(query.get("search", [""])[0], 120).lower()
+
+            tickets = load_json_list(SUPPORT_TICKETS_FILE)
+            if status_filter:
+                tickets = [t for t in tickets if str(t.get("status", "")).lower() == status_filter]
+            if category_filter:
+                tickets = [t for t in tickets if str(t.get("category", "")).lower() == category_filter]
+            if search:
+                tickets = [
+                    t for t in tickets
+                    if search in str(t.get("id", "")).lower()
+                    or search in str(t.get("vendorEmail", "")).lower()
+                    or search in str(t.get("description", "")).lower()
+                ]
+            tickets.sort(key=lambda t: t.get("createdAt", ""), reverse=True)
+
+            self._json_response(200, {"tickets": tickets})
+            return
+
+        if self.path.startswith("/api/account/tickets"):
+            email = get_logged_in_vendor_email(self)
+            if not email:
+                self._json_response(401, {"error": "Please log in."})
+                return
+
+            tickets = [
+                vendor_safe_ticket(t)
+                for t in load_json_list(SUPPORT_TICKETS_FILE)
+                if str(t.get("vendorEmail", "")).lower() == email
+            ]
+            tickets.sort(key=lambda t: t.get("createdAt", ""), reverse=True)
+
+            self._json_response(200, {"tickets": tickets})
+            return
+
+        # =====================================================
+        # CSV EXPORTS (role-gated; never includes secrets)
+        # =====================================================
+        if self.path.startswith("/api/admin/export/"):
+            export_kind = urlparse(self.path).path.removeprefix("/api/admin/export/")
+            export_permissions = {
+                "orders": "view_orders",
+                "vendors": "view_vendors",
+                "subscriptions": "view_finance",
+                "payments": "view_finance",
+                "rider-payments": "view_finance",
+                "performance": "view_reports",
+            }
+            required_permission = export_permissions.get(export_kind)
+
+            if not required_permission or not require_permission(self, "export_data") or not require_permission(self, required_permission):
+                self._json_response(403, {"error": "You do not have permission to export this data."})
+                return
+
+            csv_text = build_export_csv(export_kind)
+            if csv_text is None:
+                self._json_response(404, {"error": "Unknown export type."})
+                return
+
+            body = csv_text.encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "text/csv; charset=utf-8")
+            self.send_header("Content-Disposition", f'attachment; filename="{export_kind}.csv"')
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
             return
 
         if self.path == "/":
@@ -4857,6 +6324,7 @@ class FiableHandler(SimpleHTTPRequestHandler):
 
 if __name__ == "__main__":
     migrate_subscriber_ids()
+    migrate_deliveries()
     bootstrap_admin_from_environment()
     print(f"Fiable server running on 0.0.0.0:{PORT}")
     ThreadingHTTPServer(("0.0.0.0", PORT), FiableHandler).serve_forever()

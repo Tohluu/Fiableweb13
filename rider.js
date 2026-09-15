@@ -2,6 +2,10 @@
    RIDER ELEMENTS
 ===================================================== */
 
+function formatStatusLabel(status) {
+  return String(status || "").replace(/_/g, " ");
+}
+
 const riderLoginForm =
   document.getElementById(
     "riderLoginForm"
@@ -673,6 +677,16 @@ async function loadRiderAccount() {
 
     }
 
+    /* Force a password change if this account still has a temporary password */
+
+    if (rider.mustChangePassword && riderChangePasswordForm?.hasAttribute("hidden")) {
+      riderChangePasswordForm.removeAttribute("hidden");
+      const changeMessage = document.getElementById("riderChangePasswordMessage");
+      if (changeMessage) {
+        changeMessage.textContent = "You're using a temporary password. Please set a new one to continue.";
+      }
+    }
+
 
   } catch (error) {
 
@@ -684,6 +698,95 @@ async function loadRiderAccount() {
   }
 
 }
+
+/* =====================================================
+   RIDER LIFECYCLE ACTIONS (accept/decline/advance/complete)
+===================================================== */
+
+function renderLifecycleActions(delivery) {
+  const status = String(delivery.status || "assigned").toLowerCase();
+  const orderId = delivery.id;
+
+  if (status === "assigned") {
+    return `
+      <button type="button" class="rider-delivery-action-btn" data-order-id="${orderId}" data-action="accept">Accept</button>
+      <button type="button" class="rider-delivery-decline-btn" data-order-id="${orderId}" data-action="decline">Decline</button>
+    `;
+  }
+  if (status === "rider_accepted") {
+    return `<button type="button" class="rider-delivery-action-btn" data-order-id="${orderId}" data-action="advance" data-next-status="arriving_at_pickup">Heading to Pickup</button>`;
+  }
+  if (status === "arriving_at_pickup") {
+    return `<button type="button" class="rider-delivery-action-btn" data-order-id="${orderId}" data-action="advance" data-next-status="picked_up">Mark Picked Up</button>`;
+  }
+  if (status === "picked_up") {
+    return `<button type="button" class="rider-delivery-action-btn" data-order-id="${orderId}" data-action="advance" data-next-status="on_delivery">Start Delivery</button>`;
+  }
+  if (status === "on_delivery") {
+    return `
+      <form class="rider-proof-form" data-order-id="${orderId}">
+        <label>Recipient name
+          <input type="text" class="rider-proof-recipient" placeholder="Who received it?" required>
+        </label>
+        <label>Delivery photo
+          <input type="file" class="rider-proof-photo" accept="image/*" required>
+        </label>
+        <button type="submit" class="rider-delivery-action-btn">Complete Delivery</button>
+      </form>
+    `;
+  }
+  if (["delivered", "failed", "cancelled", "returned"].includes(status)) {
+    return `<div class="rider-delivery-completed">${formatStatusLabel(status)}</div>`;
+  }
+  return "";
+}
+
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function respondToAssignment(orderId, accept, reason) {
+  const endpoint = accept ? "/api/rider/delivery/accept" : "/api/rider/delivery/decline";
+  const response = await fetch(endpoint, {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(accept ? { orderId } : { orderId, reason })
+  });
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || "Unable to update this assignment.");
+  }
+  closeOrderDetailsModal();
+  await loadRiderDelivery();
+  await loadRiderAccount();
+  return data;
+}
+
+async function completeDeliveryWithProof(orderId, recipientName, photoFile) {
+  const photo = photoFile ? await fileToDataUrl(photoFile) : null;
+  const response = await fetch("/api/rider/delivery/complete", {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ orderId, recipientName, photo })
+  });
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || "Unable to complete this delivery.");
+  }
+  closeOrderDetailsModal();
+  await loadRiderDelivery();
+  await loadRiderAccount();
+  await loadRiderPreviousDeliveries();
+  return data;
+}
+
 
 /* =====================================================
    UPDATE RIDER DELIVERY STATUS
@@ -787,17 +890,7 @@ async function updateRiderDeliveryStatus(
     /* Reset button state on error */
 
     if (buttonElement) {
-
       buttonElement.disabled = false;
-
-      if (newStatus === "on_delivery") {
-        buttonElement.textContent =
-          "Start Delivery";
-      } else if (newStatus === "delivered") {
-        buttonElement.textContent =
-          "Mark Delivered";
-      }
-
     }
 
     throw error;
@@ -989,43 +1082,7 @@ function renderDeliveryCard(delivery) {
 
   /* ACTION BUTTON */
 
-  let actionButton = "";
-
-  if (status === "assigned") {
-
-    actionButton = `
-      <button
-        type="button"
-        class="rider-delivery-action-btn"
-        data-order-id="${delivery.id}"
-        data-status="on_delivery"
-      >
-        Start Delivery
-      </button>
-    `;
-
-  } else if (status === "on_delivery") {
-
-    actionButton = `
-      <button
-        type="button"
-        class="rider-delivery-action-btn"
-        data-order-id="${delivery.id}"
-        data-status="delivered"
-      >
-        Mark Delivered
-      </button>
-    `;
-
-  } else if (status === "delivered") {
-
-    actionButton = `
-      <div class="rider-delivery-completed">
-        Delivery Completed
-      </div>
-    `;
-
-  }
+  const actionButton = renderLifecycleActions(delivery);
 
   return `
 
@@ -1041,7 +1098,7 @@ function renderDeliveryCard(delivery) {
         </div>
 
         <span class="rider-delivery-status">
-          ${status.replace("_", " ")}
+          ${formatStatusLabel(status)}
         </span>
 
       </div>
@@ -1180,7 +1237,7 @@ async function loadRiderPreviousDeliveries() {
                 <td>${delivery.orderRef || `#${delivery.id}`}</td>
                 <td>${delivery.pickup || "—"} → ${delivery.dropoff || "—"}</td>
                 <td>${delivery.units ?? "—"}</td>
-                <td><span class="rider-history-status rider-history-status-${delivery.status}">${String(delivery.status || "—").replace("_", " ")}</span></td>
+                <td><span class="rider-history-status rider-history-status-${delivery.status}">${formatStatusLabel(delivery.status || "—")}</span></td>
                 <td>${delivery.updatedAt ? new Date(delivery.updatedAt).toLocaleDateString("en-GB") : "—"}</td>
                 <td><button type="button" class="rider-history-view-btn" data-order-id="${delivery.id}">View</button></td>
               </tr>
@@ -1317,7 +1374,7 @@ function openOrderDetailsModal(delivery) {
 
         <div class="rider-order-detail-item">
           <span>Status</span>
-          <strong>${status.replace("_", " ").toUpperCase()}</strong>
+          <strong>${formatStatusLabel(status).toUpperCase()}</strong>
         </div>
 
         <div class="rider-order-detail-item">
@@ -1437,7 +1494,7 @@ function openOrderDetailsModal(delivery) {
 
   if (modalFooter) {
 
-    let actionButtons = `
+    modalFooter.innerHTML = `
       <button
         type="button"
         class="rider-modal-close-btn"
@@ -1445,126 +1502,12 @@ function openOrderDetailsModal(delivery) {
       >
         Close
       </button>
+      ${renderLifecycleActions(delivery)}
     `;
-
-    if (status === "assigned") {
-
-      actionButtons = `
-        <button
-          type="button"
-          class="rider-modal-close-btn"
-          onclick="closeOrderDetailsModal()"
-        >
-          Close
-        </button>
-
-        <button
-          type="button"
-          class="rider-modal-action-btn"
-          data-order-id="${delivery.id}"
-          data-status="on_delivery"
-          onclick="handleModalActionClick(event)"
-        >
-          Start Delivery
-        </button>
-      `;
-
-    } else if (status === "on_delivery") {
-
-      actionButtons = `
-        <button
-          type="button"
-          class="rider-modal-close-btn"
-          onclick="closeOrderDetailsModal()"
-        >
-          Close
-        </button>
-
-        <button
-          type="button"
-          class="rider-modal-action-btn"
-          data-order-id="${delivery.id}"
-          data-status="delivered"
-          onclick="handleModalActionClick(event)"
-        >
-          Mark as Delivered
-        </button>
-      `;
-
-    } else if (status === "delivered") {
-
-      actionButtons = `
-        <button
-          type="button"
-          class="rider-modal-close-btn"
-          onclick="closeOrderDetailsModal()"
-        >
-          Close
-        </button>
-      `;
-
-    }
-
-    modalFooter.innerHTML = actionButtons;
 
   }
 
   modal.hidden = false;
-
-}
-
-/* =====================================================
-   HANDLE MODAL ACTION CLICK
-===================================================== */
-
-async function handleModalActionClick(event) {
-
-  const button = event.target;
-
-  const orderId =
-    button.dataset.orderId;
-
-  const newStatus =
-    button.dataset.status;
-
-  if (!orderId || !newStatus) {
-    return;
-  }
-
-  button.disabled = true;
-
-  const originalText =
-    button.textContent;
-
-  button.textContent =
-    newStatus === "on_delivery"
-      ? "Starting..."
-      : "Completing...";
-
-  try {
-
-    await updateRiderDeliveryStatus(
-      orderId,
-      newStatus,
-      button
-    );
-
-    closeOrderDetailsModal();
-
-
-  } catch (error) {
-
-    console.error(
-      "Failed to update status:",
-      error
-    );
-
-    alert(
-      error.message ||
-      "Failed to update delivery status."
-    );
-
-  }
 
 }
 
@@ -1644,76 +1587,108 @@ document.addEventListener(
 
     const button =
       event.target.closest(
-        ".rider-delivery-action-btn"
+        ".rider-delivery-action-btn, .rider-delivery-decline-btn"
       );
-
 
     if (!button) {
       return;
     }
 
+    const orderId = button.dataset.orderId;
+    const action = button.dataset.action;
 
-    const orderId =
-      button.dataset.orderId;
-
-    const newStatus =
-      button.dataset.status;
-
-
-    if (!orderId || !newStatus) {
-      console.error(
-        "Missing order ID or status"
-      );
+    if (!orderId || !action) {
       return;
     }
 
-
-    /* Disable button and show loading state */
+    if (action === "advance" && !button.dataset.nextStatus) {
+      return;
+    }
 
     button.disabled = true;
 
-    const originalText =
-      button.textContent;
-
-    button.textContent =
-      newStatus === "on_delivery"
-        ? "Starting..."
-        : "Completing...";
-
-
     try {
 
-      await updateRiderDeliveryStatus(
-        orderId,
-        newStatus,
-        button
-      );
-
-      /* Success - UI refreshed by updateRiderDeliveryStatus */
-
-      console.log(
-        "Delivery status updated successfully"
-      );
-
+      if (action === "accept") {
+        await respondToAssignment(orderId, true);
+      } else if (action === "decline") {
+        const reason = window.prompt("Reason for declining (optional):") || "";
+        await respondToAssignment(orderId, false, reason);
+      } else if (action === "advance") {
+        await updateRiderDeliveryStatus(orderId, button.dataset.nextStatus, button);
+      }
 
     } catch (error) {
 
       console.error(
-        "Failed to update status:",
+        "Failed to update delivery:",
         error
       );
-
-      /* Show error message to user */
 
       alert(
         error.message ||
         "Failed to update delivery status."
       );
 
+    } finally {
+      button.disabled = false;
     }
 
   }
 );
+
+/* =====================================================
+   PROOF OF DELIVERY SUBMISSION
+===================================================== */
+
+document.addEventListener(
+  "submit",
+  async (event) => {
+
+    const form = event.target.closest(".rider-proof-form");
+
+    if (!form) {
+      return;
+    }
+
+    event.preventDefault();
+
+    const orderId = form.dataset.orderId;
+    const recipientName = form.querySelector(".rider-proof-recipient")?.value || "";
+    const photoFile = form.querySelector(".rider-proof-photo")?.files?.[0] || null;
+    const submitButton = form.querySelector("button[type=submit]");
+
+    if (submitButton) {
+      submitButton.disabled = true;
+      submitButton.textContent = "Submitting...";
+    }
+
+    try {
+
+      await completeDeliveryWithProof(orderId, recipientName, photoFile);
+
+    } catch (error) {
+
+      console.error(
+        "Failed to complete delivery:",
+        error
+      );
+
+      alert(
+        error.message ||
+        "Failed to complete delivery."
+      );
+
+      if (submitButton) {
+        submitButton.disabled = false;
+        submitButton.textContent = "Complete Delivery";
+      }
+
+    }
+
+  }
+);
+
 
 /* =====================================================
    RIDER LOGOUT

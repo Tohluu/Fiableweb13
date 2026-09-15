@@ -1861,3 +1861,209 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* =========================================================
+   BATCH 2 ADDITIONS - filters, pagination, nav visibility,
+   tickets, audit log, proof of delivery, timeline, exports
+========================================================= */
+
+.nav-item-hidden {
+  display: none !important;
+}
+
+.admin-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-block-end: 16px;
+}
+
+.admin-filter-bar input[type="search"] {
+  flex: 1 1 260px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.admin-filter-bar select {
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+  background: #fff;
+}
+
+.admin-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-block-start: 16px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.admin-pagination button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.order-timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-inline-start: 2px solid var(--border);
+}
+
+.order-timeline li {
+  position: relative;
+  padding: 0 0 18px 20px;
+}
+
+.order-timeline li::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: -7px;
+  inset-block-start: 3px;
+  inline-size: 12px;
+  block-size: 12px;
+  border-radius: 50%;
+  background: var(--accent, #1769d4);
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px var(--border);
+}
+
+.order-timeline li.exception::before {
+  background: #dc2626;
+}
+
+.order-timeline .timeline-status {
+  font-weight: 700;
+  display: block;
+}
+
+.order-timeline .timeline-meta {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.tracking-code-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tracking-code-row code {
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: var(--surface-soft);
+  font-size: 13px;
+  letter-spacing: 0.05em;
+}
+
+.proof-of-delivery-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.proof-of-delivery-photo {
+  max-inline-size: 100%;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  display: block;
+}
+
+.otp-state-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  background: var(--surface-soft);
+}
+
+.otp-state-badge.verified { background: #dcfce7; color: #166534; }
+.otp-state-badge.failed { background: #fee2e2; color: #991b1b; }
+.otp-state-badge.generated { background: #fef3c7; color: #92400e; }
+
+.priority-select-inline {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.ticket-priority-badge, .ticket-status-badge {
+  display: inline-flex;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.ticket-status-badge.open { background: #ebbe0d; color: #27251d; }
+.ticket-status-badge.in_progress { background: #1769d4; color: #fff; }
+.ticket-status-badge.resolved { background: #166534; color: #fff; }
+.ticket-status-badge.closed { background: #e5e7eb; color: #111827; }
+
+.ticket-priority-badge.low { background: #e5e7eb; color: #111827; }
+.ticket-priority-badge.normal { background: #dbeafe; color: #1e3a8a; }
+.ticket-priority-badge.high { background: #fed7aa; color: #9a3412; }
+.ticket-priority-badge.urgent { background: #fee2e2; color: #991b1b; }
+
+.ticket-message {
+  padding: 12px 14px;
+  border-radius: 10px;
+  margin-block-end: 10px;
+}
+
+.ticket-message.vendor-reply {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+}
+
+.ticket-message.admin-reply {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+}
+
+.ticket-message.internal-note {
+  background: #fefce8;
+  border: 1px dashed #eab308;
+}
+
+.ticket-message .message-meta {
+  font-size: 12px;
+  color: var(--muted);
+  margin-block-end: 4px;
+}
+
+.export-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+@media (max-width: 900px) {
+  .export-grid, .proof-of-delivery-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.export-card {
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.role-description-list {
+  display: grid;
+  gap: 8px;
+  margin-block-start: 12px;
+  font-size: 12px;
+  color: var(--muted);
+}

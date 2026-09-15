@@ -1,0 +1,62 @@
+[
+  {
+    "id": "mVvApM2plvFeqS-8",
+    "at": "2026-09-14T23:47:58.625203+00:00",
+    "actorEmail": "test-batch2-admin@fiable.local",
+    "actorRole": "owner",
+    "action": "admin_login",
+    "targetType": "admin",
+    "targetId": 2,
+    "previousValue": null,
+    "newValue": null,
+    "note": null
+  },
+  {
+    "id": "x8cDy4t1bNKGg9FX",
+    "at": "2026-09-14T23:47:59.857896+00:00",
+    "actorEmail": "test-batch2-admin@fiable.local",
+    "actorRole": "owner",
+    "action": "admin_account_created",
+    "targetType": "admin",
+    "targetId": 3,
+    "previousValue": null,
+    "newValue": "customer_support",
+    "note": null
+  },
+  {
+    "id": "Sw4-M53qHQcSOyQp",
+    "at": "2026-09-14T23:49:30.247287+00:00",
+    "actorEmail": "test-batch2-support@fiable.local",
+    "actorRole": "customer_support",
+    "action": "admin_login",
+    "targetType": "admin",
+    "targetId": 3,
+    "previousValue": null,
+    "newValue": null,
+    "note": null
+  },
+  {
+    "id": "JAxZiUF_IgMmDYc4",
+    "at": "2026-09-14T23:49:31.812879+00:00",
+    "actorEmail": "test-batch2-admin@fiable.local",
+    "actorRole": "owner",
+    "action": "admin_login",
+    "targetType": "admin",
+    "targetId": 2,
+    "previousValue": null,
+    "newValue": null,
+    "note": null
+  },
+  {
+    "id": "Dtzmj90b4cV4rAYc",
+    "at": "2026-09-14T23:49:32.133511+00:00",
+    "actorEmail": "test-batch2-admin@fiable.local",
+    "actorRole": "owner",
+    "action": "rider_created",
+    "targetType": "rider",
+    "targetId": 13,
+    "previousValue": null,
+    "newValue": null,
+    "note": null
+  }
+]
