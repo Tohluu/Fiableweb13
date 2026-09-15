@@ -46,6 +46,8 @@ BLOCKED_STATIC_PREFIXES = (
     "/README.md",
     "/Procfile",
     "/railway.toml",
+    "/seed_test_data.py",
+    "/reset_for_launch.py",
 )
 DATA_FILE = DATA_DIR / "submissions.json"
 ACCOUNTS_FILE = DATA_DIR / "accounts.json"
