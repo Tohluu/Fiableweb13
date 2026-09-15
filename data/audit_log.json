@@ -130,5 +130,17 @@
     "previousValue": null,
     "newValue": null,
     "note": null
+  },
+  {
+    "id": "VnE_q-uj0vnYyBwO",
+    "at": "2026-09-15T10:36:13.854026+00:00",
+    "actorEmail": "test-batch2-admin@fiable.local",
+    "actorRole": "owner",
+    "action": "admin_login",
+    "targetType": "admin",
+    "targetId": 2,
+    "previousValue": null,
+    "newValue": null,
+    "note": null
   }
 ]

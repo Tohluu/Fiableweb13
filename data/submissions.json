@@ -1204,5 +1204,14 @@
       "email": "test-batch2-vendorC@fiable.local",
       "name": "Test Vendor C"
     }
+  },
+  {
+    "id": 135,
+    "type": "vendor",
+    "createdAt": "2026-09-15T10:30:24.535150+00:00",
+    "data": {
+      "email": "debug-vendor@fiable.local",
+      "name": "Debug Vendor"
+    }
   }
 ]

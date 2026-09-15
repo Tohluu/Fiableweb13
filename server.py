@@ -2088,7 +2088,20 @@ def csrf_cookie(handler, value, max_age_seconds):
     return f"fiable_csrf={value}; Path=/; SameSite=Lax; Max-Age={max_age_seconds}{secure}"
 
 
-def validate_csrf(handler):
+# Login/logout are exempt: a stale or cross-portal session cookie (e.g. an
+# old vendor session still active while attempting a rider login) must
+# never be able to block a fresh login or a logout attempt - that would
+# leave a user unable to either escape or re-establish their session.
+CSRF_EXEMPT_PATHS = {
+    "/api/admin/login", "/api/admin/logout",
+    "/api/rider/login", "/api/rider/logout",
+    "/api/login", "/api/logout",
+}
+
+
+def validate_csrf(handler, path):
+    if path in CSRF_EXEMPT_PATHS:
+        return True
     has_session = bool(
         get_admin_session(handler)
         or get_rider_session(handler)
@@ -2282,7 +2295,7 @@ class FiableHandler(SimpleHTTPRequestHandler):
             self._json_response(403, {"error": gate_message, "mustChangePassword": True})
             return
 
-        if not validate_csrf(self):
+        if not validate_csrf(self, path):
             self._json_response(403, {"error": "Invalid or missing CSRF token. Please refresh and try again."})
             return
 

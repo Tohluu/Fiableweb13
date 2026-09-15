@@ -43,6 +43,7 @@ a{color:inherit;text-decoration:none}
     display:flex;
     flex-direction:column;
     padding:22px 16px;
+    overflow-y:auto;
     z-index:20
 }
 .sidebar-top{display:flex;align-items:center;justify-content:space-between;padding:4px 8px 30px}

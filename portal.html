@@ -2241,7 +2241,7 @@
         localStorage.removeItem("fiableVendorEmail");
         state.account = null;
         state.deliveries = [];
-        api("/api/logout", { method: "POST" }).catch(() => {});
+        api("/api/logout", { method: "POST", body: JSON.stringify({}) }).catch(() => {});
         window.history.replaceState({}, document.title, "/portal.html");
         showLogin();
         setTimeout(() => {
@@ -2404,7 +2404,7 @@ $("resetBackLoginBtn").addEventListener("click", () => {
 
     $("logoutBtn").addEventListener("click", async () => {
       try {
-        await api("/api/logout", { method: "POST" });
+        await api("/api/logout", { method: "POST", body: JSON.stringify({}) });
       } catch (error) {
         console.error("LOGOUT ERROR:", error);
       }
