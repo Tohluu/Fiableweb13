@@ -126,6 +126,7 @@
         <button class="nav-item" data-view="deliveries"><span>▣</span> My Deliveries</button>
         <button class="nav-item" data-view="request"><span>＋</span> Request Delivery</button>
         <button class="nav-item" data-view="subscription"><span>◈</span> Subscription</button>
+        <button class="nav-item" data-view="support"><span>☎</span> Support</button>
         <button class="nav-item" data-view="account"><span>◯</span> Account</button>
         <button class="nav-item" data-view="settings"><span>⚙</span> Settings</button>
       </nav>
@@ -489,7 +490,80 @@
             </div>
             <div id="subscriptionDeliveries" class="subscription-deliveries hidden"></div>
           </article>
+
+          <article class="panel subscription-history-panel">
+            <div class="section-title compact">
+              <div>
+                <h3>Unit adjustment history</h3>
+                <p class="muted">Manual adjustments made by Fiable to your unit balance, if any.</p>
+              </div>
+            </div>
+            <div id="unitAdjustmentHistoryVendor">
+              <p class="muted">Loading adjustment history...</p>
+            </div>
+          </article>
         </section>
+
+        <section class="view" id="view-support">
+          <div class="section-title">
+            <div>
+              <h1>Support</h1>
+              <p class="muted">Get help with a delivery, subscription, or your account.</p>
+            </div>
+            <button type="button" class="btn primary" id="newTicketBtn">New Ticket</button>
+          </div>
+
+          <article class="panel">
+            <div id="vendorTicketsList">
+              <p class="muted">Loading your tickets...</p>
+            </div>
+          </article>
+        </section>
+
+        <div class="modal" id="newTicketModal" aria-hidden="true">
+          <div class="modal-backdrop" id="newTicketBackdrop"></div>
+          <div class="modal-dialog" role="dialog" aria-modal="true">
+            <div class="modal-header">
+              <div><h2>New Support Ticket</h2></div>
+              <button class="modal-close" id="closeNewTicket" aria-label="Close">×</button>
+            </div>
+            <form id="newTicketForm" class="modal-body" style="display:grid;gap:12px">
+              <label>Category
+                <select id="ticketCategory" required>
+                  <option value="delayed_delivery">Delayed Delivery</option>
+                  <option value="rider_issue">Rider Issue</option>
+                  <option value="package_damaged">Package Damaged</option>
+                  <option value="package_missing">Package Missing</option>
+                  <option value="incorrect_units_charge">Incorrect Units/Charge</option>
+                  <option value="payment_issue">Payment Issue</option>
+                  <option value="subscription_issue">Subscription Issue</option>
+                  <option value="other">Other</option>
+                </select>
+              </label>
+              <label>Related Delivery (optional)
+                <select id="ticketOrderId">
+                  <option value="">None</option>
+                </select>
+              </label>
+              <label>Description
+                <textarea id="ticketDescription" rows="4" required placeholder="Describe the issue..."></textarea>
+              </label>
+              <div id="newTicketError" class="track-error hidden" style="color:#b91c1c"></div>
+              <button type="submit" class="btn primary">Submit Ticket</button>
+            </form>
+          </div>
+        </div>
+
+        <div class="modal" id="ticketDetailModal" aria-hidden="true">
+          <div class="modal-backdrop" id="ticketDetailBackdrop"></div>
+          <div class="modal-dialog" role="dialog" aria-modal="true">
+            <div class="modal-header">
+              <div><h2 id="ticketDetailTitle">Ticket</h2></div>
+              <button class="modal-close" id="closeTicketDetail" aria-label="Close">×</button>
+            </div>
+            <div class="modal-body" id="ticketDetailBody"></div>
+          </div>
+        </div>
 
         <section class="view" id="view-account">
           <div class="section-title">
@@ -839,6 +913,141 @@
       }
     }
 
+    async function loadUnitAdjustmentHistoryVendor() {
+      const container = $("unitAdjustmentHistoryVendor");
+      if (!container) return;
+      try {
+        const data = await api("/api/account/unit-adjustments");
+        const entries = data.adjustments || [];
+        container.innerHTML = entries.length
+          ? entries.map(entry => `
+              <div class="unit-adjustment-row">
+                <span>${escapeHtml(entry.at ? new Date(entry.at).toLocaleDateString("en-GB") : "—")}</span>
+                <strong>${entry.unitsDelta > 0 ? "+" : ""}${entry.unitsDelta} units</strong>
+                <span>${escapeHtml(entry.reason || "—")}</span>
+                <span>Balance: ${entry.previousBalance} → ${entry.newBalance}</span>
+              </div>
+            `).join("")
+          : '<p class="muted">No manual unit adjustments have been made to your account.</p>';
+      } catch (error) {
+        container.innerHTML = `<p class="muted">${escapeHtml(error.message)}</p>`;
+      }
+    }
+
+    /* =====================================================
+       SUPPORT TICKETS
+    ===================================================== */
+
+    const TICKET_CATEGORY_LABELS = {
+      delayed_delivery: "Delayed Delivery", rider_issue: "Rider Issue",
+      package_damaged: "Package Damaged", package_missing: "Package Missing",
+      incorrect_units_charge: "Incorrect Units/Charge", payment_issue: "Payment Issue",
+      subscription_issue: "Subscription Issue", other: "Other",
+    };
+
+    let vendorTickets = [];
+
+    async function loadVendorTickets() {
+      const container = $("vendorTicketsList");
+      if (!container) return;
+      try {
+        const data = await api("/api/account/tickets");
+        vendorTickets = data.tickets || [];
+        container.innerHTML = vendorTickets.length
+          ? `<div class="table-wrap"><table class="admin-table" style="inline-size:100%"><thead><tr><th>Ticket ID</th><th>Category</th><th>Related Order</th><th>Status</th><th>Priority</th><th>Updated</th><th></th></tr></thead><tbody>${vendorTickets.map(ticket => `
+              <tr>
+                <td><strong>${escapeHtml(ticket.id)}</strong></td>
+                <td>${escapeHtml(TICKET_CATEGORY_LABELS[ticket.category] || ticket.category)}</td>
+                <td>${ticket.orderId ? `#${ticket.orderId}` : "—"}</td>
+                <td><span class="ticket-status-pill ${escapeHtml(ticket.status)}">${escapeHtml((ticket.status || "").replace(/_/g, " "))}</span></td>
+                <td>${escapeHtml(ticket.priority || "—")}</td>
+                <td>${ticket.updatedAt ? new Date(ticket.updatedAt).toLocaleDateString("en-GB") : "—"}</td>
+                <td><button type="button" class="btn outline vendor-ticket-view-btn" data-ticket-id="${escapeHtml(ticket.id)}">View</button></td>
+              </tr>
+            `).join("")}</tbody></table></div>`
+          : '<p class="muted">You have not created any support tickets yet.</p>';
+        container.querySelectorAll(".vendor-ticket-view-btn").forEach(button => {
+          button.addEventListener("click", () => {
+            const ticket = vendorTickets.find(t => t.id === button.dataset.ticketId);
+            if (ticket) openVendorTicketDetail(ticket);
+          });
+        });
+      } catch (error) {
+        container.innerHTML = `<p class="muted">${escapeHtml(error.message)}</p>`;
+      }
+    }
+
+    function openVendorTicketDetail(ticket) {
+      const modal = $("ticketDetailModal");
+      const body = $("ticketDetailBody");
+      if (!modal || !body) return;
+      $("ticketDetailTitle").textContent = `${ticket.id} — ${TICKET_CATEGORY_LABELS[ticket.category] || ticket.category}`;
+      const replies = (ticket.replies || []).map(reply => `
+        <div class="ticket-message ${reply.from === "admin" ? "admin-reply" : ""}">
+          <div class="message-meta">${reply.from === "admin" ? "Fiable Support" : "You"} · ${reply.at ? new Date(reply.at).toLocaleString("en-GB") : ""}</div>
+          <div>${escapeHtml(reply.message)}</div>
+        </div>
+      `).join("");
+      body.innerHTML = `
+        <p><strong>Status:</strong> ${escapeHtml((ticket.status || "").replace(/_/g, " "))}</p>
+        <p>${escapeHtml(ticket.description || "")}</p>
+        <h4>Replies</h4>
+        ${replies || '<p class="muted">No replies yet - our support team will respond here.</p>'}
+      `;
+      modal.classList.add("show");
+      modal.setAttribute("aria-hidden", "false");
+    }
+
+    $("closeTicketDetail")?.addEventListener("click", () => {
+      $("ticketDetailModal").classList.remove("show");
+      $("ticketDetailModal").setAttribute("aria-hidden", "true");
+    });
+    $("ticketDetailBackdrop")?.addEventListener("click", () => {
+      $("ticketDetailModal").classList.remove("show");
+      $("ticketDetailModal").setAttribute("aria-hidden", "true");
+    });
+
+    $("newTicketBtn")?.addEventListener("click", () => {
+      const orderSelect = $("ticketOrderId");
+      orderSelect.innerHTML = '<option value="">None</option>' +
+        state.deliveries.map(d => `<option value="${d.id}">${escapeHtml(d.orderRef || `Order #${d.id}`)}</option>`).join("");
+      $("newTicketError").classList.add("hidden");
+      $("newTicketForm").reset();
+      $("newTicketModal").classList.add("show");
+      $("newTicketModal").setAttribute("aria-hidden", "false");
+    });
+    $("closeNewTicket")?.addEventListener("click", () => {
+      $("newTicketModal").classList.remove("show");
+      $("newTicketModal").setAttribute("aria-hidden", "true");
+    });
+    $("newTicketBackdrop")?.addEventListener("click", () => {
+      $("newTicketModal").classList.remove("show");
+      $("newTicketModal").setAttribute("aria-hidden", "true");
+    });
+
+    $("newTicketForm")?.addEventListener("submit", async event => {
+      event.preventDefault();
+      const errorBox = $("newTicketError");
+      errorBox.classList.add("hidden");
+      try {
+        await api("/api/tickets", {
+          method: "POST",
+          body: JSON.stringify({
+            category: $("ticketCategory").value,
+            orderId: $("ticketOrderId").value || null,
+            description: $("ticketDescription").value.trim(),
+          })
+        });
+        $("newTicketModal").classList.remove("show");
+        $("newTicketModal").setAttribute("aria-hidden", "true");
+        toast("Ticket submitted. Our support team will respond soon.");
+        loadVendorTickets();
+      } catch (error) {
+        errorBox.textContent = error.message;
+        errorBox.classList.remove("hidden");
+      }
+    });
+
     function statusLabel(status) {
       return String(status || "requested").replace("-", " ").replace(/\b\w/g, c => c.toUpperCase());
     }
@@ -854,6 +1063,66 @@
 
       return "status-" +
         value.replace(/[^a-z-]/g, "");
+    }
+
+    const CUSTOMER_STATUS_LABELS = {
+      requested: "Order Received",
+      assigned: "Rider Assigned",
+      rider_accepted: "Rider Accepted",
+      arriving_at_pickup: "Arriving at Pickup",
+      picked_up: "Picked Up",
+      on_delivery: "In Transit",
+      delivered: "Delivered",
+      failed: "Failed",
+      cancelled: "Cancelled",
+      returned: "Returned",
+    };
+
+    function renderDeliveryTimeline(timeline) {
+      if (!Array.isArray(timeline) || !timeline.length) {
+        return '<p class="muted">No timeline history is available yet.</p>';
+      }
+      const exceptionStatuses = new Set(["failed", "cancelled", "returned"]);
+      return `<ul class="order-timeline">${timeline.map(event => {
+        const label = CUSTOMER_STATUS_LABELS[event.status] || event.status;
+        const at = event.at ? new Date(event.at).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
+        return `
+          <li class="${exceptionStatuses.has(event.status) ? "exception" : ""}">
+            <span class="timeline-status">${escapeHtml(label)}</span>
+            <span class="timeline-meta">${escapeHtml(at)}</span>
+          </li>
+        `;
+      }).join("")}</ul>`;
+    }
+
+    function renderVendorProofOfDelivery(delivery) {
+      const proof = delivery.proofOfDelivery;
+      if (!proof) {
+        return '<p class="muted">No proof of delivery has been captured yet.</p>';
+      }
+      const otpBadge = delivery.otpState ? `<span class="status-pill">${escapeHtml(delivery.otpState.replace(/_/g, " "))}</span>` : "Not required";
+      return `
+        <div class="delivery-detail-grid">
+          <div>
+            <span class="detail-label">Recipient Name</span>
+            <strong>${escapeHtml(proof.recipientName || "—")}</strong>
+          </div>
+          <div>
+            <span class="detail-label">Delivered At</span>
+            <strong>${proof.deliveredAt ? escapeHtml(new Date(proof.deliveredAt).toLocaleString("en-GB")) : "—"}</strong>
+          </div>
+          <div>
+            <span class="detail-label">OTP Verification</span>
+            <strong>${otpBadge}</strong>
+          </div>
+          <div>
+            <span class="detail-label">GPS Confirmation</span>
+            <strong>${proof.gps ? "Captured" : "Not captured"}</strong>
+          </div>
+          ${proof.photoPath ? `<div class="delivery-detail-full"><span class="detail-label">Delivery Photo</span><img src="/api/proof/${encodeURIComponent(proof.photoPath)}" alt="Delivery photo" style="max-inline-size:100%;border-radius:10px;margin-block-start:6px"></div>` : ""}
+          ${proof.signaturePath ? `<div class="delivery-detail-full"><span class="detail-label">Signature</span><img src="/api/proof/${encodeURIComponent(proof.signaturePath)}" alt="Recipient signature" style="max-inline-size:100%;border-radius:10px;margin-block-start:6px"></div>` : ""}
+        </div>
+      `;
     }
 
     function populateLocations() {
@@ -1515,6 +1784,23 @@
 
           </div>
 
+          <div class="delivery-detail-section">
+            <h5>Tracking</h5>
+            <div style="display:flex;align-items:center;gap:8px">
+              <code id="deliveryTrackingCodeValue" style="padding:4px 10px;border-radius:6px;background:#f3f4f6;font-size:13px">${escapeHtml(d.trackingCode || "—")}</code>
+              ${d.trackingCode ? `<button type="button" class="btn outline" id="copyDeliveryTrackingBtn" data-code="${escapeHtml(d.trackingCode)}">Copy Code</button><a class="btn outline" href="track.html?code=${encodeURIComponent(d.trackingCode)}" target="_blank" rel="noopener">Track Delivery</a>` : ""}
+            </div>
+          </div>
+
+          <div class="delivery-detail-section">
+            <h5>Delivery Timeline</h5>
+            ${renderDeliveryTimeline(d.timeline)}
+          </div>
+
+          <div class="delivery-detail-section">
+            <h5>Proof of Delivery</h5>
+            ${renderVendorProofOfDelivery(d)}
+          </div>
 
           ${
             d.status === "requested"
@@ -1543,6 +1829,10 @@
         </div>
 
       `;
+
+      document.getElementById("copyDeliveryTrackingBtn")?.addEventListener("click", event => {
+        navigator.clipboard?.writeText(event.currentTarget.dataset.code).then(() => toast("Tracking code copied."));
+      });
 
       $("deliveryModalClose").onclick = () => {
 
@@ -1880,6 +2170,7 @@
         deliveries:"My Deliveries", 
         request:"Request Delivery", 
         subscription:"Subscription", 
+        support:"Support",
         account:"Account",
         settings:"Settings"
     };
@@ -1887,6 +2178,8 @@
       $("sidebar").classList.remove("open");
       $("mobileOverlay").classList.remove("show");
       window.scrollTo({ top:0, behavior:"smooth" });
+      if (view === "support") loadVendorTickets();
+      if (view === "subscription") loadUnitAdjustmentHistoryVendor();
     }
 
     function escapeHtml(value) {

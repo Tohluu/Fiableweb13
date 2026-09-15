@@ -1195,5 +1195,14 @@
       "email": "test-batch2-vendorB@fiable.local",
       "name": "Test Vendor B"
     }
+  },
+  {
+    "id": 134,
+    "type": "vendor",
+    "createdAt": "2026-09-15T10:10:12.581482+00:00",
+    "data": {
+      "email": "test-batch2-vendorC@fiable.local",
+      "name": "Test Vendor C"
+    }
   }
 ]

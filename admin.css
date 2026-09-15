@@ -1871,6 +1871,65 @@
   display: none !important;
 }
 
+/* Generic modal base (existing modals are styled per-#id; new ones use this
+   shared class so every future modal doesn't need its own CSS block). */
+.modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  box-sizing: border-box;
+}
+.modal.show {
+  display: flex;
+}
+.modal .modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+}
+.modal .modal-dialog {
+  position: relative;
+  z-index: 1;
+  inline-size: min(700px, 100%);
+  max-block-size: 90vh;
+  background: #fff;
+  border-radius: 16px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+}
+.modal .modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-block-end: 1px solid #e5e7eb;
+}
+.modal .modal-body {
+  flex: 1;
+  min-block-size: 0;
+  overflow-y: auto;
+  padding: 24px;
+}
+.modal .modal-close {
+  inline-size: 40px;
+  block-size: 40px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  font-size: 28px;
+  line-height: 1;
+  cursor: pointer;
+}
+.modal .modal-close:hover {
+  background: #f1f5f9;
+}
+
 .admin-filter-bar {
   display: flex;
   flex-wrap: wrap;

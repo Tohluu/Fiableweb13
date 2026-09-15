@@ -6237,6 +6237,19 @@ class FiableHandler(SimpleHTTPRequestHandler):
             self._json_response(200, {"adjustments": entries})
             return
 
+        if self.path.startswith("/api/account/unit-adjustments"):
+            email = get_logged_in_vendor_email(self)
+            if not email:
+                self._json_response(401, {"error": "Please log in."})
+                return
+            entries = [
+                e for e in load_json_list(UNIT_ADJUSTMENTS_FILE)
+                if str(e.get("email", "")).lower() == email
+            ]
+            entries.sort(key=lambda e: e.get("at", ""), reverse=True)
+            self._json_response(200, {"adjustments": entries})
+            return
+
         # =====================================================
         # SUPPORT TICKETS
         # =====================================================

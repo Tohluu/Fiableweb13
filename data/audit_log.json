@@ -58,5 +58,77 @@
     "previousValue": null,
     "newValue": null,
     "note": null
+  },
+  {
+    "id": "3qBpLAhVx-mQ78_P",
+    "at": "2026-09-15T09:58:28.036470+00:00",
+    "actorEmail": "test-batch2-admin@fiable.local",
+    "actorRole": "owner",
+    "action": "admin_login",
+    "targetType": "admin",
+    "targetId": 2,
+    "previousValue": null,
+    "newValue": null,
+    "note": null
+  },
+  {
+    "id": "xvO76GQnErzY_h7c",
+    "at": "2026-09-15T10:06:10.258816+00:00",
+    "actorEmail": "test-batch2-admin@fiable.local",
+    "actorRole": "owner",
+    "action": "admin_account_created",
+    "targetType": "admin",
+    "targetId": 3,
+    "previousValue": null,
+    "newValue": "customer_support",
+    "note": null
+  },
+  {
+    "id": "ITOWUaYdbaTKx4TX",
+    "at": "2026-09-15T10:08:39.416420+00:00",
+    "actorEmail": "test-batch2-support2@fiable.local",
+    "actorRole": "customer_support",
+    "action": "admin_login",
+    "targetType": "admin",
+    "targetId": 3,
+    "previousValue": null,
+    "newValue": null,
+    "note": null
+  },
+  {
+    "id": "MhnkmjWwgqCFG6wc",
+    "at": "2026-09-15T10:11:46.720104+00:00",
+    "actorEmail": "test-batch2-admin@fiable.local",
+    "actorRole": "owner",
+    "action": "admin_login",
+    "targetType": "admin",
+    "targetId": 2,
+    "previousValue": null,
+    "newValue": null,
+    "note": null
+  },
+  {
+    "id": "KV_MzkgMmT5K1gAD",
+    "at": "2026-09-15T10:11:47.396653+00:00",
+    "actorEmail": "test-batch2-admin@fiable.local",
+    "actorRole": "owner",
+    "action": "ticket_response_added",
+    "targetType": "ticket",
+    "targetId": "TCK-00001",
+    "previousValue": null,
+    "newValue": null,
+    "note": null
+  },
+  {
+    "id": "KR06zWAtmklziPPZ",
+    "at": "2026-09-15T10:11:47.469007+00:00",
+    "actorEmail": "test-batch2-admin@fiable.local",
+    "actorRole": "owner",
+    "action": "ticket_internal_note_added",
+    "targetType": "ticket",
+    "targetId": "TCK-00001",
+    "previousValue": null,
+    "newValue": null,
+    "note": null
   }
 ]
