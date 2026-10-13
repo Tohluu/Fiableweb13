@@ -111,6 +111,13 @@ input,select,textarea { border-color:#bfc8d1; border-radius:3px; font-size:14px;
 .skip-link:focus { top:10px; }
 a:focus-visible,button:focus-visible { outline:3px solid var(--blue); outline-offset:4px; }
 main [id] { scroll-margin-top:105px; }
+.client-testimonial { display:grid; grid-template-columns:240px minmax(0,1fr); gap:48px; align-items:center; margin:0; padding:36px; border:1px solid var(--line); background:#f5f5f1; }
+.client-logo { display:block; inline-size:100%; block-size:auto; border-radius:4px; }
+.client-testimonial blockquote { margin:0; font-size:clamp(17px,2vw,22px); line-height:1.6; color:var(--ink); }
+.client-testimonial blockquote p { margin:0 0 20px; }
+.client-testimonial figcaption { display:flex; flex-direction:column; gap:3px; font-size:14px; }
+.client-testimonial figcaption span { color:var(--muted); font-size:13px; }
+@media(max-width:760px) { .client-testimonial { grid-template-columns:1fr; gap:24px; padding:24px; } .client-logo { inline-size:180px; max-inline-size:100%; } }
 @media(min-width:761px) and (max-width:1050px) { .nav-links { gap:12px; font-size:12px; } .nav-links .btn { padding:10px 12px; } .brand-wordmark { font-size:18px; } .brand-logo { inline-size:32px; } }
 @media(max-width:900px) { .hero-grid { grid-template-columns:1fr 1fr; gap:32px; } .hero { padding:52px 0; } .hero h1 { font-size:48px; } .hero-copy { font-size:15px; } .hero-actions .btn { padding:12px 15px; } .benefits { grid-template-columns:1fr 1fr; } }
 @media(max-width:760px) {

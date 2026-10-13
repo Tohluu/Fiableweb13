@@ -37,7 +37,7 @@
     </nav>
 </header>
 <main id="main-content">
-<section class="page-intro"><div class="container"><div class="eyebrow">Fiable Logistics / get started</div><h1>Let’s get your deliveries moving.</h1><p>Request a one-off delivery or register your business for a monthly plan.</p></div></section>
+<section class="page-intro"><div class="container"><div class="eyebrow">Fiable Logistics / get started</div><h1>Let’s get your deliveries moving.</h1><p>Request express delivery or bulk haulage, or register your business for a monthly plan.</p></div></section>
 <section id="quick-express" class="section section-soft">
 <div class="container two-col">
 <div>
@@ -70,10 +70,10 @@
 <section id="get-started" class="section">
 <div class="container two-col">
 <div>
-<div class="eyebrow">Become a subscriber</div>
-<h2>Ready to make delivery easier?</h2>
-<p class="hero-copy" style="font-size:15px">Join Fiable's growing network of Lagos businesses and get access to structured, subscription-based delivery support.</p>
-<div class="rule-list">
+<div class="eyebrow" id="serviceEyebrow">Become a vendor</div>
+<h2 id="serviceHeading">Ready to make delivery easier?</h2>
+<p class="hero-copy" id="serviceDescription" style="font-size:15px">Join Fiable's growing network of Lagos businesses and get access to structured, subscription-based delivery support.</p>
+<div class="rule-list service-fields" id="subscriptionRules">
 <div class="rule">
 <b>01</b>
 <p>
@@ -95,42 +95,48 @@
 <strong>Exhausted units:</strong> 100% of the initial subscription amount is required for the next applicable allocation. A 50% payment does not qualify.</p>
 </div>
 </div>
+<div id="bulkGuidance" class="service-fields" hidden>
+<h3>Help us plan your move</h3>
+<p>Describe your goods and how they are packed. Include an estimate of the total weight or dimensions so we can assess the vehicle needed.</p>
+<p>Tell us about stairs, access restrictions, fragile items, or loading and unloading help you may need.</p>
+<p>Our team will confirm the quote, vehicle availability and pickup timing before you book.</p>
+</div>
 </div>
 <div class="form-box">
-<h3>Register for Fiable services</h3>
-<p style="color:var(--muted);font-size:13px">Choose the service that fits your operation. A Fiable representative will contact you shortly.</p>
+<h3 id="serviceFormHeading">Register for Fiable services</h3>
+<p id="serviceFormDescription" style="color:var(--muted);font-size:13px">Choose the service that fits your operation.</p>
 <form id="vendorForm">
-<div class="form-grid">
-<div>
-<label for="get-started-field-1">Full name</label>
-<input required placeholder="Your name" id="get-started-field-1">
-</div>
-<div>
-<label for="get-started-field-2">Business name</label>
-<input required placeholder="Business name" id="get-started-field-2">
-</div>
-<div>
-<label for="get-started-field-3">Phone number</label>
-<input required type="tel" placeholder="080..." id="get-started-field-3">
-</div>
-<div>
-<label for="get-started-field-4">Email</label>
-<input required type="email" placeholder="you@business.com" id="get-started-field-4">
-</div>
-</div>
-<label for="vendorPassword">Password</label>
-<div class="password-field">
-<input id="vendorPassword" required type="password" minlength="8" placeholder="At least 8 characters">
-<button class="password-toggle" type="button" aria-label="Show password" aria-pressed="false">&#128065;</button>
-</div>
-<input id="selectedPlan" type="hidden" value="">
 <label for="serviceType">What do you need?</label>
 <select id="serviceType" name="serviceType" required>
 <option value="">Select a service</option>
 <option value="subscription">Monthly subscription deliveries</option>
-<option value="express">Express delivery</option>
 <option value="bulk">Bulk haulage</option>
 </select>
+<div class="form-grid">
+<div>
+<label for="get-started-field-1">Full name</label>
+<input required placeholder="Your name" id="get-started-field-1" autocomplete="name" maxlength="120">
+</div>
+<div>
+<label for="get-started-field-2">Business name</label>
+<input required placeholder="Business name" id="get-started-field-2" autocomplete="organization" maxlength="160">
+</div>
+<div>
+<label for="get-started-field-3">Phone number</label>
+<input required type="tel" placeholder="080..." id="get-started-field-3" autocomplete="tel" maxlength="30">
+</div>
+<div>
+<label for="get-started-field-4">Email</label>
+<input required type="email" placeholder="you@business.com" id="get-started-field-4" autocomplete="email" maxlength="160">
+</div>
+</div>
+<div id="accountFields" class="service-fields">
+<label for="vendorPassword">Create a password</label>
+<div class="password-field">
+<input id="vendorPassword" required type="password" minlength="8" maxlength="128" autocomplete="new-password" placeholder="At least 8 characters">
+<button class="password-toggle" type="button" aria-label="Show password" aria-pressed="false">&#128065;</button>
+</div>
+<input id="selectedPlan" type="hidden" value="">
 <label for="get-started-field-5">Business type</label>
 <select required id="get-started-field-5">
 <option value="">Select business type</option>
@@ -143,6 +149,7 @@
 <option>Home Business</option>
 <option>Other</option>
 </select>
+</div>
 <div id="subscriptionFields">
 <label for="monthlyVolume">Estimated monthly deliveries</label>
 <select id="monthlyVolume" required>
@@ -154,17 +161,30 @@
 <option>110+</option>
 </select>
 </div>
-<div id="expressFields" class="service-fields" hidden>
-<label for="expressPickup">Pickup address</label>
-<input id="expressPickup" placeholder="Where should we pick up?">
-<label for="expressDropoff">Delivery address</label>
-<input id="expressDropoff" placeholder="Where should we deliver?">
-</div>
 <div id="bulkFields" class="service-fields" hidden>
-<label for="bulkDetails">Bulk haulage details</label>
-<textarea id="bulkDetails" rows="3" placeholder="Tell us about the goods, quantity, pickup location and destination"></textarea>
+<label for="bulkDetails">What needs to be moved?</label>
+<textarea id="bulkDetails" rows="3" maxlength="1000" placeholder="Describe the goods, e.g. boxed clothing, furniture or equipment"></textarea>
+<div class="form-grid">
+<div>
+<label for="bulkQuantity">Quantity and packaging</label>
+<input id="bulkQuantity" maxlength="160" placeholder="e.g. 40 cartons or 6 pallets">
 </div>
-<p class="service-note">Single deliveries and bulk haulage requests are subject to route, vehicle and operational availability.</p>
+<div>
+<label for="bulkSize">Estimated weight or dimensions</label>
+<input id="bulkSize" maxlength="160" placeholder="e.g. 500 kg; unsure is OK">
+</div>
+</div>
+<label for="bulkPickup">Full pickup address</label>
+<input id="bulkPickup" maxlength="300" placeholder="Street address, area, city and state">
+<label for="bulkDropoff">Full delivery address</label>
+<input id="bulkDropoff" maxlength="300" placeholder="Street address, area, city and state">
+<label for="bulkDate">Preferred pickup date</label>
+<input id="bulkDate" type="date" aria-describedby="bulkDateNote">
+<p class="service-note" id="bulkDateNote">Your preferred date is subject to confirmation.</p>
+<label for="bulkHandling">Handling and access notes (optional)</label>
+<textarea id="bulkHandling" rows="3" maxlength="1000" data-optional placeholder="Fragile goods, stairs, loading assistance, access restrictions or preferred time"></textarea>
+</div>
+<p class="service-note" id="serviceNote">Single deliveries and bulk haulage requests are subject to route, vehicle and operational availability.</p>
 <button class="btn btn-primary" id="serviceSubmit" type="submit" style="inline-size:100%">Apply to Become a Vendor ↗</button>
 </form>
 </div>
@@ -211,23 +231,8 @@
 </footer>
 <div class="toast" id="toast" role="status">
 </div>
-<a class="whatsapp-contact" href="https://wa.me/2347015414492" target="_blank" rel="noopener noreferrer" aria-label="Chat with Fiable on WhatsApp (opens in a new tab)">Chat on WhatsApp &nearr;</a>
 <button class="back-to-top" id="backToTop" type="button" aria-label="Back to top">↑</button>
 <script src="site.js"></script>
-<script>
-        const planParam = new URLSearchParams(window.location.search).get('plan');
-        if (planParam) { document.getElementById('selectedPlan').value = planParam; document.getElementById('serviceType').value = 'subscription'; }
-        const serviceType = document.getElementById('serviceType');
-        const serviceSubmit = document.getElementById('serviceSubmit');
-        const serviceFields = { subscription: document.getElementById('subscriptionFields'), express: document.getElementById('expressFields'), bulk: document.getElementById('bulkFields') };
-        const serviceLabels = { subscription: 'Apply to Become a Vendor ↗', express: 'Request Express Delivery ↗', bulk: 'Request Bulk Haulage ↗' };
-        const updateServiceFields = () => { Object.entries(serviceFields).forEach(([service, field]) => { const active = service === serviceType.value; field.hidden = !active; field.querySelectorAll('input, select, textarea').forEach(input => input.required = active); }); };
-        const updateServiceButton = () => { serviceSubmit.textContent = serviceLabels[serviceType.value] || serviceLabels.subscription; };
-        serviceType.addEventListener('change', updateServiceFields);
-        serviceType.addEventListener('change', updateServiceButton);
-        updateServiceFields();
-        updateServiceButton();
-        document.getElementById('vendorForm').addEventListener('submit', event => { event.preventDefault(); const form = event.currentTarget; if (!form.checkValidity()) { form.reportValidity(); return; } const selectedService = serviceType.options[serviceType.selectedIndex].text; const email = formValue(form, 'input[type="email"]'); submitRequest(form, '/api/vendor', { name:formValue(form, 'input[placeholder="Your name"]'), businessName:formValue(form, 'input[placeholder="Business name"]'), phone:formValue(form, 'input[type="tel"]'), email, password:formValue(form, '#vendorPassword'), plan:document.getElementById('selectedPlan').value, service:serviceType.value, businessType:form.querySelectorAll('select')[1].value, monthlyVolume:formValue(form, '#monthlyVolume'), expressPickup:formValue(form, '#expressPickup'), expressDropoff:formValue(form, '#expressDropoff'), bulkDetails:formValue(form, '#bulkDetails') }, `Thank you. Your ${selectedService.toLowerCase()} request has been received.`, () => { window.location.href = `portal.html?email=${encodeURIComponent(email)}`; }); });
-    </script>
+<script src="get-started.js?v=2"></script>
 </body>
 </html>
