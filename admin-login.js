@@ -8,6 +8,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const passwordToggle = $("adminPasswordToggle");
   const loginButton = $("adminLoginBtn");
   const errorBox = $("adminLoginError");
+  let mfaChallengeToken = null;
 
 
   /* =========================================================
@@ -123,6 +124,19 @@ document.addEventListener("DOMContentLoaded", () => {
         The server creates the admin session.
       */
 
+      if (data.mfaRequired) {
+        if (!data.challengeToken) throw new Error("Unable to verify this login. Please try again.");
+        mfaChallengeToken = data.challengeToken;
+        form.classList.add("hidden");
+        $("adminMfaForm").classList.remove("hidden");
+        $("adminMfaCode").value = "";
+        $("adminMfaError").textContent = "";
+        $("adminMfaError").classList.remove("show");
+        $("adminMfaCode").focus();
+        loginButton.disabled = false;
+        loginButton.textContent = "Log in";
+        return;
+      }
       window.location.href = "/admin.html";
 
 
@@ -148,6 +162,8 @@ document.addEventListener("DOMContentLoaded", () => {
   ========================================================= */
 
   function showLoginScreen() {
+    mfaChallengeToken = null;
+    $("adminMfaForm").classList.add("hidden");
     $("adminLoginForm").classList.remove("hidden");
     $("adminForgotForm").classList.add("hidden");
     $("adminResetForm").classList.add("hidden");
@@ -155,6 +171,39 @@ document.addEventListener("DOMContentLoaded", () => {
     clearForgotError();
     clearResetError();
   }
+
+  $("adminMfaBackBtn").addEventListener("click", showLoginScreen);
+  $("adminMfaForm").addEventListener("submit", async event => {
+    event.preventDefault();
+    const button = $("adminMfaSubmitBtn");
+    const error = $("adminMfaError");
+    error.classList.remove("show");
+    const code = $("adminMfaCode").value.trim();
+    if (!code || !mfaChallengeToken) {
+      error.textContent = "Enter your authentication code, or return to login to start again.";
+      error.classList.add("show");
+      return;
+    }
+    button.disabled = true;
+    button.textContent = "Verifying…";
+    try {
+      const response = await fetch("/api/admin/mfa/verify-login", {
+        method: "POST", credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ challengeToken: mfaChallengeToken, code })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Unable to verify your code.");
+      mfaChallengeToken = null;
+      window.location.href = "/admin.html";
+    } catch (failure) {
+      error.textContent = failure.message || "Unable to verify your code.";
+      error.classList.add("show");
+    } finally {
+      button.disabled = false;
+      button.textContent = "Verify and log in";
+    }
+  });
 
   function showForgotScreen() {
     $("adminLoginForm").classList.add("hidden");
@@ -226,11 +275,18 @@ document.addEventListener("DOMContentLoaded", () => {
         throw new Error(data.error || "Unable to process request.");
       }
 
-      alert(data.message || "If an account exists for this email, a password reset link has been sent.");
+      if (data.resetLink) {
+        window.location.href = data.resetLink;
+        return;
+      }
+      alert(data.message || "If an account exists for this email, a password reset link has been created.");
       showLoginScreen();
 
     } catch (error) {
       showForgotError(error.message || "Unable to send reset link.");
+      forgotSubmitBtn.disabled = false;
+      forgotSubmitBtn.textContent = "Send reset link";
+    } finally {
       forgotSubmitBtn.disabled = false;
       forgotSubmitBtn.textContent = "Send reset link";
     }

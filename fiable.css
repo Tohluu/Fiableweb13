@@ -1,3 +1,12 @@
+.whatsapp-contact { position:fixed; inset-inline-end:20px; inset-block-end:78px; z-index:30; background:#087c53; color:#fff; padding:12px 16px; border-radius:30px; font-weight:700; font-size:13px; box-shadow:0 6px 20px rgba(0,0,0,.16); }
+.whatsapp-contact:hover { background:#066342; }
+.whatsapp-contact:focus-visible { outline:3px solid var(--blue); outline-offset:4px; }
+.plan-example { padding:12px; background:var(--soft); border-radius:8px; font-size:13px; }
+#quick-express { scroll-margin-top:110px; }
+#quickExpressForm .btn { margin-block-start:18px; inline-size:100%; }
+.faq p a { color:var(--blue); text-decoration:underline; }
+@media (min-width:761px) and (max-width:1100px) { .nav-links { gap:12px; font-size:11px; } .nav-links .btn { padding:10px 12px; } }
+@media (max-width:480px) { .whatsapp-contact { inset-inline-end:15px; font-size:12px; padding:10px 14px; } }
 :root { 
     --blue:#1769e0; 
     --blue-dark:#0d4fb6; 

@@ -14,13 +14,21 @@
 
   <link
     rel="stylesheet"
-    href="rider.css"
+    href="rider.css?v=6"
   >
 
 </head>
 
 
 <body>
+
+  <header class="rider-site-header">
+    <a class="rider-site-brand" href="index.html" aria-label="Fiable Logistics home">
+      <img src="images/Logo2.png" alt="" width="40" height="50">
+      <span>FIABLE<small>LOGISTICS</small></span>
+    </a>
+    <a class="rider-home-link" href="index.html">Back to website <span aria-hidden="true">&rarr;</span></a>
+  </header>
 
   <main class="rider-auth" id="riderAuthShell">
 
@@ -173,7 +181,7 @@
         </div>
 
           <nav class="rider-dashboard-nav" aria-label="Rider dashboard navigation">
-            <button type="button" class="rider-nav-btn active" data-rider-view="profile">Profile</button>
+            <button type="button" class="rider-nav-btn active" data-rider-view="profile" aria-current="page">Profile</button>
             <button type="button" class="rider-nav-btn" data-rider-view="deliveries">
               My Deliveries
               <span id="deliveryCountBadge" class="rider-badge hidden">0</span>
@@ -359,11 +367,11 @@
 
             <div class="rider-modal-backdrop"></div>
 
-            <div class="rider-modal-content">
+            <div class="rider-modal-content" role="dialog" aria-modal="true" aria-labelledby="riderModalTitle" tabindex="-1">
 
                 <div class="rider-modal-header">
 
-                    <h2>Order Details</h2>
+                    <h2 id="riderModalTitle">Order Details</h2>
 
                     <button
                         type="button"
@@ -392,7 +400,7 @@
 
 
   <script src="csrf.js"></script>
-  <script src="rider.js?v=3"></script>
+  <script src="rider.js?v=6"></script>
 
 </body>
 

@@ -6,7 +6,7 @@
 
   <title>Fiable Admin Login</title>
 
-  <link rel="stylesheet" href="admin-login.css">
+  <link rel="stylesheet" href="admin-login.css?v=3">
 </head>
 
 <body>
@@ -18,6 +18,7 @@
       <div class="admin-login-brand">
         <a href="index.html">
           <img src="images/Logo2.png" alt="Fiable Logistics">
+          <span class="admin-login-wordmark" aria-hidden="true">FIABLE<small>LOGISTICS</small></span>
         </a>
       </div>
 
@@ -109,12 +110,24 @@
       </form>
 
 
+      <form id="adminMfaForm" class="admin-form hidden">
+        <h2>Verify your login</h2>
+        <p class="admin-form-info">Enter the code from your authenticator app, or use an unused recovery code.</p>
+        <div class="form-group">
+          <label for="adminMfaCode">Authentication or recovery code</label>
+          <input id="adminMfaCode" name="code" type="text" autocomplete="one-time-code" maxlength="20" required>
+        </div>
+        <div id="adminMfaError" class="admin-login-error" role="alert" aria-live="polite"></div>
+        <button class="admin-login-btn" id="adminMfaSubmitBtn" type="submit">Verify and log in</button>
+        <button class="admin-back-btn" id="adminMfaBackBtn" type="button">Back to login</button>
+      </form>
+
       <form id="adminForgotForm" class="admin-form hidden" novalidate>
 
         <h2>Reset your password</h2>
 
         <p class="admin-form-info">
-          Enter your admin email and we'll send you a secure password reset link.
+          Enter your admin email to request a password reset link.
         </p>
 
         <div class="form-group">
@@ -241,7 +254,7 @@
 
 
   <script src="csrf.js"></script>
-  <script src="admin-login.js"></script>
+  <script src="admin-login.js?v=2"></script>
 
 </body>
 </html>

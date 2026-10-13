@@ -2,8 +2,37 @@
    RIDER ELEMENTS
 ===================================================== */
 
+function escapeRiderHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, character => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  })[character]);
+}
+
 function formatStatusLabel(status) {
-  return String(status || "").replace(/_/g, " ");
+  return escapeRiderHtml(String(status || "").replace(/_/g, " "));
+}
+
+function selectRiderView(view) {
+  document.querySelectorAll('.rider-nav-btn').forEach(button => {
+    const selected = button.dataset.riderView === view;
+    button.classList.toggle('active', selected);
+    if (selected) button.setAttribute('aria-current', 'page');
+    else button.removeAttribute('aria-current');
+  });
+  document.querySelectorAll('.rider-dashboard-view').forEach(panel => {
+    panel.classList.toggle('active', panel.dataset.riderViewPanel === view);
+  });
+}
+
+async function riderFetch(url, options) {
+  const response = await fetch(url, options);
+  if (response.status === 401 && options?.method !== 'POST' &&
+      document.getElementById('riderDashboardView')?.style.display === 'block') {
+    stopRiderAutoRefresh();
+    window.location.replace('rider.html?expired=true');
+    throw new Error('Your session has expired. Please sign in again.');
+  }
+  return response;
 }
 
 const riderLoginForm =
@@ -49,21 +78,7 @@ const riderChangePasswordForm =
 
 document.querySelectorAll(".rider-nav-btn").forEach(button => {
   button.addEventListener("click", () => {
-    const view = button.dataset.riderView;
-
-    document.querySelectorAll(".rider-nav-btn").forEach(navButton => {
-      navButton.classList.toggle(
-        "active",
-        navButton.dataset.riderView === view
-      );
-    });
-
-    document.querySelectorAll(".rider-dashboard-view").forEach(panel => {
-      panel.classList.toggle(
-        "active",
-        panel.dataset.riderViewPanel === view
-      );
-    });
+    selectRiderView(button.dataset.riderView);
   });
 });
 
@@ -154,7 +169,7 @@ async function initializeRiderPage() {
   try {
 
     const response =
-      await fetch(
+      await riderFetch(
         "/api/rider/account",
         {
           method: "GET",
@@ -183,8 +198,11 @@ async function initializeRiderPage() {
       }
 
       await loadRiderAccount();
-      await loadRiderDelivery();
-      await loadRiderPreviousDeliveries();
+      if (!riderMustChangePassword) {
+        await loadRiderDelivery();
+        await loadRiderPreviousDeliveries();
+        await loadRiderNotifications();
+      }
 
       startRiderAutoRefresh();
 
@@ -229,14 +247,66 @@ async function initializeRiderPage() {
 
 }
 
-initializeRiderPage();
-
-
 /* =====================================================
    AUTOMATIC REFRESH MECHANISM
 ===================================================== */
 
 let riderRefreshInterval = null;
+let riderRefreshInFlight = false;
+let riderActionInFlight = false;
+let riderModalReturnFocus = null;
+let riderMustChangePassword = false;
+const riderCameraPhotos = new WeakMap();
+
+function clearRiderPhoto(form) {
+  const selected = riderCameraPhotos.get(form);
+  if (selected) URL.revokeObjectURL(selected.url);
+  riderCameraPhotos.delete(form);
+  const controls = form.querySelector('.rider-photo-controls');
+  if (!controls) return;
+  const preview = controls.querySelector('.rider-photo-preview');
+  preview.hidden = true;
+  preview.removeAttribute('src');
+  controls.querySelector('.rider-photo-message').textContent = '';
+  controls.querySelector('.rider-proof-photo').required = controls.dataset.requirePhoto === 'true';
+  controls.querySelector('.rider-camera-btn').textContent = 'Take photo';
+}
+
+document.addEventListener('click', event => {
+  const button = event.target.closest('.rider-camera-btn');
+  if (!button) return;
+  button.closest('.rider-proof-form').querySelector('.rider-proof-camera').click();
+});
+
+document.addEventListener('change', event => {
+  const input = event.target;
+  if (!input.matches('.rider-proof-camera, .rider-proof-photo')) return;
+  const form = input.closest('.rider-proof-form');
+  const file = input.files?.[0];
+  if (!file) return; // Closing the camera/picker preserves the last selection.
+  clearRiderPhoto(form);
+  const message = form.querySelector('.rider-photo-message');
+  if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || !file.size || file.size > 5 * 1024 * 1024) {
+    form.querySelector('.rider-proof-photo').value = '';
+    form.querySelector('.rider-proof-camera').value = '';
+    message.textContent = 'Choose a PNG, JPEG or WebP photo up to 5 MB.';
+    return;
+  }
+  const isCamera = input.classList.contains('rider-proof-camera');
+  form.querySelector(isCamera ? '.rider-proof-photo' : '.rider-proof-camera').value = '';
+  const url = URL.createObjectURL(file);
+  riderCameraPhotos.set(form, { file, url });
+  form.querySelector('.rider-proof-photo').required = false;
+  const preview = form.querySelector('.rider-photo-preview');
+  preview.src = url;
+  preview.hidden = false;
+  message.textContent = isCamera ? 'Camera photo ready. You can retake it or upload a different photo.' : `Photo selected: ${file.name}`;
+  form.querySelector('.rider-camera-btn').textContent = isCamera ? 'Retake photo' : 'Take photo';
+});
+
+document.addEventListener('reset', event => {
+  if (event.target.matches('.rider-proof-form')) clearRiderPhoto(event.target);
+});
 
 function startRiderAutoRefresh() {
 
@@ -251,7 +321,6 @@ function startRiderAutoRefresh() {
     );
 
   if (
-    !isDashboard ||
     !riderDashboardView ||
     !riderLoginCard ||
     riderLoginCard.style.display !== "none"
@@ -274,14 +343,16 @@ function startRiderAutoRefresh() {
 
         if (
           document.visibilityState ===
-          "visible"
+          "visible" && !riderRefreshInFlight && !riderActionInFlight
         ) {
 
           try {
-
-            await loadRiderDelivery();
+            riderRefreshInFlight = true;
             await loadRiderAccount();
+            if (riderMustChangePassword) return;
+            await loadRiderDelivery();
             await loadRiderPreviousDeliveries();
+            await loadRiderNotifications();
 
           } catch (error) {
 
@@ -290,6 +361,8 @@ function startRiderAutoRefresh() {
               error
             );
 
+          } finally {
+            riderRefreshInFlight = false;
           }
 
         }
@@ -381,7 +454,7 @@ riderLoginForm?.addEventListener(
     try {
 
       const response =
-        await fetch(
+        await riderFetch(
           "/api/rider/login",
           {
             method: "POST",
@@ -462,7 +535,7 @@ riderForgotPasswordForm?.addEventListener("submit", async event => {
   const message = document.getElementById("riderForgotMessage");
   const email = document.getElementById("riderForgotEmail")?.value.trim().toLowerCase();
   try {
-    const response = await fetch("/api/rider/forgot-password", {
+    const response = await riderFetch("/api/rider/forgot-password", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "same-origin",
@@ -470,10 +543,14 @@ riderForgotPasswordForm?.addEventListener("submit", async event => {
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || "Unable to create reset link.");
-    message.textContent = data.resetLink
-      ? `Reset link: ${data.resetLink}`
-      : data.message;
+    if (data.resetLink) {
+      window.location.href = data.resetLink;
+      return;
+    }
+    message.dataset.kind = 'success';
+    message.textContent = data.message || 'Your password reset request has been received.';
   } catch (error) {
+    message.dataset.kind = 'error';
     message.textContent = error.message;
   }
 });
@@ -481,8 +558,14 @@ riderForgotPasswordForm?.addEventListener("submit", async event => {
 riderResetPasswordForm?.addEventListener("submit", async event => {
   event.preventDefault();
   const message = document.getElementById("riderResetMessage");
+  const password = document.getElementById('riderResetPassword').value;
+  if (password !== document.getElementById('riderResetConfirmPassword').value) {
+    message.dataset.kind = 'error';
+    message.textContent = 'Passwords do not match.';
+    return;
+  }
   try {
-    const response = await fetch("/api/rider/reset-password", {
+    const response = await riderFetch("/api/rider/reset-password", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "same-origin",
@@ -494,9 +577,11 @@ riderResetPasswordForm?.addEventListener("submit", async event => {
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || "Unable to reset password.");
+    message.dataset.kind = 'success';
     message.textContent = data.message;
     setTimeout(() => window.location.replace("rider.html"), 800);
   } catch (error) {
+    message.dataset.kind = 'error';
     message.textContent = error.message;
   }
 });
@@ -511,11 +596,12 @@ riderChangePasswordForm?.addEventListener("submit", async event => {
   const newPassword = document.getElementById("riderNewPassword")?.value;
   const confirmPassword = document.getElementById("riderConfirmPassword")?.value;
   if (newPassword !== confirmPassword) {
-    message.textContent = "Passwords do not match.";
+    message.dataset.kind = 'error';
+    message.textContent = 'Passwords do not match.';
     return;
   }
   try {
-    const response = await fetch("/api/rider/change-password", {
+    const response = await riderFetch("/api/rider/change-password", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "same-origin",
@@ -526,9 +612,16 @@ riderChangePasswordForm?.addEventListener("submit", async event => {
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || "Unable to change password.");
+    message.dataset.kind = 'success';
     message.textContent = data.message;
     riderChangePasswordForm.reset();
+    riderChangePasswordForm.hidden = true;
+    await loadRiderAccount();
+    await loadRiderDelivery();
+    await loadRiderPreviousDeliveries();
+    await loadRiderNotifications();
   } catch (error) {
+    message.dataset.kind = 'error';
     message.textContent = error.message;
   }
 });
@@ -543,7 +636,7 @@ async function loadRiderAccount() {
   try {
 
     const response =
-      await fetch(
+      await riderFetch(
         "/api/rider/account",
         {
           method: "GET",
@@ -582,6 +675,8 @@ async function loadRiderAccount() {
 
     }
 
+
+    riderMustChangePassword = !!rider.mustChangePassword;
 
     /* Rider ID */
 
@@ -680,9 +775,11 @@ async function loadRiderAccount() {
     /* Force a password change if this account still has a temporary password */
 
     if (rider.mustChangePassword && riderChangePasswordForm?.hasAttribute("hidden")) {
+      selectRiderView('settings');
       riderChangePasswordForm.removeAttribute("hidden");
       const changeMessage = document.getElementById("riderChangePasswordMessage");
       if (changeMessage) {
+        changeMessage.dataset.kind = 'warning';
         changeMessage.textContent = "You're using a temporary password. Please set a new one to continue.";
       }
     }
@@ -705,7 +802,7 @@ async function loadRiderAccount() {
 
 function renderLifecycleActions(delivery) {
   const status = String(delivery.status || "assigned").toLowerCase();
-  const orderId = delivery.id;
+  const orderId = escapeRiderHtml(delivery.id);
 
   if (status === "assigned") {
     return `
@@ -723,14 +820,26 @@ function renderLifecycleActions(delivery) {
     return `<button type="button" class="rider-delivery-action-btn" data-order-id="${orderId}" data-action="advance" data-next-status="on_delivery">Start Delivery</button>`;
   }
   if (status === "on_delivery") {
+    const requirements = delivery.proofRequirements || { requireRecipientName: true, requirePhoto: true };
     return `
-      <form class="rider-proof-form" data-order-id="${orderId}">
+      <form class="rider-proof-form" data-order-id="${orderId}" data-require-gps="${!!requirements.requireGps}">
+        <h4>Proof of delivery</h4>
         <label>Recipient name
-          <input type="text" class="rider-proof-recipient" placeholder="Who received it?" required>
+          <input type="text" class="rider-proof-recipient" maxlength="120" placeholder="Who received it?" ${requirements.requireRecipientName ? 'required' : ''}>
         </label>
-        <label>Delivery photo
-          <input type="file" class="rider-proof-photo" accept="image/*" required>
+        <div class="rider-photo-controls" data-require-photo="${!!requirements.requirePhoto}">
+        <label>Upload delivery photo
+          <input type="file" class="rider-proof-photo" accept="image/png,image/jpeg,image/webp" ${requirements.requirePhoto ? 'required' : ''}>
         </label>
+        <button type="button" class="rider-camera-btn">Take photo</button>
+        <input type="file" class="rider-proof-camera" accept="image/*" capture="environment" aria-label="Take a delivery photo with your camera" hidden>
+        <p class="rider-photo-message" role="status" aria-live="polite"></p>
+        <img class="rider-photo-preview" alt="Selected delivery photo" hidden>
+        </div>
+        <small>PNG, JPEG or WebP. Maximum 5 MB per file.</small>
+        ${requirements.requireOtp ? '<label>Recipient delivery code<input class="rider-proof-otp" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required></label>' : ''}
+        ${requirements.requireSignature ? '<label>Recipient signature image<input class="rider-proof-signature" type="file" accept="image/png,image/jpeg,image/webp" required></label>' : ''}
+        ${requirements.requireGps ? '<small>Your location will be requested when you complete this delivery.</small>' : ''}
         <button type="submit" class="rider-delivery-action-btn">Complete Delivery</button>
       </form>
     `;
@@ -752,7 +861,7 @@ function fileToDataUrl(file) {
 
 async function respondToAssignment(orderId, accept, reason) {
   const endpoint = accept ? "/api/rider/delivery/accept" : "/api/rider/delivery/decline";
-  const response = await fetch(endpoint, {
+  const response = await riderFetch(endpoint, {
     method: "POST",
     credentials: "same-origin",
     headers: { "Content-Type": "application/json" },
@@ -768,18 +877,29 @@ async function respondToAssignment(orderId, accept, reason) {
   return data;
 }
 
-async function completeDeliveryWithProof(orderId, recipientName, photoFile) {
+async function completeDeliveryWithProof(orderId, recipientName, photoFile, extraProof = {}) {
+  for (const file of [photoFile, extraProof.signatureFile].filter(Boolean)) {
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) throw new Error('Choose a PNG, JPEG or WebP image.');
+    if (!file.size || file.size > 5 * 1024 * 1024) throw new Error('Each image must be between 1 byte and 5 MB.');
+  }
   const photo = photoFile ? await fileToDataUrl(photoFile) : null;
-  const response = await fetch("/api/rider/delivery/complete", {
+  const signature = extraProof.signatureFile ? await fileToDataUrl(extraProof.signatureFile) : null;
+  const response = await riderFetch("/api/rider/delivery/complete", {
     method: "POST",
     credentials: "same-origin",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ orderId, recipientName, photo })
+    body: JSON.stringify({ orderId, recipientName: recipientName.trim(), photo, signature, otp: extraProof.otp, gps: extraProof.gps })
   });
   const data = await response.json();
   if (!response.ok) {
     throw new Error(data.error || "Unable to complete this delivery.");
   }
+  document.querySelectorAll('.rider-proof-form').forEach(form => {
+    if (String(form.dataset.orderId) !== String(orderId)) return;
+    form.reset();
+    if (form.contains(document.activeElement)) document.activeElement.blur();
+    form.closest('.rider-delivery-card')?.remove();
+  });
   closeOrderDetailsModal();
   await loadRiderDelivery();
   await loadRiderAccount();
@@ -801,7 +921,7 @@ async function updateRiderDeliveryStatus(
   try {
 
     const response =
-      await fetch(
+      await riderFetch(
         "/api/rider/delivery/status",
         {
           method: "POST",
@@ -862,21 +982,14 @@ async function updateRiderDeliveryStatus(
 
     }
 
-    console.log(
-      "UPDATED ORDER:",
-      data.order
-    );
 
-    console.log(
-      "UPDATED RIDER:",
-      data.rider
-    );
 
     /* Success - reload UI */
 
     await loadRiderDelivery();
     await loadRiderAccount();
-
+    await loadRiderPreviousDeliveries();
+    closeOrderDetailsModal();
     return true;
 
 
@@ -905,6 +1018,11 @@ async function updateRiderDeliveryStatus(
 ===================================================== */
 
 async function loadRiderDelivery() {
+  // Keep a rider's photo, name and code intact while they prepare proof.
+  if ([...document.querySelectorAll('#riderCurrentDelivery .rider-proof-form')]
+      .some(form => riderCameraPhotos.has(form))) return;
+  if ([...document.querySelectorAll('#riderCurrentDelivery .rider-proof-form input')]
+      .some(input => input.value || input.files?.length || input === document.activeElement)) return;
 
   const deliveryContainer =
     document.getElementById(
@@ -923,7 +1041,7 @@ async function loadRiderDelivery() {
   try {
 
     const response =
-      await fetch(
+      await riderFetch(
         "/api/rider/delivery",
         {
           method: "GET",
@@ -989,7 +1107,7 @@ async function loadRiderDelivery() {
       .forEach(btn => {
         btn.addEventListener("click", () => {
           const orderId = Number(btn.dataset.orderId);
-          const assignedDelivery = deliveries.find(d => d.id === orderId);
+          const assignedDelivery = deliveries.find(d => Number(d.id) === orderId);
           if (assignedDelivery) {
             openOrderDetailsModal(assignedDelivery);
           }
@@ -1094,10 +1212,10 @@ function renderDeliveryCard(delivery) {
           <span class="rider-delivery-label">
             Order
           </span>
-          <h3>${orderRef}</h3>
+          <h3>${escapeRiderHtml(orderRef)}</h3>
         </div>
 
-        <span class="rider-delivery-status">
+        <span class="rider-delivery-status rider-status-${escapeRiderHtml(status.replace(/[^a-z_]/g, ''))}">
           ${formatStatusLabel(status)}
         </span>
 
@@ -1107,32 +1225,32 @@ function renderDeliveryCard(delivery) {
 
         <div class="rider-delivery-item">
           <span>Pickup</span>
-          <strong>${pickup}</strong>
+          <strong>${escapeRiderHtml(pickup)}</strong>
         </div>
 
         <div class="rider-delivery-item">
           <span>Destination</span>
-          <strong>${dropoff}</strong>
+          <strong>${escapeRiderHtml(dropoff)}</strong>
         </div>
 
         <div class="rider-delivery-item">
           <span>Recipient</span>
-          <strong>${recipientName}</strong>
+          <strong>${escapeRiderHtml(recipientName)}</strong>
         </div>
 
         <div class="rider-delivery-item">
           <span>Package Type</span>
-          <strong>${packageType}</strong>
+          <strong>${escapeRiderHtml(packageType)}</strong>
         </div>
 
         <div class="rider-delivery-item">
           <span>Units</span>
-          <strong>${units}</strong>
+          <strong>${escapeRiderHtml(units)}</strong>
         </div>
 
         <div class="rider-delivery-item">
           <span>Priority</span>
-          <strong>${priority}</strong>
+          <strong>${escapeRiderHtml(priority)}</strong>
         </div>
 
       </div>
@@ -1142,20 +1260,20 @@ function renderDeliveryCard(delivery) {
         <button
           type="button"
           class="rider-view-order-btn"
-          data-order-id="${delivery.id}"
-          data-order-ref="${orderRef}"
-          data-pickup="${pickup}"
-          data-dropoff="${dropoff}"
-          data-pickup-contact="${pickupContactName}"
-          data-pickup-phone="${pickupPhone}"
-          data-recipient="${recipientName}"
-          data-recipient-phone="${recipientPhone}"
-          data-package-type="${packageType}"
-          data-description="${packageDescription}"
-          data-units="${units}"
-          data-priority="${priority}"
-          data-window="${deliveryWindow}"
-          data-status="${status}"
+          data-order-id="${escapeRiderHtml(delivery.id)}"
+          data-order-ref="${escapeRiderHtml(orderRef)}"
+          data-pickup="${escapeRiderHtml(pickup)}"
+          data-dropoff="${escapeRiderHtml(dropoff)}"
+          data-pickup-contact="${escapeRiderHtml(pickupContactName)}"
+          data-pickup-phone="${escapeRiderHtml(pickupPhone)}"
+          data-recipient="${escapeRiderHtml(recipientName)}"
+          data-recipient-phone="${escapeRiderHtml(recipientPhone)}"
+          data-package-type="${escapeRiderHtml(packageType)}"
+          data-description="${escapeRiderHtml(packageDescription)}"
+          data-units="${escapeRiderHtml(units)}"
+          data-priority="${escapeRiderHtml(priority)}"
+          data-window="${escapeRiderHtml(deliveryWindow)}"
+          data-status="${escapeRiderHtml(status)}"
         >
           View Order
         </button>
@@ -1189,7 +1307,7 @@ async function loadRiderPreviousDeliveries() {
 
   try {
 
-    const response = await fetch(
+    const response = await riderFetch(
       "/api/rider/deliveries",
       {
         method: "GET",
@@ -1234,12 +1352,12 @@ async function loadRiderPreviousDeliveries() {
           <tbody>
             ${deliveries.map(delivery => `
               <tr>
-                <td>${delivery.orderRef || `#${delivery.id}`}</td>
-                <td>${delivery.pickup || "—"} → ${delivery.dropoff || "—"}</td>
-                <td>${delivery.units ?? "—"}</td>
-                <td><span class="rider-history-status rider-history-status-${delivery.status}">${formatStatusLabel(delivery.status || "—")}</span></td>
+                <td>${escapeRiderHtml(delivery.orderRef || `#${delivery.id}`)}</td>
+                <td>${escapeRiderHtml(delivery.pickup || "—")} → ${escapeRiderHtml(delivery.dropoff || "—")}</td>
+                <td>${escapeRiderHtml(delivery.units ?? "—")}</td>
+                <td><span class="rider-history-status rider-history-status-${escapeRiderHtml(String(delivery.status || '').replace(/[^a-z_]/g, ''))}">${formatStatusLabel(delivery.status || "—")}</span></td>
                 <td>${delivery.updatedAt ? new Date(delivery.updatedAt).toLocaleDateString("en-GB") : "—"}</td>
-                <td><button type="button" class="rider-history-view-btn" data-order-id="${delivery.id}">View</button></td>
+                <td><button type="button" class="rider-history-view-btn" data-order-id="${escapeRiderHtml(delivery.id)}">View</button></td>
               </tr>
             `).join("")}
           </tbody>
@@ -1369,22 +1487,22 @@ function openOrderDetailsModal(delivery) {
 
         <div class="rider-order-detail-item">
           <span>Order Reference</span>
-          <strong>${orderRef}</strong>
+          <strong>${escapeRiderHtml(orderRef)}</strong>
         </div>
 
         <div class="rider-order-detail-item">
           <span>Status</span>
-          <strong>${formatStatusLabel(status).toUpperCase()}</strong>
+          <strong>${escapeRiderHtml(String(status).replace(/_/g, ' ').toUpperCase())}</strong>
         </div>
 
         <div class="rider-order-detail-item">
           <span>Units</span>
-          <strong>${units}</strong>
+          <strong>${escapeRiderHtml(units)}</strong>
         </div>
 
         <div class="rider-order-detail-item">
           <span>Priority</span>
-          <strong>${priority}</strong>
+          <strong>${escapeRiderHtml(priority)}</strong>
         </div>
 
       </div>
@@ -1400,22 +1518,22 @@ function openOrderDetailsModal(delivery) {
 
         <div class="rider-order-detail-item">
           <span>Location</span>
-          <strong>${pickup}</strong>
+          <strong>${escapeRiderHtml(pickup)}</strong>
         </div>
 
         <div class="rider-order-detail-item">
           <span>Contact Name</span>
-          <strong>${pickupContactName}</strong>
+          <strong>${escapeRiderHtml(pickupContactName)}</strong>
         </div>
 
         <div class="rider-order-detail-item">
           <span>Contact Phone</span>
-          <strong>${pickupPhone}</strong>
+          <strong>${escapeRiderHtml(pickupPhone)}</strong>
         </div>
 
         <div class="rider-order-detail-item">
           <span>Pickup Address</span>
-          <strong>${pickupAddress}</strong>
+          <strong>${escapeRiderHtml(pickupAddress)}</strong>
         </div>
 
       </div>
@@ -1431,22 +1549,22 @@ function openOrderDetailsModal(delivery) {
 
         <div class="rider-order-detail-item">
           <span>Destination</span>
-          <strong>${dropoff}</strong>
+          <strong>${escapeRiderHtml(dropoff)}</strong>
         </div>
 
         <div class="rider-order-detail-item">
           <span>Recipient Name</span>
-          <strong>${recipientName}</strong>
+          <strong>${escapeRiderHtml(recipientName)}</strong>
         </div>
 
         <div class="rider-order-detail-item">
           <span>Recipient Phone</span>
-          <strong>${recipientPhone}</strong>
+          <strong>${escapeRiderHtml(recipientPhone)}</strong>
         </div>
 
         <div class="rider-order-detail-item">
           <span>Delivery Address</span>
-          <strong>${deliveryAddress}</strong>
+          <strong>${escapeRiderHtml(deliveryAddress)}</strong>
         </div>
 
       </div>
@@ -1462,12 +1580,12 @@ function openOrderDetailsModal(delivery) {
 
         <div class="rider-order-detail-item">
           <span>Package Type</span>
-          <strong>${packageType}</strong>
+          <strong>${escapeRiderHtml(packageType)}</strong>
         </div>
 
         <div class="rider-order-detail-item">
           <span>Delivery Window</span>
-          <strong>${deliveryWindow}</strong>
+          <strong>${escapeRiderHtml(deliveryWindow)}</strong>
         </div>
 
       </div>
@@ -1476,7 +1594,7 @@ function openOrderDetailsModal(delivery) {
 
         <div class="rider-order-detail-item" style="margin-block-start: 16px;">
           <span>Description</span>
-          <strong>${packageDescription}</strong>
+          <strong>${escapeRiderHtml(packageDescription)}</strong>
         </div>
 
       ` : ""}
@@ -1508,6 +1626,9 @@ function openOrderDetailsModal(delivery) {
   }
 
   modal.hidden = false;
+  riderModalReturnFocus = document.activeElement;
+  document.body.style.overflow = 'hidden';
+  document.getElementById('riderModalCloseBtn')?.focus();
 
 }
 
@@ -1524,6 +1645,12 @@ function closeOrderDetailsModal() {
 
   if (modal) {
     modal.hidden = true;
+    modal.querySelectorAll('.rider-proof-form').forEach(form => form.reset());
+    document.getElementById('riderModalBody')?.replaceChildren();
+    document.getElementById('riderModalFooter')?.replaceChildren();
+    document.body.style.overflow = '';
+    if (riderModalReturnFocus?.isConnected) riderModalReturnFocus.focus();
+    riderModalReturnFocus = null;
   }
 
 }
@@ -1570,6 +1697,12 @@ document.addEventListener("DOMContentLoaded", () => {
         if (event.key === "Escape") {
           closeOrderDetailsModal();
         }
+        if (event.key === 'Tab') {
+          const focusable = [...modal.querySelectorAll('button:not(:disabled), input:not(:disabled), a[href], [tabindex="0"]')];
+          const first = focusable[0], last = focusable[focusable.length - 1];
+          if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+          else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+        }
       }
     );
   }
@@ -1606,13 +1739,15 @@ document.addEventListener(
     }
 
     button.disabled = true;
+    riderActionInFlight = true;
 
     try {
 
       if (action === "accept") {
         await respondToAssignment(orderId, true);
       } else if (action === "decline") {
-        const reason = window.prompt("Reason for declining (optional):") || "";
+        const reason = window.prompt("Reason for declining (optional):");
+        if (reason === null) return;
         await respondToAssignment(orderId, false, reason);
       } else if (action === "advance") {
         await updateRiderDeliveryStatus(orderId, button.dataset.nextStatus, button);
@@ -1631,6 +1766,7 @@ document.addEventListener(
       );
 
     } finally {
+      riderActionInFlight = false;
       button.disabled = false;
     }
 
@@ -1655,8 +1791,10 @@ document.addEventListener(
 
     const orderId = form.dataset.orderId;
     const recipientName = form.querySelector(".rider-proof-recipient")?.value || "";
-    const photoFile = form.querySelector(".rider-proof-photo")?.files?.[0] || null;
+    const photoFile = riderCameraPhotos.get(form)?.file || form.querySelector(".rider-proof-photo")?.files?.[0] || null;
     const submitButton = form.querySelector("button[type=submit]");
+    if (!form.reportValidity()) return;
+    riderActionInFlight = true;
 
     if (submitButton) {
       submitButton.disabled = true;
@@ -1665,7 +1803,18 @@ document.addEventListener(
 
     try {
 
-      await completeDeliveryWithProof(orderId, recipientName, photoFile);
+      let gps;
+      if (form.dataset.requireGps === 'true') {
+        if (!navigator.geolocation) throw new Error('Location is unavailable on this device.');
+        const position = await new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 15000 }));
+        gps = { lat: position.coords.latitude, lng: position.coords.longitude };
+      }
+      await completeDeliveryWithProof(orderId, recipientName, photoFile, {
+        otp: form.querySelector('.rider-proof-otp')?.value.trim(),
+        signatureFile: form.querySelector('.rider-proof-signature')?.files?.[0], gps
+      });
+      form.reset();
+      await loadRiderDelivery();
 
     } catch (error) {
 
@@ -1684,6 +1833,8 @@ document.addEventListener(
         submitButton.textContent = "Complete Delivery";
       }
 
+    } finally {
+      riderActionInFlight = false;
     }
 
   }
@@ -1724,7 +1875,7 @@ document.addEventListener(
     try {
 
       const response =
-        await fetch(
+        await riderFetch(
           "/api/rider/logout",
           {
             method: "POST",
@@ -1785,3 +1936,25 @@ document.addEventListener(
 
   }
 );
+
+async function loadRiderNotifications() {
+  const container = document.getElementById('riderNotifications');
+  if (!container) return;
+  try {
+    const response = await riderFetch('/api/rider/notifications', { credentials: 'same-origin', cache: 'no-store' });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Unable to load notifications.');
+    container.innerHTML = (data.notifications || []).map(item => `
+      <article class="rider-notification-item">
+        <h3>${escapeRiderHtml(item.title || 'Delivery update')}</h3>
+        <p>${escapeRiderHtml(item.message)}</p>
+        <small>${escapeRiderHtml(item.createdAt ? new Date(item.createdAt).toLocaleString('en-GB') : '')}</small>
+      </article>
+    `).join('') || '<div class="rider-empty-state"><p>No notifications yet.</p></div>';
+  } catch (error) {
+    container.textContent = error.message || 'Unable to load notifications.';
+  }
+}
+
+if (riderParams.get('expired')) riderLoginMessage.textContent = 'Your session has expired. Please sign in again.';
+initializeRiderPage();

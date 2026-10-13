@@ -6,6 +6,7 @@
   <meta name="description" content="Fiable Logistics vendor portal">
   <title>Fiable Vendor Portal</title>
   <link rel="stylesheet" href="portal.css?v=4">
+  <link rel="stylesheet" href="portal-design.css?v=1">
 </head>
 <body>
   <div id="authGate" class="auth-gate">
@@ -2270,7 +2271,7 @@
       } catch (error) {
         const loginError = $("loginError");
 
-        loginError.textContent = "Invalid email, Subscriber ID, or password";
+        loginError.textContent = error.message || "Unable to log in. Please try again.";
         loginError.style.display = "block";
       } finally {
         btn.disabled = false;

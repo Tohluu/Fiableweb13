@@ -8,6 +8,7 @@
 
   <link rel="stylesheet" href="portal.css">
   <link rel="stylesheet" href="admin.css?v=5">
+  <link rel="stylesheet" href="admin-design.css?v=1">
   <style>
     body.admin-page-loading {
       visibility: hidden;
@@ -28,6 +29,7 @@
 
         <a class="brand" href="index.html">
           <img src="images/Logo2.png" alt="Fiable Logistics">
+          <span class="admin-wordmark" aria-hidden="true">FIABLE<small>LOGISTICS</small></span>
         </a>
 
         <button
@@ -52,7 +54,7 @@
           data-admin-view="admin-dashboard"
           type="button"
         >
-          <span>⌂</span>
+          <span aria-hidden="true"><svg class="admin-nav-icon"><use href="images/admin-icons.svg#dashboard"></use></svg></span>
           Dashboard
         </button>
 
@@ -61,7 +63,7 @@
           data-admin-view="admin-vendors"
           type="button"
         >
-          <span>◉</span>
+          <span aria-hidden="true"><svg class="admin-nav-icon"><use href="images/admin-icons.svg#vendors"></use></svg></span>
           Vendors
         </button>
 
@@ -70,7 +72,7 @@
           data-admin-view="admin-orders"
           type="button"
         >
-          <span>▣</span>
+          <span aria-hidden="true"><svg class="admin-nav-icon"><use href="images/admin-icons.svg#orders"></use></svg></span>
           Orders
         </button>
 
@@ -79,7 +81,7 @@
           data-admin-view="admin-subscriptions"
           type="button"
         >
-          <span>◈</span>
+          <span aria-hidden="true"><svg class="admin-nav-icon"><use href="images/admin-icons.svg#subscriptions"></use></svg></span>
           Subscriptions
         </button>
 
@@ -88,7 +90,7 @@
           data-admin-view="admin-riders"
           type="button"
         >
-          <span>🚚</span>
+          <span aria-hidden="true"><svg class="admin-nav-icon"><use href="images/admin-icons.svg#riders"></use></svg></span>
           Riders
         </button>
 
@@ -97,7 +99,7 @@
           data-admin-view="admin-team"
           type="button"
         >
-          <span>♙</span>
+          <span aria-hidden="true"><svg class="admin-nav-icon"><use href="images/admin-icons.svg#team"></use></svg></span>
           Team
         </button>
 
@@ -106,7 +108,7 @@
           data-admin-view="admin-tickets"
           type="button"
         >
-          <span>☎</span>
+          <span aria-hidden="true"><svg class="admin-nav-icon"><use href="images/admin-icons.svg#tickets"></use></svg></span>
           Support Tickets
         </button>
 
@@ -115,7 +117,7 @@
           data-admin-view="admin-audit-log"
           type="button"
         >
-          <span>▤</span>
+          <span aria-hidden="true"><svg class="admin-nav-icon"><use href="images/admin-icons.svg#audit-log"></use></svg></span>
           Audit Log
         </button>
 
@@ -124,7 +126,7 @@
           data-admin-view="admin-reports"
           type="button"
         >
-          <span>⇩</span>
+          <span aria-hidden="true"><svg class="admin-nav-icon"><use href="images/admin-icons.svg#reports"></use></svg></span>
           Reports
         </button>
 
@@ -133,7 +135,7 @@
           data-admin-view="admin-settings"
           type="button"
         >
-          <span>⚙</span>
+          <span aria-hidden="true"><svg class="admin-nav-icon"><use href="images/admin-icons.svg#settings"></use></svg></span>
           Settings
         </button>
 

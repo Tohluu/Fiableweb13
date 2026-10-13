@@ -1,0 +1,14 @@
+/* Shared Fiable identity for customer access and account management. */
+:root { --blue:#0866d9; --blue-dark:#074fa7; --blue-soft:#eaf1f8; --ink:#14263b; --muted:#596775; --line:#d9dee3; --bg:#f3f4f2; --radius:5px; --shadow:0 4px 16px rgba(20,38,59,.04); }
+body { font-family:"Segoe UI",Arial,sans-serif; line-height:1.5; }
+h1,h2,h3 { letter-spacing:-.025em; }
+.btn { border-radius:3px; box-shadow:none; font-weight:600; }
+.btn.primary:hover { transform:none; }
+.auth-card { border-radius:5px; box-shadow:var(--shadow); border-block-start:4px solid var(--blue); }
+.auth-screen { background:#f3f4f2; }
+.sidebar { border-inline-end:1px solid var(--line); }
+.panel,.stat-card,.portal-plan,.side-card { box-shadow:none; }
+input,select,textarea { border-radius:3px; }
+.sidebar-link { border-radius:3px; }
+a:focus-visible,button:focus-visible { outline:3px solid var(--blue); outline-offset:3px; }
+@media(prefers-reduced-motion:reduce) { html { scroll-behavior:auto; } *,*::before,*::after { transition:none!important; animation:none!important; } }

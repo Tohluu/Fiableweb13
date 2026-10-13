@@ -1,0 +1,29 @@
+[
+  {
+    "id": "w6Dqukp3HgXLhQ",
+    "event": "delivery_otp",
+    "channel": "sms",
+    "recipient": "***4492",
+    "sent": false,
+    "reason": "no_provider_configured",
+    "at": "2026-10-13T10:42:29.294043+00:00"
+  },
+  {
+    "id": "Ku7OsgscyilkBQ",
+    "event": "delivery_otp",
+    "channel": "sms",
+    "recipient": "***4492",
+    "sent": false,
+    "reason": "no_provider_configured",
+    "at": "2026-10-13T10:50:51.351256+00:00"
+  },
+  {
+    "id": "xZZBVhR-sDwVJQ",
+    "event": "delivery_otp",
+    "channel": "sms",
+    "recipient": "***4492",
+    "sent": false,
+    "reason": "no_provider_configured",
+    "at": "2026-10-13T11:01:30.997974+00:00"
+  }
+]

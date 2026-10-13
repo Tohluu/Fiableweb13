@@ -10,6 +10,14 @@ import base64
 import math
 import csv
 import io
+import struct
+import time
+import tempfile
+import threading
+import urllib.request
+import urllib.error
+import urllib.parse
+from contextlib import contextmanager
 from datetime import datetime, timezone, timedelta
 import os
 
@@ -34,6 +42,72 @@ DATA_DIR = Path(os.environ.get("DATA_DIR") or (ROOT / "data")).resolve()
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 APP_ENV = os.environ.get("APP_ENV", "development").strip().lower()
+
+# =========================================================
+# ATOMIC WRITES + IN-PROCESS FILE LOCKING
+# =========================================================
+# See PRODUCTION_NOTES.md for the full concurrency writeup. Summary:
+# - atomic_write_json() prevents a crash mid-write from ever leaving a
+#   truncated/corrupted JSON file (write to temp file, fsync, os.replace).
+# - locked_file() serializes a read-modify-write critical section using a
+#   threading.Lock keyed by file path. This ONLY protects against races
+#   between threads *within this one process*. It provides ZERO protection
+#   if more than one process/container/replica ever writes to the same
+#   DATA_DIR concurrently (e.g. Railway horizontal scaling). Do not run
+#   multiple replicas against shared JSON data without migrating to a real
+#   database with row-level locking/transactions first.
+_FILE_LOCKS = {}
+_FILE_LOCKS_GUARD = threading.Lock()
+
+
+def _lock_for_path(path):
+    key = str(path)
+    with _FILE_LOCKS_GUARD:
+        lock = _FILE_LOCKS.get(key)
+        if lock is None:
+            lock = threading.Lock()
+            _FILE_LOCKS[key] = lock
+        return lock
+
+
+@contextmanager
+def locked_file(*paths):
+    """Hold the in-process lock(s) for one or more data files for the
+    duration of a read-modify-write critical section. Always acquires in a
+    stable (sorted) order across call sites to avoid deadlocks when a
+    section needs more than one file."""
+    locks = [_lock_for_path(path) for path in sorted(set(paths), key=str)]
+    for lock in locks:
+        lock.acquire()
+    try:
+        yield
+    finally:
+        for lock in reversed(locks):
+            lock.release()
+
+
+def atomic_write_json(path, data, **dump_kwargs):
+    """Write JSON to `path` atomically: serialize to a temp file in the same
+    directory, flush + fsync, then os.replace() over the target. A reader
+    always sees either the complete old file or the complete new file,
+    never a partially-written one, even if the process is killed mid-write."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    dump_kwargs.setdefault("indent", 2)
+    payload = json.dumps(data, **dump_kwargs)
+    fd, tmp_name = tempfile.mkstemp(dir=str(path.parent), prefix=f".{path.name}.", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as tmp_file:
+            tmp_file.write(payload)
+            tmp_file.flush()
+            os.fsync(tmp_file.fileno())
+        os.replace(tmp_name, path)
+    except Exception:
+        try:
+            os.unlink(tmp_name)
+        except OSError:
+            pass
+        raise
 
 # Static-file paths that must never be served, even though they live
 # under the project root that SimpleHTTPRequestHandler serves from.
@@ -347,7 +421,9 @@ def load_accounts():
     if not ACCOUNTS_FILE.exists():
         return []
     try:
-        return json.loads(ACCOUNTS_FILE.read_text(encoding="utf-8"))
+        # Accept files saved by Windows editors with a UTF-8 byte-order mark.
+        # utf-8-sig also reads ordinary UTF-8 without changing account data.
+        return json.loads(ACCOUNTS_FILE.read_text(encoding="utf-8-sig"))
     except json.JSONDecodeError:
         return []
 
@@ -394,27 +470,20 @@ def migrate_subscriber_ids():
             changed = True
 
     if changed:
-        ACCOUNTS_FILE.write_text(
-            json.dumps(accounts, indent=2),
-            encoding="utf-8"
-        )
+        atomic_write_json(ACCOUNTS_FILE, accounts)
 
 def save_account(account):
-    ACCOUNTS_FILE.parent.mkdir(exist_ok=True)
-    accounts = load_accounts()
-    accounts.append(account)
-    ACCOUNTS_FILE.write_text(json.dumps(accounts, indent=2), encoding="utf-8")
+    with locked_file(ACCOUNTS_FILE):
+        accounts = load_accounts()
+        accounts.append(account)
+        atomic_write_json(ACCOUNTS_FILE, accounts)
 
 
 def password_hash(password, salt):
     return hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), 120_000).hex()
 
 def save_admin_credentials(admins):
-    ADMIN_CREDENTIALS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    ADMIN_CREDENTIALS_FILE.write_text(
-        json.dumps(admins, indent=2),
-        encoding="utf-8"
-    )
+    atomic_write_json(ADMIN_CREDENTIALS_FILE, admins)
 
 
 def load_admin_credentials():
@@ -636,31 +705,29 @@ def authenticate(identifier, password):
 def update_account(email, plan):
     if plan not in PLANS:
         raise ValueError("Please choose a valid subscription plan")
-    accounts = load_accounts()
-    for account in accounts:
-        if account["email"] == email.lower():
-            summary = summary_for_account(account)
-            # Prevent changing an active subscription
-            # while the vendor still has units remaining.
-            if summary["subscriptionState"] in (
-                "active",
-                "expiring_soon",
-                "grace_period"
-            ) and summary["unitsRemaining"] > 0:
-                raise ValueError(
-                    "Your current subscription is still active. "
-                    "You can renew after your units are exhausted "
-                    "or after your subscription expires."
-                )
-            # Vendor is allowed to choose a new plan.
-            account["plan"] = plan
-            account["paymentStatus"] = "pending"
-            ACCOUNTS_FILE.write_text(
-                json.dumps(accounts, indent=2),
-                encoding="utf-8"
-            )
-            return account
-    raise ValueError("Account not found")
+    with locked_file(ACCOUNTS_FILE):
+        accounts = load_accounts()
+        for account in accounts:
+            if account["email"] == email.lower():
+                summary = summary_for_account(account)
+                # Prevent changing an active subscription
+                # while the vendor still has units remaining.
+                if summary["subscriptionState"] in (
+                    "active",
+                    "expiring_soon",
+                    "grace_period"
+                ) and summary["unitsRemaining"] > 0:
+                    raise ValueError(
+                        "Your current subscription is still active. "
+                        "You can renew after your units are exhausted "
+                        "or after your subscription expires."
+                    )
+                # Vendor is allowed to choose a new plan.
+                account["plan"] = plan
+                account["paymentStatus"] = "pending"
+                atomic_write_json(ACCOUNTS_FILE, accounts)
+                return account
+        raise ValueError("Account not found")
 
 
 def load_reset_tokens():
@@ -673,11 +740,7 @@ def load_reset_tokens():
 
 
 def save_reset_tokens(tokens):
-    RESET_TOKENS_FILE.parent.mkdir(exist_ok=True)
-    RESET_TOKENS_FILE.write_text(
-        json.dumps(tokens, indent=2),
-        encoding="utf-8"
-    )
+    atomic_write_json(RESET_TOKENS_FILE, tokens)
 
 
 def create_reset_token(email):
@@ -732,21 +795,39 @@ def consume_reset_token(token):
     return data
 
 def mark_payment_complete(email):
-    accounts = load_accounts()
-    for account in accounts:
-        if account["email"] == email.lower():
-            subscriptions = load_subscriptions()
-            previous_paid_at = parse_iso_date(account.get("paidAt"))
-            previous_period_start = (
-                previous_paid_at.isoformat()
-                if previous_paid_at else None
-            )
+    with locked_file(ACCOUNTS_FILE, SUBSCRIPTIONS_FILE):
+        accounts = load_accounts()
+        for account in accounts:
+            if account["email"] == email.lower():
+                subscriptions = load_subscriptions()
+                previous_paid_at = parse_iso_date(account.get("paidAt"))
+                previous_period_start = (
+                    previous_paid_at.isoformat()
+                    if previous_paid_at else None
+                )
 
-            if previous_paid_at and not any(
-                record.get("email", "").lower() == account["email"].lower()
-                and record.get("periodStart") == previous_period_start
-                for record in subscriptions
-            ):
+                if previous_paid_at and not any(
+                    record.get("email", "").lower() == account["email"].lower()
+                    and record.get("periodStart") == previous_period_start
+                    for record in subscriptions
+                ):
+                    subscriptions.append({
+                        "id": f"SUB-{len(subscriptions) + 1:05d}",
+                        "email": account["email"],
+                        "subscriberId": account.get("subscriberId"),
+                        "plan": account.get("plan"),
+                        "amount": plan_price(account.get("plan")),
+                        "unitsAllocated": PLANS.get(account.get("plan"), {}).get("units", 0),
+                        "paymentStatus": "paid",
+                        "paidAt": previous_period_start,
+                        "periodStart": previous_period_start,
+                        "periodEnd": (previous_paid_at + timedelta(days=30)).isoformat(),
+                    })
+
+                paid_at = datetime.now(timezone.utc)
+                account["paymentStatus"] = "paid"
+                account["paidAt"] = paid_at.isoformat()
+                atomic_write_json(ACCOUNTS_FILE, accounts)
                 subscriptions.append({
                     "id": f"SUB-{len(subscriptions) + 1:05d}",
                     "email": account["email"],
@@ -755,30 +836,13 @@ def mark_payment_complete(email):
                     "amount": plan_price(account.get("plan")),
                     "unitsAllocated": PLANS.get(account.get("plan"), {}).get("units", 0),
                     "paymentStatus": "paid",
-                    "paidAt": previous_period_start,
-                    "periodStart": previous_period_start,
-                    "periodEnd": (previous_paid_at + timedelta(days=30)).isoformat(),
+                    "paidAt": paid_at.isoformat(),
+                    "periodStart": paid_at.isoformat(),
+                    "periodEnd": (paid_at + timedelta(days=30)).isoformat(),
                 })
-
-            paid_at = datetime.now(timezone.utc)
-            account["paymentStatus"] = "paid"
-            account["paidAt"] = paid_at.isoformat()
-            ACCOUNTS_FILE.write_text(json.dumps(accounts, indent=2), encoding="utf-8")
-            subscriptions.append({
-                "id": f"SUB-{len(subscriptions) + 1:05d}",
-                "email": account["email"],
-                "subscriberId": account.get("subscriberId"),
-                "plan": account.get("plan"),
-                "amount": plan_price(account.get("plan")),
-                "unitsAllocated": PLANS.get(account.get("plan"), {}).get("units", 0),
-                "paymentStatus": "paid",
-                "paidAt": paid_at.isoformat(),
-                "periodStart": paid_at.isoformat(),
-                "periodEnd": (paid_at + timedelta(days=30)).isoformat(),
-            })
-            save_subscriptions(subscriptions)
-            return account
-    raise ValueError("Account not found")
+                save_subscriptions(subscriptions)
+                return account
+        raise ValueError("Account not found")
 
 
 def plan_price(plan):
@@ -796,11 +860,7 @@ def load_subscriptions():
 
 
 def save_subscriptions(subscriptions):
-    SUBSCRIPTIONS_FILE.parent.mkdir(exist_ok=True)
-    SUBSCRIPTIONS_FILE.write_text(
-        json.dumps(subscriptions, indent=2),
-        encoding="utf-8"
-    )
+    atomic_write_json(SUBSCRIPTIONS_FILE, subscriptions)
 
 
 def subscription_history_for_account(account):
@@ -864,21 +924,21 @@ def deliveries_for_subscription(email, subscription):
 
 
 def save_submission(kind, payload):
-    DATA_FILE.parent.mkdir(exist_ok=True)
-    submissions = []
-    if DATA_FILE.exists():
-        try:
-            submissions = json.loads(DATA_FILE.read_text(encoding="utf-8"))
-        except json.JSONDecodeError:
-            submissions = []
-    submissions.append({
-        "id": len(submissions) + 1,
-        "type": kind,
-        "createdAt": datetime.now(timezone.utc).isoformat(),
-        "data": payload,
-    })
-    DATA_FILE.write_text(json.dumps(submissions, indent=2), encoding="utf-8")
-    return submissions[-1]
+    with locked_file(DATA_FILE):
+        submissions = []
+        if DATA_FILE.exists():
+            try:
+                submissions = json.loads(DATA_FILE.read_text(encoding="utf-8"))
+            except json.JSONDecodeError:
+                submissions = []
+        submissions.append({
+            "id": len(submissions) + 1,
+            "type": kind,
+            "createdAt": datetime.now(timezone.utc).isoformat(),
+            "data": payload,
+        })
+        atomic_write_json(DATA_FILE, submissions)
+        return submissions[-1]
 
 
 def load_deliveries():
@@ -891,8 +951,7 @@ def load_deliveries():
 
 
 def save_deliveries(deliveries):
-    DELIVERIES_FILE.parent.mkdir(exist_ok=True)
-    DELIVERIES_FILE.write_text(json.dumps(deliveries, indent=2), encoding="utf-8")
+    atomic_write_json(DELIVERIES_FILE, deliveries)
 
 
 def create_delivery(account_email, pickup, dropoff, units, details=None, order_ref=None, unit_price=None, plan=None, pricing=None):
@@ -1265,7 +1324,7 @@ def load_riders():
     try:
         return json.loads(
             RIDERS_FILE.read_text(
-                encoding="utf-8"
+                encoding="utf-8-sig"
             )
         )
     except json.JSONDecodeError:
@@ -1273,19 +1332,7 @@ def load_riders():
 
 
 def save_riders(riders):
-    RIDERS_FILE.parent.mkdir(
-        parents=True,
-        exist_ok=True
-    )
-
-    RIDERS_FILE.write_text(
-        json.dumps(
-            riders,
-            indent=2,
-            ensure_ascii=False
-        ),
-        encoding="utf-8"
-    )
+    atomic_write_json(RIDERS_FILE, riders, ensure_ascii=False)
 
 def load_rider_notifications():
 
@@ -1314,16 +1361,7 @@ def load_rider_notifications():
 
 
 def save_rider_notifications(notifications):
-
-    RIDER_NOTIFICATIONS_FILE.parent.mkdir(parents=True, exist_ok=True)
-
-    RIDER_NOTIFICATIONS_FILE.write_text(
-        json.dumps(
-            notifications,
-            indent=2
-        ),
-        encoding="utf-8"
-    )
+    atomic_write_json(RIDER_NOTIFICATIONS_FILE, notifications)
 
 
 def create_rider_notification(
@@ -1370,19 +1408,7 @@ def load_rider_payments():
 
 
 def save_rider_payments(payments):
-    RIDER_PAYMENTS_FILE.parent.mkdir(
-        parents=True,
-        exist_ok=True
-    )
-
-    RIDER_PAYMENTS_FILE.write_text(
-        json.dumps(
-            payments,
-            indent=2,
-            ensure_ascii=False
-        ),
-        encoding="utf-8"
-    )
+    atomic_write_json(RIDER_PAYMENTS_FILE, payments, ensure_ascii=False)
 
 # =========================================================
 # ADMIN SESSION FUNCTIONS
@@ -1402,6 +1428,26 @@ def create_admin_session(email):
     }
 
     return token
+
+
+def issue_admin_session(handler, admin, message="Admin login successful."):
+    """Writes the session+CSRF cookies and JSON body for a fully-authenticated
+    admin. Only ever called after password AND (if enabled) MFA succeed."""
+    session_token = create_admin_session(admin.get("email"))
+    body = json.dumps({"message": message}).encode("utf-8")
+    handler.send_response(200)
+    handler.send_header("Content-Type", "application/json; charset=utf-8")
+    handler.send_header(
+        "Set-Cookie",
+        session_cookie(handler, "fiable_admin_session", session_token, ADMIN_SESSION_EXPIRY_HOURS * 60 * 60)
+    )
+    handler.send_header(
+        "Set-Cookie",
+        csrf_cookie(handler, generate_csrf_token(), ADMIN_SESSION_EXPIRY_HOURS * 60 * 60)
+    )
+    handler.send_header("Content-Length", str(len(body)))
+    handler.end_headers()
+    handler.wfile.write(body)
 
 
 def get_admin_session(handler):
@@ -1939,8 +1985,499 @@ def ensure_tracking_code(order):
     return order["trackingCode"]
 
 
+def rider_safe_order(order):
+    """Strip fields a rider must never read from their own session - most
+    importantly the delivery OTP. The whole point of the OTP is that the
+    RECIPIENT must provide it to the rider; a rider who could just read it
+    from their own app would make the check meaningless."""
+    if not isinstance(order, dict):
+        return order
+    safe = dict(order)
+    safe.pop("deliveryOtp", None)
+    safe["proofRequirements"] = dict(PROOF_OF_DELIVERY_REQUIREMENTS)
+    return safe
+
+
+def rider_safe_profile(rider):
+    return {key: value for key, value in rider.items() if key not in ("passwordHash", "salt")}
+
+
 def generate_delivery_otp():
     return f"{secrets.randbelow(1_000_000):06d}"
+
+
+OTP_EXPIRY_MINUTES = 10
+OTP_MAX_ATTEMPTS = 5
+
+
+# =========================================================
+# NOTIFICATION SERVICE (provider-agnostic abstraction)
+# =========================================================
+# Every outbound SMS/WhatsApp/email goes through this one facade instead of
+# being scattered as provider-specific calls throughout the business logic.
+# No provider is wired up yet (SMS_PROVIDER/WHATSAPP_PROVIDER/EMAIL_PROVIDER
+# are all unset by default) - every send_* method below returns
+# {"sent": bool, "channel": str, "reason": str} and NEVER reports sent=True
+# unless a real provider actually confirmed delivery. Adding a provider
+# later means implementing _send_sms/_send_whatsapp/_send_email once; no
+# call site below needs to change.
+NOTIFICATION_LOG_FILE = DATA_DIR / "notification_log.json"
+
+SMS_PROVIDER = os.environ.get("SMS_PROVIDER", "").strip().lower() or None
+WHATSAPP_PROVIDER = os.environ.get("WHATSAPP_PROVIDER", "").strip().lower() or None
+EMAIL_PROVIDER = os.environ.get("EMAIL_PROVIDER", "").strip().lower() or None
+
+
+def redact_recipient(recipient):
+    """Never store a full phone number/email in the notification log."""
+    if not recipient:
+        return None
+    recipient = str(recipient)
+    if "@" in recipient:
+        name, _, domain = recipient.partition("@")
+        return f"{name[:2]}***@{domain}"
+    return f"***{recipient[-4:]}" if len(recipient) > 4 else "***"
+
+
+def _record_notification(event, channel, recipient, sent, reason):
+    """Safe audit trail of send ATTEMPTS - never the message body, OTP,
+    or any other sensitive content."""
+    entries = load_json_list(NOTIFICATION_LOG_FILE)
+    entries.append({
+        "id": secrets.token_urlsafe(10),
+        "event": event,
+        "channel": channel,
+        "recipient": redact_recipient(recipient),
+        "sent": sent,
+        "reason": reason,
+        "at": now_iso(),
+    })
+    if len(entries) > 2000:
+        entries = entries[-2000:]
+    save_json_list(NOTIFICATION_LOG_FILE, entries)
+
+
+class NotificationService:
+    """Stateless facade over SMS/WhatsApp/email. Safe to call with zero
+    providers configured (today's default) - callers must check the
+    returned "sent" flag and must never assume it succeeded."""
+
+    @staticmethod
+    def _send_sms(to, message):
+        if not SMS_PROVIDER:
+            return {"sent": False, "channel": "sms", "reason": "no_provider_configured"}
+        return {"sent": False, "channel": "sms", "reason": "provider_not_implemented"}
+
+    @staticmethod
+    def _send_whatsapp(to, message):
+        if not WHATSAPP_PROVIDER:
+            return {"sent": False, "channel": "whatsapp", "reason": "no_provider_configured"}
+        return {"sent": False, "channel": "whatsapp", "reason": "provider_not_implemented"}
+
+    @staticmethod
+    def _send_email(to, subject, body):
+        if not EMAIL_PROVIDER:
+            return {"sent": False, "channel": "email", "reason": "no_provider_configured"}
+        return {"sent": False, "channel": "email", "reason": "provider_not_implemented"}
+
+    @classmethod
+    def send_delivery_otp(cls, phone, otp, order_ref):
+        result = cls._send_sms(
+            phone,
+            f"Fiable delivery {order_ref}: your OTP is {otp}. Only share this with your rider at handover.",
+        )
+        _record_notification("delivery_otp", result["channel"], phone, result["sent"], result["reason"])
+        return result
+
+    @classmethod
+    def send_delivery_update(cls, phone, order_ref, status_label):
+        result = cls._send_sms(phone, f"Fiable delivery {order_ref} update: {status_label}.")
+        _record_notification("delivery_update", result["channel"], phone, result["sent"], result["reason"])
+        return result
+
+    @classmethod
+    def send_assignment_notification(cls, phone, order_ref):
+        result = cls._send_sms(phone, f"Fiable: you have been assigned delivery {order_ref}.")
+        _record_notification("assignment", result["channel"], phone, result["sent"], result["reason"])
+        return result
+
+    @classmethod
+    def send_low_units_alert(cls, email, units_remaining):
+        result = cls._send_email(
+            email, "Low delivery units remaining",
+            f"You have {units_remaining} units left on your Fiable subscription.",
+        )
+        _record_notification("low_units_alert", result["channel"], email, result["sent"], result["reason"])
+        return result
+
+    @classmethod
+    def send_subscription_reminder(cls, email, renewal_date):
+        result = cls._send_email(
+            email, "Your Fiable subscription renews soon",
+            f"Your subscription renews on {renewal_date}.",
+        )
+        _record_notification("subscription_reminder", result["channel"], email, result["sent"], result["reason"])
+        return result
+
+    @classmethod
+    def send_payment_confirmation(cls, email, amount, plan):
+        result = cls._send_email(
+            email, "Payment received",
+            f"We received your payment of NGN {amount} for the {plan} plan.",
+        )
+        _record_notification("payment_confirmation", result["channel"], email, result["sent"], result["reason"])
+        return result
+
+    @classmethod
+    def send_support_update(cls, email, ticket_id):
+        result = cls._send_email(
+            email, f"Update on ticket {ticket_id}",
+            "There is a new update on your support ticket.",
+        )
+        _record_notification("support_update", result["channel"], email, result["sent"], result["reason"])
+        return result
+
+
+# =========================================================
+# ADMIN MFA (TOTP - RFC 6238), stdlib-only implementation
+# =========================================================
+MFA_ISSUER = "Fiable Logistics"
+MFA_TOTP_DIGITS = 6
+MFA_TOTP_PERIOD_SECONDS = 30
+MFA_TOTP_WINDOW = 1  # tolerate 1 step (30s) of clock drift each side
+MFA_RECOVERY_CODE_COUNT = 8
+MFA_CHALLENGE_EXPIRY_SECONDS = 5 * 60
+MFA_CHALLENGE_MAX_ATTEMPTS = 5
+
+# In-memory only: a challenge exists between "password verified" and
+# "MFA code verified". No admin session is issued until the challenge is
+# resolved, so a stolen password alone can never grant a working session.
+ADMIN_MFA_CHALLENGES = {}
+
+
+def generate_totp_secret():
+    return base64.b32encode(secrets.token_bytes(20)).decode("ascii").rstrip("=")
+
+
+def format_totp_secret_for_display(secret):
+    return " ".join(secret[i:i + 4] for i in range(0, len(secret), 4))
+
+
+def totp_provisioning_uri(secret, account_email):
+    label = urllib.parse.quote(f"{MFA_ISSUER}:{account_email}")
+    issuer = urllib.parse.quote(MFA_ISSUER)
+    return f"otpauth://totp/{label}?secret={secret}&issuer={issuer}&algorithm=SHA1&digits={MFA_TOTP_DIGITS}&period={MFA_TOTP_PERIOD_SECONDS}"
+
+
+def _totp_code_at(secret, for_time):
+    padded = secret + "=" * ((8 - len(secret) % 8) % 8)
+    key = base64.b32decode(padded, casefold=True)
+    counter = int(for_time // MFA_TOTP_PERIOD_SECONDS)
+    msg = struct.pack(">Q", counter)
+    digest = hmac.new(key, msg, hashlib.sha1).digest()
+    offset = digest[-1] & 0x0F
+    code_int = struct.unpack(">I", digest[offset:offset + 4])[0] & 0x7FFFFFFF
+    return str(code_int % (10 ** MFA_TOTP_DIGITS)).zfill(MFA_TOTP_DIGITS)
+
+
+def verify_totp_code(secret, code):
+    if not secret or not code:
+        return False
+    code = re.sub(r"\s+", "", str(code))
+    if not code.isdigit() or len(code) != MFA_TOTP_DIGITS:
+        return False
+    now = time.time()
+    for step in range(-MFA_TOTP_WINDOW, MFA_TOTP_WINDOW + 1):
+        expected = _totp_code_at(secret, now + step * MFA_TOTP_PERIOD_SECONDS)
+        if hmac.compare_digest(expected, code):
+            return True
+    return False
+
+
+def generate_recovery_codes():
+    """Returns (plaintext_codes, hashed_records). Plaintext is returned to
+    the caller exactly once and is never stored - only the salted hashes
+    are persisted, the same way passwords are handled."""
+    plaintext_codes = []
+    hashed_records = []
+    for _ in range(MFA_RECOVERY_CODE_COUNT):
+        raw = secrets.token_hex(5).upper()  # 10 hex chars
+        code = f"{raw[:5]}-{raw[5:]}"
+        salt = secrets.token_hex(16)
+        plaintext_codes.append(code)
+        hashed_records.append({"hash": password_hash(code, salt), "salt": salt})
+    return plaintext_codes, hashed_records
+
+
+def consume_recovery_code(admin, code):
+    """If `code` matches one of the admin's unused recovery codes, removes
+    it (one-time use) and returns True. Constant-time comparison per code."""
+    if not code:
+        return False
+    normalized = code.strip().upper()
+    records = admin.get("mfaRecoveryCodesHash") or []
+    for record in records:
+        if hmac.compare_digest(record.get("hash", ""), password_hash(normalized, record.get("salt", ""))):
+            records.remove(record)
+            admin["mfaRecoveryCodesHash"] = records
+            return True
+    return False
+
+
+def create_mfa_challenge(email):
+    token = secrets.token_urlsafe(32)
+    ADMIN_MFA_CHALLENGES[token] = {
+        "email": email,
+        "expiresAt": datetime.now(timezone.utc) + timedelta(seconds=MFA_CHALLENGE_EXPIRY_SECONDS),
+        "attempts": 0,
+    }
+    return token
+
+
+def pop_valid_mfa_challenge(token):
+    """Returns the challenge dict if `token` is present and not expired,
+    without consuming it (caller must call invalidate_mfa_challenge once
+    the attempt has been fully resolved, success or final failure)."""
+    challenge = ADMIN_MFA_CHALLENGES.get(token)
+    if not challenge:
+        return None
+    if datetime.now(timezone.utc) > challenge["expiresAt"]:
+        ADMIN_MFA_CHALLENGES.pop(token, None)
+        return None
+    return challenge
+
+
+def invalidate_mfa_challenge(token):
+    ADMIN_MFA_CHALLENGES.pop(token, None)
+
+
+# =========================================================
+# PAYMENT PROVIDER ABSTRACTION + PAYSTACK INTEGRATION
+# =========================================================
+# Business logic (subscription activation, unit allocation) never talks to
+# Paystack - or any provider - directly. It only calls the PaymentProvider
+# interface below, so a second provider (e.g. Flutterwave) can be added
+# later by implementing one new class, without touching activation logic.
+
+PAYMENTS_FILE = DATA_DIR / "payments.json"
+
+# Hard off-switch: until this is explicitly "true" (and a provider is
+# actually configured), no live/test transaction can be initialized. This
+# prevents an accidentally-live payment button while Fiable is still under
+# development, regardless of what credentials happen to be present.
+PAYMENTS_ENABLED = os.environ.get("PAYMENTS_ENABLED", "false").strip().lower() == "true"
+PAYMENT_PROVIDER_NAME = os.environ.get("PAYMENT_PROVIDER", "paystack").strip().lower()
+PAYSTACK_SECRET_KEY = os.environ.get("PAYSTACK_SECRET_KEY", "").strip()
+PAYSTACK_PUBLIC_KEY = os.environ.get("PAYSTACK_PUBLIC_KEY", "").strip()
+# Paystack test secret keys start with sk_test_ - used only to decide what
+# safe label to show in the admin UI; verification always uses whatever key
+# is actually configured, live or test.
+PAYSTACK_IS_TEST_MODE = PAYSTACK_SECRET_KEY.startswith("sk_test_")
+
+PAYMENT_STATES = {
+    "pending", "verification_pending", "successful", "failed",
+    "cancelled", "refunded",
+}
+
+
+class PaymentProvider:
+    """Interface every payment provider must implement."""
+
+    def initialize_transaction(self, *, email, amount_kobo, reference, callback_url, metadata):
+        raise NotImplementedError
+
+    def verify_transaction(self, reference):
+        raise NotImplementedError
+
+    def verify_webhook_signature(self, raw_body, signature_header):
+        raise NotImplementedError
+
+
+class PaystackProvider(PaymentProvider):
+    BASE_URL = "https://api.paystack.co"
+
+    def __init__(self, secret_key):
+        self.secret_key = secret_key
+
+    def _request(self, method, path, body=None):
+        url = f"{self.BASE_URL}{path}"
+        data = json.dumps(body).encode("utf-8") if body is not None else None
+        request = urllib.request.Request(url, data=data, method=method)
+        request.add_header("Authorization", f"Bearer {self.secret_key}")
+        request.add_header("Content-Type", "application/json")
+        try:
+            with urllib.request.urlopen(request, timeout=15) as response:
+                return json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as error:
+            try:
+                return json.loads(error.read().decode("utf-8"))
+            except Exception:
+                return {"status": False, "message": f"Paystack request failed (HTTP {error.code})"}
+        except urllib.error.URLError as error:
+            return {"status": False, "message": f"Could not reach Paystack: {error.reason}"}
+        except Exception:
+            return {"status": False, "message": "Unexpected error contacting Paystack."}
+
+    def initialize_transaction(self, *, email, amount_kobo, reference, callback_url, metadata):
+        return self._request("POST", "/transaction/initialize", {
+            "email": email,
+            "amount": amount_kobo,
+            "reference": reference,
+            "callback_url": callback_url,
+            "metadata": metadata or {},
+        })
+
+    def verify_transaction(self, reference):
+        return self._request("GET", f"/transaction/verify/{urllib.parse.quote(reference, safe='')}")
+
+    def verify_webhook_signature(self, raw_body, signature_header):
+        if not signature_header or not self.secret_key:
+            return False
+        computed = hmac.new(self.secret_key.encode("utf-8"), raw_body, hashlib.sha512).hexdigest()
+        return hmac.compare_digest(computed, signature_header)
+
+
+def get_payment_provider():
+    """Returns a configured provider instance, or None if payments are
+    disabled or no provider credentials are present - callers must handle
+    None by refusing to start/verify any transaction."""
+    if not PAYMENTS_ENABLED:
+        return None
+    if PAYMENT_PROVIDER_NAME == "paystack" and PAYSTACK_SECRET_KEY:
+        return PaystackProvider(PAYSTACK_SECRET_KEY)
+    return None
+
+
+def load_payments():
+    return load_json_list(PAYMENTS_FILE)
+
+
+def save_payments(payments):
+    save_json_list(PAYMENTS_FILE, payments)
+
+
+def generate_payment_reference():
+    return f"FL-PAY-{secrets.token_hex(10)}"
+
+
+def find_payment_by_reference(payments, reference):
+    return next((item for item in payments if item.get("reference") == reference), None)
+
+
+def next_receipt_number(payments):
+    numbers = []
+    for payment in payments:
+        receipt_id = str(payment.get("receiptId") or "")
+        if receipt_id.startswith("FL-RCPT-"):
+            try:
+                numbers.append(int(receipt_id.replace("FL-RCPT-", "")))
+            except ValueError:
+                continue
+    return f"FL-RCPT-{(max(numbers, default=0) + 1):06d}"
+
+
+def vendor_safe_payment(payment):
+    """Vendor-facing projection - never includes provider webhook metadata
+    verbatim (only the safe summary fields already on the record)."""
+    return {
+        "reference": payment.get("reference"),
+        "plan": payment.get("plan"),
+        "amount": payment.get("amount"),
+        "currency": payment.get("currency", "NGN"),
+        "provider": payment.get("provider"),
+        "status": payment.get("status"),
+        "createdAt": payment.get("createdAt"),
+        "verifiedAt": payment.get("verifiedAt"),
+        "receiptId": payment.get("receiptId"),
+        "periodStart": payment.get("periodStart"),
+        "periodEnd": payment.get("periodEnd"),
+    }
+
+
+def build_receipt(payment):
+    """A professional receipt for a verified successful payment. Never
+    includes card/provider-sensitive data - only what was already safe to
+    show the vendor."""
+    return {
+        "receiptNumber": payment.get("receiptId"),
+        "business": "Fiable Logistics",
+        "vendorEmail": payment.get("vendorEmail"),
+        "plan": payment.get("plan"),
+        "amount": payment.get("amount"),
+        "currency": payment.get("currency", "NGN"),
+        "paymentReference": payment.get("reference"),
+        "paymentMethod": payment.get("provider"),
+        "paymentDate": payment.get("verifiedAt"),
+        "unitsAllocated": payment.get("unitsAllocated"),
+        "periodStart": payment.get("periodStart"),
+        "periodEnd": payment.get("periodEnd"),
+    }
+
+
+def activate_subscription_from_payment(payment, payments):
+    """The ONE place a verified successful payment turns into an active
+    subscription. Called from both the webhook and the manual-verify
+    endpoint so there is exactly one activation code path to reason about.
+    MUST be called while holding locked_file(PAYMENTS_FILE, ACCOUNTS_FILE,
+    SUBSCRIPTIONS_FILE). Idempotent: if the payment is already successful,
+    does nothing and returns False (caller can tell no new activation
+    happened)."""
+    if payment.get("status") == "successful":
+        return False
+
+    accounts = load_accounts()
+    account = next((a for a in accounts if a.get("email", "").lower() == payment["vendorEmail"].lower()), None)
+    if not account:
+        payment["status"] = "failed"
+        payment["failureReason"] = "vendor_account_not_found"
+        return False
+
+    paid_at = datetime.now(timezone.utc)
+    period_end = paid_at + timedelta(days=30)
+
+    account["plan"] = payment["plan"]
+    account["paymentStatus"] = "paid"
+    account["paidAt"] = paid_at.isoformat()
+    atomic_write_json(ACCOUNTS_FILE, accounts)
+
+    subscriptions = load_subscriptions()
+    subscriptions.append({
+        "id": f"SUB-{len(subscriptions) + 1:05d}",
+        "email": account["email"],
+        "subscriberId": account.get("subscriberId"),
+        "plan": payment["plan"],
+        "amount": payment["amount"],
+        "unitsAllocated": PLANS.get(payment["plan"], {}).get("units", 0),
+        "paymentStatus": "paid",
+        "paidAt": paid_at.isoformat(),
+        "periodStart": paid_at.isoformat(),
+        "periodEnd": period_end.isoformat(),
+        "paymentReference": payment["reference"],
+    })
+    save_subscriptions(subscriptions)
+
+    payment["status"] = "successful"
+    payment["verifiedAt"] = paid_at.isoformat()
+    payment["periodStart"] = paid_at.isoformat()
+    payment["periodEnd"] = period_end.isoformat()
+    payment["unitsAllocated"] = PLANS.get(payment["plan"], {}).get("units", 0)
+    payment["receiptId"] = next_receipt_number(payments)
+
+    append_audit_log(
+        actor_email=payment["vendorEmail"], actor_role="system", action="payment_verified",
+        target_type="payment", target_id=payment["reference"],
+    )
+    append_audit_log(
+        actor_email=payment["vendorEmail"], actor_role="system", action="subscription_activated",
+        target_type="vendor", target_id=payment["vendorEmail"], new={"plan": payment["plan"]},
+    )
+    append_audit_log(
+        actor_email=payment["vendorEmail"], actor_role="system", action="units_allocated",
+        target_type="vendor", target_id=payment["vendorEmail"], new={"units": payment["unitsAllocated"]},
+    )
+
+    NotificationService.send_payment_confirmation(payment["vendorEmail"], payment["amount"], payment["plan"])
+    return True
 
 
 ALLOWED_PROOF_MIME_TYPES = {
@@ -1993,8 +2530,7 @@ def load_json_list(path):
 
 
 def save_json_list(path, data):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+    atomic_write_json(path, data, ensure_ascii=False)
 
 
 # =========================================================
@@ -2181,6 +2717,7 @@ CSRF_EXEMPT_PATHS = {
     "/api/admin/login", "/api/admin/logout",
     "/api/rider/login", "/api/rider/logout",
     "/api/login", "/api/logout",
+    "/api/admin/mfa/verify-login",
 }
 
 
@@ -2371,9 +2908,113 @@ class FiableHandler(SimpleHTTPRequestHandler):
             raise ValueError("Request is too large")
         return json.loads(self.rfile.read(length).decode("utf-8"))
 
+    def _handle_paystack_webhook(self):
+        """Verifies the Paystack signature against the RAW body, then
+        independently re-verifies the transaction directly with Paystack's
+        API before ever activating a subscription - the webhook payload
+        itself is never trusted as proof of payment, only as a trigger to
+        go check."""
+        try:
+            length = int(self.headers.get("Content-Length", 0))
+            if length > 200_000:
+                self._json_response(400, {"error": "Payload too large"})
+                return
+            raw_body = self.rfile.read(length)
+        except (TypeError, ValueError):
+            self._json_response(400, {"error": "Invalid request"})
+            return
+
+        provider = get_payment_provider()
+        if not provider:
+            # Payments aren't enabled/configured - never process anything.
+            self._json_response(503, {"error": "Payments are not enabled."})
+            return
+
+        signature = self.headers.get("X-Paystack-Signature", "")
+        if not provider.verify_webhook_signature(raw_body, signature):
+            append_audit_log(
+                actor_email=None, actor_role="system", action="webhook_signature_invalid",
+                target_type="payment", note="Rejected Paystack webhook with an invalid signature.",
+            )
+            self._json_response(401, {"error": "Invalid signature"})
+            return
+
+        try:
+            event = json.loads(raw_body.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            self._json_response(400, {"error": "Invalid JSON body"})
+            return
+
+        event_type = event.get("event")
+        reference = (event.get("data") or {}).get("reference")
+
+        if not reference:
+            self._json_response(400, {"error": "Missing transaction reference"})
+            return
+
+        with locked_file(PAYMENTS_FILE, ACCOUNTS_FILE, SUBSCRIPTIONS_FILE):
+            payments = load_payments()
+            payment = find_payment_by_reference(payments, reference)
+
+            if not payment:
+                # Unknown reference - nothing we initialized. Ack anyway so
+                # Paystack stops retrying, but never act on it.
+                self._json_response(200, {"message": "Ignored (unknown reference)."})
+                return
+
+            if payment.get("status") == "successful":
+                # Idempotency: retried/duplicate webhook for an already
+                # fully-processed payment. Do nothing, just acknowledge.
+                self._json_response(200, {"message": "Already processed."})
+                return
+
+            if event_type != "charge.success":
+                self._json_response(200, {"message": "Event ignored (not a successful charge)."})
+                return
+
+            verification = provider.verify_transaction(reference)
+            verified_data = (verification or {}).get("data") or {}
+
+            expected_kobo = int(round(payment["amount"] * 100))
+            independently_verified = (
+                verification.get("status") is True
+                and verified_data.get("status") == "success"
+                and verified_data.get("reference") == reference
+                and int(verified_data.get("amount", -1)) == expected_kobo
+                and str(verified_data.get("currency", "")).upper() == "NGN"
+            )
+
+            if not independently_verified:
+                payment["status"] = "failed"
+                payment["failureReason"] = "webhook_verification_mismatch"
+                save_payments(payments)
+                append_audit_log(
+                    actor_email=payment.get("vendorEmail"), actor_role="system", action="payment_failed",
+                    target_type="payment", target_id=reference, note="Independent verification did not match.",
+                )
+                self._json_response(200, {"message": "Verification mismatch - not activated."})
+                return
+
+            payment["providerReference"] = verified_data.get("reference")
+            payment["providerMetadata"] = {
+                "channel": verified_data.get("channel"),
+                "paidAt": verified_data.get("paid_at"),
+                "gatewayResponse": verified_data.get("gateway_response"),
+            }
+            activate_subscription_from_payment(payment, payments)
+            save_payments(payments)
+
+        self._json_response(200, {"message": "Webhook processed."})
 
     def do_POST(self):
         path = urlparse(self.path).path
+
+        # Paystack calls this directly (no browser session, no CSRF token,
+        # and needs the EXACT raw request bytes to verify the signature) -
+        # handle it before any of the normal JSON-body/CSRF/session plumbing.
+        if path == "/api/payments/paystack/webhook":
+            self._handle_paystack_webhook()
+            return
 
         gate_message = password_change_gate(self, path)
         if gate_message:
@@ -2612,6 +3253,7 @@ class FiableHandler(SimpleHTTPRequestHandler):
                 rider["salt"] = salt
                 rider["passwordHash"] = password_hash(new_password, salt)
                 rider["passwordResetAt"] = datetime.now(timezone.utc).isoformat()
+                rider["mustChangePassword"] = False
                 save_riders(riders)
                 consume_reset_token(token)
                 self._json_response(200, {"message": "Password reset successfully."})
@@ -2770,11 +3412,21 @@ class FiableHandler(SimpleHTTPRequestHandler):
                 order["status"] = new_status
 
                 if new_status == "picked_up" and not order.get("deliveryOtp"):
-                    # Recipient OTP - shown to the vendor (who relays it to the
-                    # recipient) since no SMS provider is configured yet, so it
-                    # is never marked as automatically "sent".
-                    order["deliveryOtp"] = generate_delivery_otp()
+                    # Recipient OTP - no SMS/WhatsApp provider is configured
+                    # yet (NotificationService reports this honestly below),
+                    # so it is shown to the vendor/admin to relay manually
+                    # and is never marked as automatically "sent".
+                    otp = generate_delivery_otp()
+                    order["deliveryOtp"] = otp
                     order["otpState"] = "generated"
+                    order["otpAttempts"] = 0
+                    order["otpGeneratedAt"] = now_iso()
+                    order["otpExpiresAt"] = (
+                        datetime.now(timezone.utc) + timedelta(minutes=OTP_EXPIRY_MINUTES)
+                    ).isoformat()
+                    recipient_phone = (order.get("details") or {}).get("recipientPhone")
+                    if recipient_phone:
+                        NotificationService.send_delivery_otp(recipient_phone, otp, order.get("orderRef"))
 
                 if new_status == "on_delivery":
                     rider["status"] = "on_delivery"
@@ -2809,8 +3461,8 @@ class FiableHandler(SimpleHTTPRequestHandler):
                     200,
                     {
                         "message": "Delivery status updated successfully.",
-                        "order": order,
-                        "rider": rider
+                        "order": rider_safe_order(order),
+                        "rider": rider_safe_profile(rider)
                     }
                 )
 
@@ -2864,7 +3516,7 @@ class FiableHandler(SimpleHTTPRequestHandler):
 
                 save_deliveries(deliveries)
 
-                self._json_response(200, {"message": "Assignment accepted.", "order": order})
+                self._json_response(200, {"message": "Assignment accepted.", "order": rider_safe_order(order)})
                 return
 
             if path == "/api/rider/delivery/decline":
@@ -2944,7 +3596,7 @@ class FiableHandler(SimpleHTTPRequestHandler):
                     note=reason,
                 )
 
-                self._json_response(200, {"message": "Assignment declined.", "order": order})
+                self._json_response(200, {"message": "Assignment declined.", "order": rider_safe_order(order)})
                 return
 
             # =====================================================
@@ -3012,11 +3664,25 @@ class FiableHandler(SimpleHTTPRequestHandler):
                 if requirements.get("requireOtp"):
                     if not otp_input:
                         missing.append("delivery OTP")
-                    elif not order.get("deliveryOtp") or not hmac.compare_digest(otp_input, str(order.get("deliveryOtp"))):
-                        order["otpState"] = "failed"
-                        save_deliveries(deliveries)
-                        self._json_response(400, {"error": "The OTP entered does not match."})
-                        return
+                    else:
+                        otp_expires_at = parse_iso_date(order.get("otpExpiresAt"))
+                        if otp_expires_at and datetime.now(timezone.utc) > otp_expires_at:
+                            order["otpState"] = "expired"
+                            save_deliveries(deliveries)
+                            self._json_response(400, {"error": "This OTP has expired. Ask the vendor or an admin to regenerate it."})
+                            return
+                        if int(order.get("otpAttempts", 0) or 0) >= OTP_MAX_ATTEMPTS:
+                            order["otpState"] = "failed"
+                            save_deliveries(deliveries)
+                            self._json_response(400, {"error": "Too many incorrect attempts. Ask an admin to regenerate the OTP."})
+                            return
+                        if not order.get("deliveryOtp") or not hmac.compare_digest(otp_input, str(order.get("deliveryOtp"))):
+                            order["otpAttempts"] = int(order.get("otpAttempts", 0) or 0) + 1
+                            attempts_left = max(0, OTP_MAX_ATTEMPTS - order["otpAttempts"])
+                            order["otpState"] = "failed" if attempts_left == 0 else order.get("otpState", "generated")
+                            save_deliveries(deliveries)
+                            self._json_response(400, {"error": "The OTP entered does not match.", "attemptsRemaining": attempts_left})
+                            return
                 if requirements.get("requirePhoto") and not photo_data_url:
                     missing.append("delivery photo")
                 if requirements.get("requireSignature") and not signature_data_url:
@@ -3082,8 +3748,8 @@ class FiableHandler(SimpleHTTPRequestHandler):
                     200,
                     {
                         "message": "Delivery completed with proof of delivery.",
-                        "order": order,
-                        "rider": rider_record
+                        "order": rider_safe_order(order),
+                        "rider": rider_safe_profile(rider_record)
                     }
                 )
                 return
@@ -3267,30 +3933,31 @@ class FiableHandler(SimpleHTTPRequestHandler):
                     self._json_response(400, {"error": "A reason is required for every unit adjustment."})
                     return
 
-                accounts = load_accounts()
-                account = next((a for a in accounts if a.get("email", "").lower() == email), None)
-                if not account:
-                    self._json_response(404, {"error": "Vendor account not found."})
-                    return
+                with locked_file(ACCOUNTS_FILE, UNIT_ADJUSTMENTS_FILE):
+                    accounts = load_accounts()
+                    account = next((a for a in accounts if a.get("email", "").lower() == email), None)
+                    if not account:
+                        self._json_response(404, {"error": "Vendor account not found."})
+                        return
 
-                previous_balance = int(account.get("manualUnitAdjustment", 0) or 0)
-                new_balance = previous_balance + delta
-                account["manualUnitAdjustment"] = new_balance
-                ACCOUNTS_FILE.write_text(json.dumps(accounts, indent=2), encoding="utf-8")
+                    previous_balance = int(account.get("manualUnitAdjustment", 0) or 0)
+                    new_balance = previous_balance + delta
+                    account["manualUnitAdjustment"] = new_balance
+                    atomic_write_json(ACCOUNTS_FILE, accounts)
 
-                entries = load_json_list(UNIT_ADJUSTMENTS_FILE)
-                entry = {
-                    "id": secrets.token_urlsafe(10),
-                    "email": email,
-                    "unitsDelta": delta,
-                    "reason": reason,
-                    "adminEmail": admin.get("email"),
-                    "previousBalance": previous_balance,
-                    "newBalance": new_balance,
-                    "at": now_iso(),
-                }
-                entries.append(entry)
-                save_json_list(UNIT_ADJUSTMENTS_FILE, entries)
+                    entries = load_json_list(UNIT_ADJUSTMENTS_FILE)
+                    entry = {
+                        "id": secrets.token_urlsafe(10),
+                        "email": email,
+                        "unitsDelta": delta,
+                        "reason": reason,
+                        "adminEmail": admin.get("email"),
+                        "previousBalance": previous_balance,
+                        "newBalance": new_balance,
+                        "at": now_iso(),
+                    }
+                    entries.append(entry)
+                    save_json_list(UNIT_ADJUSTMENTS_FILE, entries)
 
                 audit_admin_action(
                     self, "manual_unit_adjustment", "vendor", email,
@@ -3438,10 +4105,19 @@ class FiableHandler(SimpleHTTPRequestHandler):
 
 
                 # -------------------------------------------------
-                # CREATE ADMIN SESSION
+                # CREATE ADMIN SESSION (or, if MFA is enabled, issue a
+                # short-lived challenge instead - no session yet)
                 # -------------------------------------------------
 
                 clear_login_attempts(rate_key)
+
+                if matched_admin.get("mfaEnabled"):
+                    challenge_token = create_mfa_challenge(matched_admin.get("email"))
+                    self._json_response(200, {
+                        "mfaRequired": True,
+                        "challengeToken": challenge_token,
+                    })
+                    return
 
                 session_token = create_admin_session(matched_admin.get("email"))
 
@@ -3787,6 +4463,222 @@ class FiableHandler(SimpleHTTPRequestHandler):
                     }
                 )
 
+                return
+
+
+            # =====================================================
+            # ADMIN MFA (TOTP)
+            # =====================================================
+
+            if path == "/api/admin/mfa/setup/start":
+                current_admin = get_current_admin(self)
+                if not current_admin:
+                    self._json_response(401, {"error": "Admin authentication required."})
+                    return
+                if current_admin.get("mfaEnabled"):
+                    self._json_response(400, {"error": "MFA is already enabled. Disable it first to set up a new device."})
+                    return
+
+                secret = generate_totp_secret()
+                admins = load_admin_credentials()
+                target_admin = find_admin_by_email(admins, current_admin.get("email"))
+                # Stored as "pending" until the admin proves they can generate
+                # a valid code with it - MFA does not become active here.
+                target_admin["mfaPendingSecret"] = secret
+                save_admin_credentials(admins)
+
+                self._json_response(200, {
+                    "secret": format_totp_secret_for_display(secret),
+                    "otpauthUrl": totp_provisioning_uri(secret, current_admin.get("email")),
+                })
+                return
+
+            if path == "/api/admin/mfa/setup/confirm":
+                current_admin = get_current_admin(self)
+                if not current_admin:
+                    self._json_response(401, {"error": "Admin authentication required."})
+                    return
+
+                code = clean(payload.get("code"), 20)
+                admins = load_admin_credentials()
+                target_admin = find_admin_by_email(admins, current_admin.get("email"))
+                pending_secret = target_admin.get("mfaPendingSecret")
+
+                if not pending_secret:
+                    self._json_response(400, {"error": "No MFA setup is in progress. Start setup again."})
+                    return
+
+                if not verify_totp_code(pending_secret, code):
+                    self._json_response(400, {"error": "Incorrect authenticator code. Please try again."})
+                    return
+
+                recovery_codes, hashed_codes = generate_recovery_codes()
+
+                target_admin["mfaEnabled"] = True
+                target_admin["mfaMethod"] = "totp"
+                target_admin["mfaSecret"] = pending_secret
+                target_admin["mfaPendingSecret"] = None
+                target_admin["mfaRecoveryCodesHash"] = hashed_codes
+                save_admin_credentials(admins)
+
+                append_audit_log(
+                    actor_email=target_admin.get("email"),
+                    actor_role=target_admin.get("role"),
+                    action="mfa_enabled",
+                    target_type="admin",
+                    target_id=target_admin.get("id"),
+                )
+
+                self._json_response(200, {
+                    "message": "Two-factor authentication is now enabled.",
+                    "recoveryCodes": recovery_codes,
+                })
+                return
+
+            if path == "/api/admin/mfa/disable":
+                current_admin = get_current_admin(self)
+                if not current_admin:
+                    self._json_response(401, {"error": "Admin authentication required."})
+                    return
+
+                password = clean(payload.get("password"), 128)
+                code = clean(payload.get("code"), 20)
+
+                admins = load_admin_credentials()
+                target_admin = find_admin_by_email(admins, current_admin.get("email"))
+
+                if not hmac.compare_digest(
+                    target_admin.get("passwordHash", ""),
+                    password_hash(password, target_admin.get("salt", ""))
+                ):
+                    self._json_response(401, {"error": "Current password is incorrect."})
+                    return
+
+                if not target_admin.get("mfaEnabled"):
+                    self._json_response(400, {"error": "MFA is not currently enabled."})
+                    return
+
+                if not verify_totp_code(target_admin.get("mfaSecret"), code) and not consume_recovery_code(target_admin, code):
+                    self._json_response(401, {"error": "Incorrect authentication code."})
+                    return
+
+                target_admin["mfaEnabled"] = False
+                target_admin["mfaMethod"] = None
+                target_admin["mfaSecret"] = None
+                target_admin["mfaPendingSecret"] = None
+                target_admin["mfaRecoveryCodesHash"] = []
+                save_admin_credentials(admins)
+
+                append_audit_log(
+                    actor_email=target_admin.get("email"),
+                    actor_role=target_admin.get("role"),
+                    action="mfa_disabled",
+                    target_type="admin",
+                    target_id=target_admin.get("id"),
+                )
+
+                self._json_response(200, {"message": "Two-factor authentication has been disabled."})
+                return
+
+            if path == "/api/admin/mfa/recovery-codes/regenerate":
+                current_admin = get_current_admin(self)
+                if not current_admin:
+                    self._json_response(401, {"error": "Admin authentication required."})
+                    return
+
+                code = clean(payload.get("code"), 20)
+                admins = load_admin_credentials()
+                target_admin = find_admin_by_email(admins, current_admin.get("email"))
+
+                if not target_admin.get("mfaEnabled"):
+                    self._json_response(400, {"error": "MFA is not currently enabled."})
+                    return
+
+                if not verify_totp_code(target_admin.get("mfaSecret"), code):
+                    self._json_response(401, {"error": "Incorrect authenticator code."})
+                    return
+
+                recovery_codes, hashed_codes = generate_recovery_codes()
+                target_admin["mfaRecoveryCodesHash"] = hashed_codes
+                save_admin_credentials(admins)
+
+                append_audit_log(
+                    actor_email=target_admin.get("email"),
+                    actor_role=target_admin.get("role"),
+                    action="mfa_recovery_codes_regenerated",
+                    target_type="admin",
+                    target_id=target_admin.get("id"),
+                )
+
+                self._json_response(200, {
+                    "message": "Recovery codes regenerated. Save these somewhere safe - they will not be shown again.",
+                    "recoveryCodes": recovery_codes,
+                })
+                return
+
+            if path == "/api/admin/mfa/verify-login":
+                challenge_token = clean(payload.get("challengeToken"), 200)
+                code = clean(payload.get("code"), 20)
+
+                if not challenge_token or not code:
+                    self._json_response(400, {"error": "A challenge token and code are required."})
+                    return
+
+                challenge = pop_valid_mfa_challenge(challenge_token)
+                if not challenge:
+                    self._json_response(401, {"error": "This verification step has expired. Please log in again."})
+                    return
+
+                if challenge["attempts"] >= MFA_CHALLENGE_MAX_ATTEMPTS:
+                    invalidate_mfa_challenge(challenge_token)
+                    self._json_response(429, {"error": "Too many incorrect attempts. Please log in again."})
+                    return
+
+                admins = load_admin_credentials()
+                admin = find_admin_by_email(admins, challenge["email"])
+
+                if not admin or not admin.get("mfaEnabled"):
+                    invalidate_mfa_challenge(challenge_token)
+                    self._json_response(401, {"error": "Please log in again."})
+                    return
+
+                if admin.get("status") == "revoked":
+                    invalidate_mfa_challenge(challenge_token)
+                    self._json_response(403, {"error": "Your access has been revoked. Contact the account owner."})
+                    return
+
+                used_recovery_code = False
+                valid_code = verify_totp_code(admin.get("mfaSecret"), code)
+                if not valid_code:
+                    used_recovery_code = consume_recovery_code(admin, code)
+                    if used_recovery_code:
+                        save_admin_credentials(admins)
+
+                if not valid_code and not used_recovery_code:
+                    challenge["attempts"] += 1
+                    remaining = MFA_CHALLENGE_MAX_ATTEMPTS - challenge["attempts"]
+                    self._json_response(401, {"error": "Incorrect authentication code.", "attemptsRemaining": max(0, remaining)})
+                    return
+
+                invalidate_mfa_challenge(challenge_token)
+
+                append_audit_log(
+                    actor_email=admin.get("email"),
+                    actor_role=admin.get("role"),
+                    action="admin_login",
+                    target_type="admin",
+                    target_id=admin.get("id"),
+                )
+                if used_recovery_code:
+                    append_audit_log(
+                        actor_email=admin.get("email"),
+                        actor_role=admin.get("role"),
+                        action="mfa_recovery_code_used",
+                        target_type="admin",
+                        target_id=admin.get("id"),
+                    )
+
+                issue_admin_session(self, admin)
                 return
 
 
@@ -4197,18 +5089,19 @@ class FiableHandler(SimpleHTTPRequestHandler):
                     )
                     return
 
-                rider_payments = load_rider_payments()
-                
-                payment = {
-                    "id": secrets.token_urlsafe(12),
-                    "riderId": rider_id,
-                    "amount": amount,
-                    "month": month,
-                    "paidAt": datetime.now(timezone.utc).isoformat()
-                }
-                
-                rider_payments.append(payment)
-                save_rider_payments(rider_payments)
+                with locked_file(RIDER_PAYMENTS_FILE):
+                    rider_payments = load_rider_payments()
+
+                    payment = {
+                        "id": secrets.token_urlsafe(12),
+                        "riderId": rider_id,
+                        "amount": amount,
+                        "month": month,
+                        "paidAt": datetime.now(timezone.utc).isoformat()
+                    }
+
+                    rider_payments.append(payment)
+                    save_rider_payments(rider_payments)
 
                 audit_admin_action(self, "rider_payment_recorded", "rider", rider_id, new={"amount": amount, "month": month})
 
@@ -4755,6 +5648,46 @@ class FiableHandler(SimpleHTTPRequestHandler):
             # ADMIN UPDATE ORDER STATUS
             # =====================================================
 
+            if path == "/api/admin/orders/regenerate-otp":
+
+                admin = require_permission(self, "manage_orders")
+                if not admin:
+                    self._json_response(403, {"error": "You do not have permission to regenerate delivery OTPs."})
+                    return
+
+                try:
+                    order_id = int(payload.get("orderId"))
+                except (TypeError, ValueError):
+                    self._json_response(400, {"error": "A valid order ID is required."})
+                    return
+
+                with locked_file(DELIVERIES_FILE):
+                    deliveries = load_deliveries()
+                    order = next((item for item in deliveries if str(item.get("id", "")) == str(order_id)), None)
+                    if not order:
+                        self._json_response(404, {"error": "Order not found."})
+                        return
+                    if not order.get("deliveryOtp") and order.get("otpState", "not_generated") == "not_generated":
+                        self._json_response(400, {"error": "This delivery has not reached the OTP stage yet."})
+                        return
+
+                    otp = generate_delivery_otp()
+                    order["deliveryOtp"] = otp
+                    order["otpState"] = "generated"
+                    order["otpAttempts"] = 0
+                    order["otpGeneratedAt"] = now_iso()
+                    order["otpExpiresAt"] = (datetime.now(timezone.utc) + timedelta(minutes=OTP_EXPIRY_MINUTES)).isoformat()
+                    save_deliveries(deliveries)
+
+                    recipient_phone = (order.get("details") or {}).get("recipientPhone")
+                    if recipient_phone:
+                        NotificationService.send_delivery_otp(recipient_phone, otp, order.get("orderRef"))
+
+                audit_admin_action(self, "otp_regenerated", "delivery", order_id)
+
+                self._json_response(200, {"message": "OTP regenerated.", "otp": otp, "expiresAt": order["otpExpiresAt"]})
+                return
+
             if path == "/api/admin/orders/update-status":
 
                 admin = require_permission(self, "manage_orders")
@@ -5139,10 +6072,7 @@ class FiableHandler(SimpleHTTPRequestHandler):
                 account["passwordHash"] = password_hash(newPassword, salt)
                 account["passwordChangedAt"] = datetime.now(timezone.utc).isoformat()
 
-                ACCOUNTS_FILE.write_text(
-                    json.dumps(accounts, indent=2),
-                    encoding="utf-8"
-                )
+                atomic_write_json(ACCOUNTS_FILE, accounts)
 
                 self._json_response(
                     200,
@@ -5162,9 +6092,136 @@ class FiableHandler(SimpleHTTPRequestHandler):
                 if not email:
                     self._json_response(401, {"error": "Please log in."})
                     return
+                if get_payment_provider():
+                    # Once a real provider is configured, this instant "demo
+                    # checkout" must never be reachable - it would let anyone
+                    # activate a subscription for free, bypassing Paystack.
+                    self._json_response(403, {"error": "Demo checkout is disabled once real payments are configured. Use /api/account/payments/initialize."})
+                    return
                 account = mark_payment_complete(email)
                 self._json_response(200, {"paymentStatus": account["paymentStatus"], "message": "Payment recorded for local demo checkout."})
                 return
+
+            if path == "/api/account/payments/initialize":
+                email = get_logged_in_vendor_email(self)
+                if not email:
+                    self._json_response(401, {"error": "Please log in."})
+                    return
+                provider = get_payment_provider()
+                if not provider:
+                    self._json_response(503, {
+                        "error": "Online payments are not yet enabled.",
+                        "paymentsEnabled": False,
+                    })
+                    return
+
+                plan = clean(payload.get("plan"), 40)
+                if plan not in PLANS:
+                    self._json_response(400, {"error": "Please choose a valid subscription plan."})
+                    return
+
+                account = next((a for a in load_accounts() if a.get("email", "").lower() == email), None)
+                if not account:
+                    self._json_response(401, {"error": "Account not found"})
+                    return
+
+                amount = plan_price(plan)
+                reference = generate_payment_reference()
+                origin = f"{'https' if is_secure_request(self) else 'http'}://{self.headers.get('Host', '')}"
+
+                provider_response = provider.initialize_transaction(
+                    email=email,
+                    amount_kobo=int(round(amount * 100)),
+                    reference=reference,
+                    callback_url=f"{origin}/portal.html?payment=callback",
+                    metadata={"vendorEmail": email, "plan": plan},
+                )
+
+                if not provider_response.get("status"):
+                    self._json_response(502, {"error": provider_response.get("message") or "Unable to start payment with the provider."})
+                    return
+
+                with locked_file(PAYMENTS_FILE):
+                    payments = load_payments()
+                    payments.append({
+                        "reference": reference,
+                        "vendorEmail": email,
+                        "plan": plan,
+                        "amount": amount,
+                        "currency": "NGN",
+                        "provider": "paystack",
+                        "providerReference": None,
+                        "status": "pending",
+                        "createdAt": now_iso(),
+                        "verifiedAt": None,
+                        "unitsAllocated": None,
+                        "receiptId": None,
+                    })
+                    save_payments(payments)
+
+                append_audit_log(
+                    actor_email=email, actor_role="vendor", action="payment_initialized",
+                    target_type="payment", target_id=reference, new={"plan": plan, "amount": amount},
+                )
+
+                self._json_response(200, {
+                    "reference": reference,
+                    "authorizationUrl": (provider_response.get("data") or {}).get("authorization_url"),
+                    "publicKey": PAYSTACK_PUBLIC_KEY,
+                    "testMode": PAYSTACK_IS_TEST_MODE,
+                })
+                return
+
+            if path == "/api/account/payments/verify":
+                email = get_logged_in_vendor_email(self)
+                if not email:
+                    self._json_response(401, {"error": "Please log in."})
+                    return
+                provider = get_payment_provider()
+                if not provider:
+                    self._json_response(503, {"error": "Online payments are not yet enabled."})
+                    return
+
+                reference = clean(payload.get("reference"), 120)
+                if not reference:
+                    self._json_response(400, {"error": "A payment reference is required."})
+                    return
+
+                with locked_file(PAYMENTS_FILE, ACCOUNTS_FILE, SUBSCRIPTIONS_FILE):
+                    payments = load_payments()
+                    payment = find_payment_by_reference(payments, reference)
+                    if not payment or payment.get("vendorEmail", "").lower() != email.lower():
+                        self._json_response(404, {"error": "Payment not found."})
+                        return
+
+                    if payment.get("status") == "successful":
+                        self._json_response(200, {"status": "successful", "payment": vendor_safe_payment(payment)})
+                        return
+
+                    verification = provider.verify_transaction(reference)
+                    verified_data = (verification or {}).get("data") or {}
+                    expected_kobo = int(round(payment["amount"] * 100))
+                    independently_verified = (
+                        verification.get("status") is True
+                        and verified_data.get("status") == "success"
+                        and verified_data.get("reference") == reference
+                        and int(verified_data.get("amount", -1)) == expected_kobo
+                        and str(verified_data.get("currency", "")).upper() == "NGN"
+                    )
+
+                    if not independently_verified:
+                        payment["status"] = "verification_pending" if verified_data.get("status") == "pending" else "failed"
+                        save_payments(payments)
+                        self._json_response(200, {"status": payment["status"], "payment": vendor_safe_payment(payment)})
+                        return
+
+                    payment["providerReference"] = verified_data.get("reference")
+                    activate_subscription_from_payment(payment, payments)
+                    save_payments(payments)
+
+                self._json_response(200, {"status": "successful", "payment": vendor_safe_payment(payment)})
+                return
+
             if path == "/api/batch-delivery-quote":
                 email = get_logged_in_vendor_email(self)
                 if not email:
@@ -5204,64 +6261,65 @@ class FiableHandler(SimpleHTTPRequestHandler):
                 if summary["subscriptionState"] not in ("active", "expiring_soon", "grace_period"):
                     self._json_response(402, {"error": "Complete payment and activate your subscription before requesting deliveries."})
                     return
-                batch_quote = estimate_batch_deliveries(
-                    requests,
-                    summary.get("plan")
-                )
-                if summary["unitsRemaining"] < batch_quote["chargedUnits"]:
-                    self._json_response(409, {"error": "Insufficient units for this batch delivery."})
-                    return
-
-                created_deliveries = []
-                batch_id = f"BATCH-{secrets.token_urlsafe(8)}"
-                for request, quote in zip(requests, batch_quote["deliveries"]):
-                    required_fields = {
-                        "pickup": clean(request.get("pickup"), 120),
-                        "dropoff": clean(request.get("dropoff"), 120),
-                        "pickupContactName": clean(request.get("pickupContactName"), 100),
-                        "pickupPhone": clean(request.get("pickupPhone"), 40),
-                        "pickupAddress": clean(request.get("pickupAddress"), 300),
-                        "recipientName": clean(request.get("recipientName"), 100),
-                        "recipientPhone": clean(request.get("recipientPhone"), 40),
-                        "deliveryAddress": clean(request.get("deliveryAddress"), 300),
-                    }
-                    if not all(required_fields.values()):
-                        raise ValueError("Complete all required details for every batch delivery.")
-                    requested_window = clean(request.get("deliveryWindow"), 40)
-                    delivery_window = validate_delivery_window(requested_window)
-                    priority = "Express" if requested_window == "Express" else "Standard"
-                    details = {
-                        "pickupContactName": required_fields["pickupContactName"],
-                        "pickupPhone": required_fields["pickupPhone"],
-                        "pickupAddress": required_fields["pickupAddress"],
-                        "recipientName": required_fields["recipientName"],
-                        "recipientPhone": required_fields["recipientPhone"],
-                        "deliveryAddress": required_fields["deliveryAddress"],
-                        "packageType": "General",
-                        "priority": priority,
-                        "deliveryWindow": delivery_window,
-                        "packageDescription": clean(request.get("packageDescription"), 300),
-                        "pickupInstructions": clean(request.get("pickupInstructions"), 300),
-                        "deliveryInstructions": clean(request.get("deliveryInstructions"), 300),
-                    }
-                    quote["batchId"] = batch_id
-                    delivery = create_delivery(
-                        email,
-                        required_fields["pickup"],
-                        required_fields["dropoff"],
-                        quote["chargedUnits"],
-                        details,
-                        unit_price=quote["unitPrice"],
-                        plan=summary.get("plan"),
-                        pricing=quote
+                with locked_file(ACCOUNTS_FILE, DELIVERIES_FILE):
+                    batch_quote = estimate_batch_deliveries(
+                        requests,
+                        summary.get("plan")
                     )
-                    delivery["batchId"] = batch_id
-                    created_deliveries.append(delivery)
+                    if summary["unitsRemaining"] < batch_quote["chargedUnits"]:
+                        self._json_response(409, {"error": "Insufficient units for this batch delivery."})
+                        return
 
-                save_deliveries(
-                    load_deliveries()[:-len(created_deliveries)] +
-                    created_deliveries
-                )
+                    created_deliveries = []
+                    batch_id = f"BATCH-{secrets.token_urlsafe(8)}"
+                    for request, quote in zip(requests, batch_quote["deliveries"]):
+                        required_fields = {
+                            "pickup": clean(request.get("pickup"), 120),
+                            "dropoff": clean(request.get("dropoff"), 120),
+                            "pickupContactName": clean(request.get("pickupContactName"), 100),
+                            "pickupPhone": clean(request.get("pickupPhone"), 40),
+                            "pickupAddress": clean(request.get("pickupAddress"), 300),
+                            "recipientName": clean(request.get("recipientName"), 100),
+                            "recipientPhone": clean(request.get("recipientPhone"), 40),
+                            "deliveryAddress": clean(request.get("deliveryAddress"), 300),
+                        }
+                        if not all(required_fields.values()):
+                            raise ValueError("Complete all required details for every batch delivery.")
+                        requested_window = clean(request.get("deliveryWindow"), 40)
+                        delivery_window = validate_delivery_window(requested_window)
+                        priority = "Express" if requested_window == "Express" else "Standard"
+                        details = {
+                            "pickupContactName": required_fields["pickupContactName"],
+                            "pickupPhone": required_fields["pickupPhone"],
+                            "pickupAddress": required_fields["pickupAddress"],
+                            "recipientName": required_fields["recipientName"],
+                            "recipientPhone": required_fields["recipientPhone"],
+                            "deliveryAddress": required_fields["deliveryAddress"],
+                            "packageType": "General",
+                            "priority": priority,
+                            "deliveryWindow": delivery_window,
+                            "packageDescription": clean(request.get("packageDescription"), 300),
+                            "pickupInstructions": clean(request.get("pickupInstructions"), 300),
+                            "deliveryInstructions": clean(request.get("deliveryInstructions"), 300),
+                        }
+                        quote["batchId"] = batch_id
+                        delivery = create_delivery(
+                            email,
+                            required_fields["pickup"],
+                            required_fields["dropoff"],
+                            quote["chargedUnits"],
+                            details,
+                            unit_price=quote["unitPrice"],
+                            plan=summary.get("plan"),
+                            pricing=quote
+                        )
+                        delivery["batchId"] = batch_id
+                        created_deliveries.append(delivery)
+
+                    save_deliveries(
+                        load_deliveries()[:-len(created_deliveries)] +
+                        created_deliveries
+                    )
                 self._json_response(201, {
                     "message": "Batch delivery requests received.",
                     "deliveries": created_deliveries,
@@ -5315,42 +6373,43 @@ class FiableHandler(SimpleHTTPRequestHandler):
                 if not account:
                     self._json_response(401, {"error": "Account not found"})
                     return
-                summary = summary_for_account(account)
-                if summary["subscriptionState"] not in ("active", "expiring_soon", "grace_period"):
-                    self._json_response(402, {"error": "Complete payment and activate your subscription before requesting deliveries."})
-                    return
-                est = estimate_delivery(
-                    pickup,
-                    dropoff,
-                    summary.get("plan"),
-                    priority
-                )
-                if summary["unitsRemaining"] < est["units"]:
-                    self._json_response(409, {"error": "Insufficient units for this delivery. Please renew or choose a smaller route."})
-                    return
-                details = {
-                    "pickupContactName": contactName,
-                    "pickupPhone": contactPhone,
-                    "pickupAddress": pickupAddress,
-                    "recipientName": recipient,
-                    "recipientPhone": recipientPhone,
-                    "deliveryAddress": deliveryAddress,
-                    "packageType": packageType,
-                    "deliveryWindow": window,
-                    "packageDescription": packageDescription,
-                    "pickupInstructions": clean(payload.get("pickupInstructions"), 300),
-                    "deliveryInstructions": clean(payload.get("deliveryInstructions"), 300),
-                }
-                delivery = create_delivery(
-                    email,
-                    pickup,
-                    dropoff,
-                    est.get("units", 1),
-                    details,
-                    unit_price=est.get("unitPrice"),
-                    plan=summary.get("plan"),
-                    pricing=est
-                )
+                with locked_file(ACCOUNTS_FILE, DELIVERIES_FILE):
+                    summary = summary_for_account(account)
+                    if summary["subscriptionState"] not in ("active", "expiring_soon", "grace_period"):
+                        self._json_response(402, {"error": "Complete payment and activate your subscription before requesting deliveries."})
+                        return
+                    est = estimate_delivery(
+                        pickup,
+                        dropoff,
+                        summary.get("plan"),
+                        priority
+                    )
+                    if summary["unitsRemaining"] < est["units"]:
+                        self._json_response(409, {"error": "Insufficient units for this delivery. Please renew or choose a smaller route."})
+                        return
+                    details = {
+                        "pickupContactName": contactName,
+                        "pickupPhone": contactPhone,
+                        "pickupAddress": pickupAddress,
+                        "recipientName": recipient,
+                        "recipientPhone": recipientPhone,
+                        "deliveryAddress": deliveryAddress,
+                        "packageType": packageType,
+                        "deliveryWindow": window,
+                        "packageDescription": packageDescription,
+                        "pickupInstructions": clean(payload.get("pickupInstructions"), 300),
+                        "deliveryInstructions": clean(payload.get("deliveryInstructions"), 300),
+                    }
+                    delivery = create_delivery(
+                        email,
+                        pickup,
+                        dropoff,
+                        est.get("units", 1),
+                        details,
+                        unit_price=est.get("unitPrice"),
+                        plan=summary.get("plan"),
+                        pricing=est
+                    )
                 self._json_response(201, {"message": "Delivery request received", "delivery": delivery, "summary": summary_for_account(account)})
                 return
             if path == "/api/delivery/status":
@@ -5517,10 +6576,7 @@ class FiableHandler(SimpleHTTPRequestHandler):
                 if not account_found:
                     raise ValueError("Account not found")
 
-                ACCOUNTS_FILE.write_text(
-                    json.dumps(accounts, indent=2),
-                    encoding="utf-8"
-                )
+                atomic_write_json(ACCOUNTS_FILE, accounts)
 
                 # Make the reset token unusable immediately
                 consume_reset_token(token)
@@ -5663,6 +6719,83 @@ class FiableHandler(SimpleHTTPRequestHandler):
             items = deliveries_for_account(email)
             self._json_response(200, {"deliveries": items})
             return
+
+        if self.path.startswith("/api/account/payments/receipt"):
+            email = get_logged_in_vendor_email(self)
+            if not email:
+                self._json_response(401, {"error": "Please log in."})
+                return
+            query = parse_qs(urlparse(self.path).query)
+            reference = clean(query.get("reference", [""])[0], 120)
+            payment = find_payment_by_reference(load_payments(), reference)
+            if not payment or payment.get("vendorEmail", "").lower() != email.lower():
+                self._json_response(404, {"error": "Receipt not found."})
+                return
+            if payment.get("status") != "successful":
+                self._json_response(400, {"error": "This payment has not been verified yet."})
+                return
+            self._json_response(200, {"receipt": build_receipt(payment)})
+            return
+
+        if self.path.startswith("/api/account/payments"):
+            email = get_logged_in_vendor_email(self)
+            if not email:
+                self._json_response(401, {"error": "Please log in."})
+                return
+            own_payments = [p for p in load_payments() if p.get("vendorEmail", "").lower() == email.lower()]
+            own_payments.sort(key=lambda p: p.get("createdAt", ""), reverse=True)
+            self._json_response(200, {
+                "payments": [vendor_safe_payment(p) for p in own_payments],
+                "paymentsEnabled": bool(get_payment_provider()),
+            })
+            return
+
+        if self.path.startswith("/api/admin/finance/payments/export"):
+            if not require_permission(self, "export_data") or not require_permission(self, "view_finance"):
+                self._json_response(403, {"error": "You do not have permission to export payment data."})
+                return
+            rows = [csv_safe_row(vendor_safe_payment(p) | {"vendorEmail": p.get("vendorEmail")}) for p in load_payments()]
+            csv_text = rows_to_csv(rows)
+            audit_admin_action(self, "export_data", "payments")
+            self.send_response(200)
+            self.send_header("Content-Type", "text/csv; charset=utf-8")
+            self.send_header("Content-Disposition", "attachment; filename=fiable-payments.csv")
+            body = csv_text.encode("utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
+        if self.path.startswith("/api/admin/finance/payments"):
+            if not require_permission(self, "view_finance"):
+                self._json_response(403, {"error": "You do not have permission to view payments."})
+                return
+
+            query = parse_qs(urlparse(self.path).query)
+            status_filter = clean(query.get("status", [""])[0], 40).lower()
+            vendor_filter = clean(query.get("vendor", [""])[0], 160).lower()
+            date_from = parse_iso_date(query.get("dateFrom", [""])[0])
+            date_to = parse_iso_date(query.get("dateTo", [""])[0])
+
+            payments = load_payments()
+            if status_filter:
+                payments = [p for p in payments if p.get("status") == status_filter]
+            if vendor_filter:
+                payments = [p for p in payments if vendor_filter in p.get("vendorEmail", "").lower()]
+            if date_from:
+                payments = [p for p in payments if (parse_iso_date(p.get("createdAt")) or datetime.min.replace(tzinfo=timezone.utc)) >= date_from]
+            if date_to:
+                payments = [p for p in payments if (parse_iso_date(p.get("createdAt")) or datetime.min.replace(tzinfo=timezone.utc)) <= date_to]
+
+            payments.sort(key=lambda p: p.get("createdAt", ""), reverse=True)
+
+            self._json_response(200, {
+                "payments": payments,
+                "paymentsEnabled": bool(get_payment_provider()),
+                "testMode": PAYSTACK_IS_TEST_MODE,
+            })
+            return
+
         if self.path.startswith("/api/dashboard-stats"):
             email = get_logged_in_vendor_email(self)
             if not email:
@@ -6031,7 +7164,7 @@ class FiableHandler(SimpleHTTPRequestHandler):
                     order.get("status", "")
                 ).strip().lower()
 
-                if status in {"assigned", "on_delivery"}:
+                if status in {"assigned", "rider_accepted", "arriving_at_pickup", "picked_up", "on_delivery"}:
                     assigned_deliveries.append(order)
 
             # Sort: on_delivery first, then assigned
@@ -6052,13 +7185,26 @@ class FiableHandler(SimpleHTTPRequestHandler):
             self._json_response(
                 200,
                 {
-                    "delivery": current_delivery,
-                    "deliveries": assigned_deliveries,
+                    "delivery": rider_safe_order(current_delivery),
+                    "deliveries": [rider_safe_order(item) for item in assigned_deliveries],
                     "count": len(assigned_deliveries)
                 }
             )
 
 
+            return
+
+        if self.path == "/api/rider/notifications":
+            rider = get_logged_in_rider(self)
+            if not rider:
+                self._json_response(401, {"error": "Rider authentication required."})
+                return
+            notifications = [
+                item for item in load_rider_notifications()
+                if str(item.get("riderId", "")) == str(rider.get("id", ""))
+            ]
+            notifications.sort(key=lambda item: item.get("createdAt", ""), reverse=True)
+            self._json_response(200, {"notifications": notifications})
             return
 
         if self.path == "/api/rider/deliveries":
@@ -6077,7 +7223,7 @@ class FiableHandler(SimpleHTTPRequestHandler):
                 order for order in load_deliveries()
                 if str(order.get("riderId", "")) == rider_id
                 and str(order.get("status", "")).strip().lower()
-                in {"delivered", "failed", "cancelled"}
+                in ({"delivered"} | DELIVERY_EXCEPTION_STATUSES)
             ]
             deliveries.sort(
                 key=lambda order: order.get("updatedAt", order.get("createdAt", "")),
@@ -6086,10 +7232,34 @@ class FiableHandler(SimpleHTTPRequestHandler):
 
             self._json_response(
                 200,
-                {"deliveries": deliveries}
+                {"deliveries": [rider_safe_order(order) for order in deliveries]}
             )
 
             return
+
+        if self.path.startswith("/api/admin/orders/otp"):
+            if not require_permission(self, "manage_orders"):
+                self._json_response(403, {"error": "You do not have permission to view delivery OTPs."})
+                return
+            query = parse_qs(urlparse(self.path).query)
+            try:
+                order_id = int(query.get("orderId", [""])[0])
+            except (TypeError, ValueError):
+                self._json_response(400, {"error": "A valid order ID is required."})
+                return
+            order = next((item for item in load_deliveries() if str(item.get("id", "")) == str(order_id)), None)
+            if not order:
+                self._json_response(404, {"error": "Order not found."})
+                return
+            audit_admin_action(self, "otp_viewed", "delivery", order_id)
+            self._json_response(200, {
+                "otp": order.get("deliveryOtp"),
+                "otpState": order.get("otpState", "not_generated"),
+                "otpExpiresAt": order.get("otpExpiresAt"),
+                "otpAttempts": order.get("otpAttempts", 0),
+            })
+            return
+
         # =====================================================
         # ADMIN ORDERS
         # =====================================================

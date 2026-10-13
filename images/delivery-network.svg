@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="500" viewBox="0 0 640 500" fill="none">
+<rect width="640" height="500" fill="#14263b"/>
+<g stroke="#26394d" stroke-width="1">
+<path d="M0 80H640M0 160H640M0 240H640M0 320H640M0 400H640M80 0V500M160 0V500M240 0V500M320 0V500M400 0V500M480 0V500M560 0V500"/>
+</g>
+<path d="M640 300C570 268 570 374 484 364C421 357 413 315 340 335C275 352 309 405 220 422C157 435 111 465 94 500H640Z" fill="#1c3b50"/>
+<path d="M640 300C570 268 570 374 484 364C421 357 413 315 340 335C275 352 309 405 220 422C157 435 111 465 94 500" stroke="#345365" stroke-width="2"/>
+<g stroke="#456076" stroke-width="2">
+<path d="M54 115L185 88L301 151L430 117L581 157M74 245L199 211L291 250L402 225L555 277M185 88L199 211L172 346M301 151L291 250L340 335M430 117L402 225L484 364M74 245L54 115"/>
+</g>
+<path d="M185 88L199 211L291 250L402 225L484 364" stroke="#419aff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M199 211L172 346" stroke="#419aff" stroke-width="3" stroke-dasharray="6 7"/>
+<g fill="#14263b" stroke="#96c8ff" stroke-width="3">
+<circle cx="185" cy="88" r="7"/><circle cx="199" cy="211" r="7"/><circle cx="291" cy="250" r="7"/><circle cx="402" cy="225" r="7"/><circle cx="484" cy="364" r="7"/><circle cx="172" cy="346" r="7"/>
+</g>
+<circle cx="199" cy="211" r="18" stroke="#419aff" stroke-opacity=".3" stroke-width="8"/>
+<g fill="#f5f7fa" font-family="Segoe UI,Arial,sans-serif" font-size="14">
+<text x="204" y="80">Ikeja</text><text x="217" y="202">Yaba</text><text x="310" y="273">Lagos Island</text><text x="420" y="217">Victoria Island</text><text x="503" y="386">Lekki</text><text x="95" y="375">Surulere</text>
+</g>
+<text x="374" y="439" fill="#86a5ba" font-family="Segoe UI,Arial,sans-serif" font-size="12" letter-spacing="3">LAGOS LAGOON</text>
+<g transform="translate(280 225)"><rect width="24" height="24" rx="3" fill="#419aff"/><path d="M6 9L12 6L18 9V16L12 19L6 16V9ZM6 9L12 12L18 9M12 12V19" stroke="white" stroke-width="1.5" stroke-linejoin="round"/></g>
+</svg>

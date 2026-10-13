@@ -142,5 +142,224 @@
     "previousValue": null,
     "newValue": null,
     "note": null
+  },
+  {
+    "id": "CwBmo_4Hqku7LcS_",
+    "at": "2026-09-15T12:26:49.465042+00:00",
+    "actorEmail": "mfa-smoketest@test.fiable.internal",
+    "actorRole": "owner",
+    "action": "admin_login",
+    "targetType": "admin",
+    "targetId": 1,
+    "previousValue": null,
+    "newValue": null,
+    "note": null
+  },
+  {
+    "id": "eN_1SzSnYICr-K-i",
+    "at": "2026-09-15T12:26:50.203022+00:00",
+    "actorEmail": "mfa-smoketest@test.fiable.internal",
+    "actorRole": "owner",
+    "action": "admin_login",
+    "targetType": "admin",
+    "targetId": 1,
+    "previousValue": null,
+    "newValue": null,
+    "note": null
+  },
+  {
+    "id": "1qcTmNoFQGCW8S7e",
+    "at": "2026-09-15T12:28:18.794448+00:00",
+    "actorEmail": "mfa-smoketest@test.fiable.internal",
+    "actorRole": "owner",
+    "action": "admin_login",
+    "targetType": "admin",
+    "targetId": 1,
+    "previousValue": null,
+    "newValue": null,
+    "note": null
+  },
+  {
+    "id": "ysf_K8iAQRZu5-ZR",
+    "at": "2026-09-15T12:29:28.233128+00:00",
+    "actorEmail": "mfa-smoketest@test.fiable.internal",
+    "actorRole": "owner",
+    "action": "mfa_enabled",
+    "targetType": "admin",
+    "targetId": 1,
+    "previousValue": null,
+    "newValue": null,
+    "note": null
+  },
+  {
+    "id": "beGYS3Ieh1rdi5Us",
+    "at": "2026-09-15T12:29:58.846228+00:00",
+    "actorEmail": "mfa-smoketest@test.fiable.internal",
+    "actorRole": "owner",
+    "action": "admin_login",
+    "targetType": "admin",
+    "targetId": 1,
+    "previousValue": null,
+    "newValue": null,
+    "note": null
+  },
+  {
+    "id": "Rn7WoUbgcvhPRmd7",
+    "at": "2026-09-15T12:30:29.317065+00:00",
+    "actorEmail": "mfa-smoketest@test.fiable.internal",
+    "actorRole": "owner",
+    "action": "mfa_disabled",
+    "targetType": "admin",
+    "targetId": 1,
+    "previousValue": null,
+    "newValue": null,
+    "note": null
+  },
+  {
+    "id": "rMBEFvJgyYJTR8zD",
+    "at": "2026-09-15T12:30:56.150803+00:00",
+    "actorEmail": "mfa-smoketest@test.fiable.internal",
+    "actorRole": "owner",
+    "action": "mfa_enabled",
+    "targetType": "admin",
+    "targetId": 1,
+    "previousValue": null,
+    "newValue": null,
+    "note": null
+  },
+  {
+    "id": "aYbK0rtH7kmeNXFS",
+    "at": "2026-09-15T12:31:00.216397+00:00",
+    "actorEmail": "mfa-smoketest@test.fiable.internal",
+    "actorRole": "owner",
+    "action": "admin_login",
+    "targetType": "admin",
+    "targetId": 1,
+    "previousValue": null,
+    "newValue": null,
+    "note": null
+  },
+  {
+    "id": "lHHauylBy5p6Rkmj",
+    "at": "2026-09-15T12:31:00.235165+00:00",
+    "actorEmail": "mfa-smoketest@test.fiable.internal",
+    "actorRole": "owner",
+    "action": "mfa_recovery_code_used",
+    "targetType": "admin",
+    "targetId": 1,
+    "previousValue": null,
+    "newValue": null,
+    "note": null
+  },
+  {
+    "id": "pBnHrJ3VCygdSzEC",
+    "at": "2026-10-13T10:17:36.132636+00:00",
+    "actorEmail": "toluwaloseoyinloye@gmail.com",
+    "actorRole": "owner",
+    "action": "admin_login",
+    "targetType": "admin",
+    "targetId": 2,
+    "previousValue": null,
+    "newValue": null,
+    "note": null
+  },
+  {
+    "id": "vs-g2A9QHOHMNThm",
+    "at": "2026-10-13T10:40:44.135357+00:00",
+    "actorEmail": "toluwaloseoyinloye@gmail.com",
+    "actorRole": "owner",
+    "action": "admin_login",
+    "targetType": "admin",
+    "targetId": 2,
+    "previousValue": null,
+    "newValue": null,
+    "note": null
+  },
+  {
+    "id": "XJr2UzmbZDEwbGtB",
+    "at": "2026-10-13T10:41:51.142596+00:00",
+    "actorEmail": "toluwaloseoyinloye@gmail.com",
+    "actorRole": "owner",
+    "action": "rider_assigned",
+    "targetType": "delivery",
+    "targetId": 66,
+    "previousValue": null,
+    "newValue": {
+      "riderId": 8,
+      "riderName": "Isreal Attah"
+    },
+    "note": null
+  },
+  {
+    "id": "xM90qsyYPZHB0My7",
+    "at": "2026-10-13T10:49:50.103611+00:00",
+    "actorEmail": "toluwaloseoyinloye@gmail.com",
+    "actorRole": "owner",
+    "action": "rider_assigned",
+    "targetType": "delivery",
+    "targetId": 67,
+    "previousValue": null,
+    "newValue": {
+      "riderId": 8,
+      "riderName": "Isreal Attah"
+    },
+    "note": null
+  },
+  {
+    "id": "Jsx1pnniJRj-VROf",
+    "at": "2026-10-13T11:00:57.350724+00:00",
+    "actorEmail": "toluwaloseoyinloye@gmail.com",
+    "actorRole": "owner",
+    "action": "rider_assigned",
+    "targetType": "delivery",
+    "targetId": 68,
+    "previousValue": null,
+    "newValue": {
+      "riderId": 8,
+      "riderName": "Isreal Attah"
+    },
+    "note": null
+  },
+  {
+    "id": "xh7I0voQ3AJCJQPc",
+    "at": "2026-10-13T11:16:04.800328+00:00",
+    "actorEmail": "toluwaloseoyinloye@gmail.com",
+    "actorRole": "owner",
+    "action": "manual_unit_adjustment",
+    "targetType": "vendor",
+    "targetId": "toluwaloseoyinloye@gmail.com",
+    "previousValue": 0,
+    "newValue": 8,
+    "note": "give away"
+  },
+  {
+    "id": "kBEg-tZfrUxYtfut",
+    "at": "2026-10-13T11:18:39.571214+00:00",
+    "actorEmail": "toluwaloseoyinloye@gmail.com",
+    "actorRole": "owner",
+    "action": "rider_payment_recorded",
+    "targetType": "rider",
+    "targetId": 12,
+    "previousValue": null,
+    "newValue": {
+      "amount": 3120,
+      "month": "2026-10"
+    },
+    "note": null
+  },
+  {
+    "id": "yXR5BNQsqYSHtMBv",
+    "at": "2026-10-13T11:18:59.000918+00:00",
+    "actorEmail": "toluwaloseoyinloye@gmail.com",
+    "actorRole": "owner",
+    "action": "rider_payment_recorded",
+    "targetType": "rider",
+    "targetId": 8,
+    "previousValue": null,
+    "newValue": {
+      "amount": 13520,
+      "month": "2026-10"
+    },
+    "note": null
   }
 ]
