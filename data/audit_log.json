@@ -1939,5 +1939,17 @@
       "pickupRules": {}
     },
     "note": null
+  },
+  {
+    "id": "XxYrakwdb8wONLJe",
+    "at": "2026-10-14T17:17:55.012353+00:00",
+    "actorEmail": "toluwaloseoyinloye@gmail.com",
+    "actorRole": "owner",
+    "action": "admin_login",
+    "targetType": "admin",
+    "targetId": 2,
+    "previousValue": null,
+    "newValue": null,
+    "note": null
   }
 ]
