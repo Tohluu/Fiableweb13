@@ -19,7 +19,7 @@ PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0l
 def fixtures(directory):
     root = Path(directory)
     for attribute in ["RIDERS_FILE", "DELIVERIES_FILE", "RIDER_NOTIFICATIONS_FILE", "ACCOUNTS_FILE", "AUDIT_LOG_FILE", "RESET_TOKENS_FILE", "DATA_FILE", "SUBSCRIPTIONS_FILE", "NOTIFICATION_LOG_FILE"]:
-        setattr(server, attribute, root / (attribute.lower() + ".json"))
+        setattr(server, attribute, root / getattr(server, attribute).name)
     server.PROOF_DIR = root / "proof"
     riders = [{"id": i, "riderRef": f"FL-RIDER-{i:04d}", "name": f"Check Rider {i}", "email": f"rider{i}@example.test", "phone": "08000000000", "vehicle": "Motorcycle", "status": "available", "salt": "test-salt", "passwordHash": server.password_hash(TEST_PASSWORD, "test-salt"), "mustChangePassword": i == 3} for i in [1, 2, 3]]
     server.save_riders(riders)

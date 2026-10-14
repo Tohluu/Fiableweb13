@@ -2493,6 +2493,7 @@ if (logoutBtn) {
             <!-- Destination -->
             <td>
               ${order.dropoff || "—"}
+              ${order.batchGroupId ? `<br><small>${escapeSubscriptionValue(order.batchAxisLabel || order.batchAxis)}</small><br><button type="button" class="btn outline batch-group-filter" data-batch-group="${escapeSubscriptionValue(order.batchGroupId)}">View delivery group</button>` : ""}
             </td>
 
 
@@ -2547,6 +2548,15 @@ if (logoutBtn) {
 
       /* Setup bulk assignment event listeners */
       setupBulkAssignmentListeners();
+      tableBody.querySelectorAll('.batch-group-filter').forEach(button => {
+        button.addEventListener('click', () => {
+          document.getElementById('ordersSearchInput').value = button.dataset.batchGroup;
+          document.getElementById('ordersStatusFilter').value = '';
+          selectedOrderIds.clear();
+          ordersCurrentPage = 1;
+          loadAdminOrders();
+        });
+      });
 
     } catch (error) {
 

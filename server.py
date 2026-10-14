@@ -20,6 +20,7 @@ import urllib.parse
 from contextlib import contextmanager
 from datetime import datetime, timezone, timedelta
 import os
+from database import DatabaseUnavailable, configured_store
 
 # Deploy marker (no functional change) - used once to force a Railway
 # redeploy while verifying persistent-storage behavior across restarts.
@@ -30,8 +31,8 @@ ROOT = Path(__file__).parent
 # =========================================================
 # PERSISTENT STORAGE ROOT
 # =========================================================
-# Every persistent runtime file (vendor/rider/order/ticket/audit/proof data)
-# resolves from this single directory. Locally it defaults to <project>/data
+# With DATABASE_URL set, records and proof uploads use PostgreSQL. Without it,
+# persistent files resolve from this directory, locally <project>/data
 # (based on this file's real location, NOT the process's current working
 # directory, so `python server.py` behaves the same regardless of which
 # shell folder you launched it from). In production, set the DATA_DIR
@@ -40,6 +41,7 @@ ROOT = Path(__file__).parent
 # restarts/redeploys instead of living in the ephemeral container filesystem.
 DATA_DIR = Path(os.environ.get("DATA_DIR") or (ROOT / "data")).resolve()
 DATA_DIR.mkdir(parents=True, exist_ok=True)
+DATABASE = configured_store()
 
 APP_ENV = os.environ.get("APP_ENV", "development").strip().lower()
 
@@ -49,13 +51,13 @@ APP_ENV = os.environ.get("APP_ENV", "development").strip().lower()
 # See PRODUCTION_NOTES.md for the full concurrency writeup. Summary:
 # - atomic_write_json() prevents a crash mid-write from ever leaving a
 #   truncated/corrupted JSON file (write to temp file, fsync, os.replace).
-# - locked_file() serializes a read-modify-write critical section using a
+# - With PostgreSQL, locked_file() reuses the request's database transaction.
+# - In JSON mode, locked_file() serializes read-modify-write sections using a
 #   threading.Lock keyed by file path. This ONLY protects against races
 #   between threads *within this one process*. It provides ZERO protection
 #   if more than one process/container/replica ever writes to the same
-#   DATA_DIR concurrently (e.g. Railway horizontal scaling). Do not run
-#   multiple replicas against shared JSON data without migrating to a real
-#   database with row-level locking/transactions first.
+#   DATA_DIR concurrently. PostgreSQL uses transaction advisory locking across
+#   processes; the current in-memory login sessions still require one instance.
 _FILE_LOCKS = {}
 _FILE_LOCKS_GUARD = threading.Lock()
 
@@ -76,6 +78,10 @@ def locked_file(*paths):
     duration of a read-modify-write critical section. Always acquires in a
     stable (sorted) order across call sites to avoid deadlocks when a
     section needs more than one file."""
+    if DATABASE is not None:
+        with DATABASE.transaction():
+            yield
+        return
     locks = [_lock_for_path(path) for path in sorted(set(paths), key=str)]
     for lock in locks:
         lock.acquire()
@@ -91,6 +97,9 @@ def atomic_write_json(path, data, **dump_kwargs):
     directory, flush + fsync, then os.replace() over the target. A reader
     always sees either the complete old file or the complete new file,
     never a partially-written one, even if the process is killed mid-write."""
+    if DATABASE is not None:
+        DATABASE.write(path, data)
+        return
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     dump_kwargs.setdefault("indent", 2)
@@ -109,6 +118,14 @@ def atomic_write_json(path, data, **dump_kwargs):
             pass
         raise
 
+def stored_exists(path):
+    return DATABASE.exists(path) if DATABASE is not None else path.exists()
+
+
+def read_stored_json(path):
+    return DATABASE.read(path) if DATABASE is not None else json.loads(path.read_text(encoding="utf-8-sig"))
+
+
 # Static-file paths that must never be served, even though they live
 # under the project root that SimpleHTTPRequestHandler serves from.
 BLOCKED_STATIC_PREFIXES = (
@@ -122,6 +139,8 @@ BLOCKED_STATIC_PREFIXES = (
     "/railway.toml",
     "/seed_test_data.py",
     "/reset_for_launch.py",
+    "/database.py", "/manage_database.py", "/migrations/", "/tests/",
+    "/render.yaml", "/requirements.txt", "/.env", "/docs/",
 )
 DATA_FILE = DATA_DIR / "submissions.json"
 ACCOUNTS_FILE = DATA_DIR / "accounts.json"
@@ -197,6 +216,7 @@ RIDER_PAYMENTS_FILE = DATA_DIR / "rider_payments.json"
 ADMIN_CREDENTIALS_FILE = DATA_DIR / "admin_credentials.json"
 RESET_TOKENS_FILE = DATA_DIR / "reset_tokens.json"
 SUBSCRIPTIONS_FILE = DATA_DIR / "subscriptions.json"
+BATCH_ROUTING_FILE = DATA_DIR / "batch_routing.json"
 RESET_TOKEN_EXPIRY_MINUTES = 60
 
 LOCATION_ZONES = {
@@ -225,11 +245,171 @@ LOCATION_ZONES = {
     "marwa": "lekki",
 }
 
-LEKKI_AXIS_LOCATIONS = {
-    "lekki-phase-1", "marwa", "ikate-elegushi", "chevron", "ajah",
-    "ikota", "vgc", "osapa-london", "jakande-lekki", "orchid-road",
-    "abraham-adesanya", "ilasan",
+# Dispatch areas are separate from pricing zones. Distant destinations
+# start in separate groups even when their pricing zone is the same.
+DEFAULT_DELIVERY_AREAS = {
+    "lekki-phase-1": ("Lekki Phase 1 / Ikate", {"lekki-phase-1", "marwa", "ikate-elegushi", "ilasan"}),
+    "lekki": ("Chevron / Ikota", {"chevron", "ikota", "osapa-london", "jakande-lekki", "orchid-road"}),
+    "ajah": ("Ajah / VGC", {"ajah", "vgc", "abraham-adesanya"}),
+    "sangotedo": ("Sangotedo / Lekki Phase 2", {"sangotedo", "lekki-phase-2"}),
+    "lagos-island": ("Lagos Island", {"lagos-island"}),
+    "victoria-island": ("Victoria Island / Oniru", {"victoria-island-vi", "oniru"}),
+    "ikoyi": ("Ikoyi", {"ikoyi"}),
+    "ikeja": ("Ikeja / Oshodi / Kosofe", {"ikeja", "oshodi-isolo", "kosofe"}),
+    "yaba": ("Yaba / Lagos Mainland", {"yaba", "lagos-mainland"}),
+    "surulere": ("Surulere", {"surulere"}),
+    "mushin": ("Mushin", {"mushin"}),
+    "shomolu": ("Shomolu", {"shomolu"}),
+    "mainland-north": ("Agege / Abule Egba", {"agege", "ifako-ijaiye", "abule-egba", "agbado", "alagbado"}),
+    "alimosho": ("Alimosho axis", {"egbeda", "shasha", "igando", "ayobo", "ipaja", "idimu", "ikotun"}),
+    "mainland-west": ("Amuwo-Odofin / Ojo / Ajegunle", {"amuwo-odofin", "ojo", "ajegunle", "ajeromi-ifelodun"}),
+    "apapa": ("Apapa", {"apapa"}),
+    "ikorodu": ("Ikorodu", {"ikorodu"}),
+    "badagry": ("Badagry", {"badagry"}),
+    "epe": ("Epe", {"epe"}),
+    "ibeju-lekki": ("Ibeju-Lekki", {"ibeju-lekki"}),
 }
+MAX_BATCH_DELIVERIES = 100
+MAX_DELIVERY_LOCATIONS = 500
+PRICING_ZONE_LABELS = {
+    "mainland-west": "Mainland West (Agege / Amuwo-Odofin / Apapa)",
+    "mainland-north": "Mainland North (Egbeda / Ipaja / Idimu)",
+    "mainland-central": "Mainland Central (Yaba / Mushin)",
+    "mainland-east": "Mainland East (Ikeja / Kosofe / Oshodi)",
+    "island-central": "Central Island (VI / Ikoyi / Lekki Phase 1)",
+    "lekki": "Lekki corridor (Chevron / Ajah / Sangotedo)",
+    "extended": "Extended routes (Ikorodu / Epe / Badagry / Ibeju-Lekki)",
+}
+
+
+def default_delivery_locations():
+    labels = {
+        "victoria-island-vi": "Victoria Island (VI)", "vgc": "VGC",
+        "jakande-lekki": "Jakande (Lekki)", "oshodi-isolo": "Oshodi-Isolo",
+        "amuwo-odofin": "Amuwo-Odofin", "ifako-ijaiye": "Ifako-Ijaiye",
+        "ajeromi-ifelodun": "Ajeromi-Ifelodun", "ibeju-lekki": "Ibeju-Lekki",
+    }
+    return [{"id": key, "label": labels.get(key, key.replace("-", " ").title()), "zone": zone}
+            for key, zone in LOCATION_ZONES.items()]
+
+
+def validate_delivery_locations(locations):
+    if not isinstance(locations, list) or not 1 <= len(locations) <= MAX_DELIVERY_LOCATIONS:
+        raise ValueError(f"Provide between 1 and {MAX_DELIVERY_LOCATIONS} delivery locations.")
+    seen, names, normalized = set(), set(), []
+    for location in locations:
+        if not isinstance(location, dict):
+            raise ValueError("Every location must include a name and pricing zone.")
+        key, label, zone = location.get("id"), location.get("label"), location.get("zone")
+        if not isinstance(key, str) or not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,79}", key) or key in seen:
+            raise ValueError("Location IDs must be unique lowercase names.")
+        if not isinstance(label, str) or not label.strip() or len(label.strip()) > 100:
+            raise ValueError("Location names must be 1–100 characters long.")
+        name_key = re.sub(r"[\W_]+", " ", label, flags=re.UNICODE).strip().casefold()
+        if not name_key or name_key in names:
+            raise ValueError("A location with that name already exists. Use a unique location name.")
+        if not isinstance(zone, str) or zone not in PRICING_ZONE_LABELS:
+            raise ValueError("Choose a valid pricing zone for every location.")
+        if key in LOCATION_ZONES and zone != LOCATION_ZONES[key]:
+            raise ValueError("Existing standard locations must keep their original pricing zones.")
+        seen.add(key)
+        names.add(name_key)
+        normalized.append({"id": key, "label": label.strip(), "zone": zone})
+    if not set(LOCATION_ZONES).issubset(seen):
+        raise ValueError("Keep all existing standard locations in the location list.")
+    return normalized
+
+
+def default_batch_routing():
+    # Starting areas for dispatcher review; no cross-area combinations until
+    # an administrator explicitly configures them for a pickup area.
+    return {
+        "locations": default_delivery_locations(),
+        "areas": [{"id": key, "label": label, "locations": sorted(locations)}
+                  for key, (label, locations) in DEFAULT_DELIVERY_AREAS.items()],
+        "pickupRules": {},
+    }
+
+
+def validate_batch_routing(config):
+    if not isinstance(config, dict):
+        raise ValueError("Delivery routing must be an object.")
+    # Older saved routing files contain only areas and pickup rules.
+    catalog = validate_delivery_locations(config.get("locations", default_delivery_locations()))
+    supported_locations = {location["id"] for location in catalog}
+    areas = config.get("areas")
+    rules = config.get("pickupRules")
+    if not isinstance(areas, list) or not 1 <= len(areas) <= len(supported_locations):
+        raise ValueError("Define at least one delivery area.")
+    if not isinstance(rules, dict):
+        raise ValueError("Pickup rules must be an object.")
+    area_ids, labels, locations, normalized = set(), set(), set(), []
+    for area in areas:
+        if not isinstance(area, dict):
+            raise ValueError("Each delivery area must be an object.")
+        key, label, members = area.get("id"), area.get("label"), area.get("locations")
+        if not isinstance(key, str) or not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,59}", key) or key in area_ids:
+            raise ValueError("Delivery area IDs must be unique lowercase names.")
+        if not isinstance(label, str) or not label.strip() or len(label.strip()) > 100 or label.strip().casefold() in labels:
+            raise ValueError("Delivery area names must be unique and 1–100 characters long.")
+        if not isinstance(members, list) or not members:
+            raise ValueError(f"Assign at least one location to {label}.")
+        for location in members:
+            if not isinstance(location, str) or location not in supported_locations or location in locations:
+                raise ValueError("Every supported location must belong to exactly one area.")
+            locations.add(location)
+        area_ids.add(key)
+        labels.add(label.strip().casefold())
+        normalized.append({"id": key, "label": label.strip(), "locations": sorted(members)})
+    if locations != supported_locations:
+        raise ValueError("Every supported location must belong to exactly one area.")
+    normalized_rules = {}
+    for pickup, groups in rules.items():
+        if pickup not in area_ids or not isinstance(groups, list) or not 1 <= len(groups) <= len(area_ids):
+            raise ValueError("Choose a valid pickup area and delivery groups.")
+        seen, group_ids, group_labels, output = set(), set(), set(), []
+        for group in groups:
+            if not isinstance(group, dict):
+                raise ValueError("Each delivery group must be an object.")
+            key, label, members = group.get("id"), group.get("label"), group.get("areas")
+            if not isinstance(key, str) or not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,59}", key) or key in group_ids:
+                raise ValueError("Delivery group IDs must be unique lowercase names.")
+            if not isinstance(label, str) or not label.strip() or len(label.strip()) > 100 or label.strip().casefold() in group_labels:
+                raise ValueError("Delivery group names must be unique and 1–100 characters long.")
+            if not isinstance(members, list) or not members:
+                raise ValueError("Every delivery group needs at least one area.")
+            for member in members:
+                if not isinstance(member, str) or member not in area_ids or member in seen:
+                    raise ValueError("Each destination area must appear in exactly one group per pickup area.")
+                seen.add(member)
+            group_ids.add(key)
+            group_labels.add(label.strip().casefold())
+            output.append({"id": key, "label": label.strip(), "areas": sorted(members)})
+        if seen != area_ids:
+            raise ValueError("Each destination area must appear in exactly one group per pickup area.")
+        normalized_rules[pickup] = output
+    return {"locations": catalog, "areas": normalized, "pickupRules": normalized_rules}
+
+
+def load_batch_routing():
+    try:
+        config = read_stored_json(BATCH_ROUTING_FILE)
+    except FileNotFoundError:
+        config = default_batch_routing()
+    except (OSError, json.JSONDecodeError) as error:
+        raise ValueError("Delivery routing could not be loaded. Contact an administrator.") from error
+    return validate_batch_routing(config)
+
+
+def batch_routing_version(config):
+    return hashlib.sha256(json.dumps(config, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+
+
+def batch_routing_groups(config, pickup_area):
+    return config["pickupRules"].get(pickup_area, [
+        {"id": area["id"], "label": area["label"], "areas": [area["id"]]}
+        for area in config["areas"]
+    ])
 
 # Distance-based unit matrix between zones.
 # Symmetric — order of pickup/dropoff doesn't matter.
@@ -269,9 +449,11 @@ ZONE_UNIT_MATRIX = {
 EXTENDED_UNITS = 7  # default for any route touching "extended", unless overridden above
 
 
-def estimate_delivery(pickup, dropoff, plan=None, priority="Standard"):
-    pickup_zone = LOCATION_ZONES.get(pickup)
-    dropoff_zone = LOCATION_ZONES.get(dropoff)
+def estimate_delivery(pickup, dropoff, plan=None, priority="Standard", location_zones=None):
+    if location_zones is None:
+        location_zones = {location["id"]: location["zone"] for location in load_batch_routing()["locations"]}
+    pickup_zone = location_zones.get(pickup)
+    dropoff_zone = location_zones.get(dropoff)
     if not pickup_zone or not dropoff_zone:
         raise ValueError("Pickup and delivery locations must be valid Lagos locations")
 
@@ -331,82 +513,111 @@ def batch_discount_rate(delivery_count):
     return 0
 
 
-def estimate_batch_deliveries(delivery_requests, plan=None):
-    if len(delivery_requests) < 3:
-        raise ValueError("A batch requires at least 3 deliveries.")
+def estimate_batch_deliveries(delivery_requests, plan=None, routing=None):
+    if not isinstance(delivery_requests, list) or not 3 <= len(delivery_requests) <= MAX_BATCH_DELIVERIES:
+        raise ValueError(f"A batch requires 3 to {MAX_BATCH_DELIVERIES} deliveries.")
+    if any(not isinstance(item, dict) for item in delivery_requests):
+        raise ValueError("Each batch delivery must contain delivery details.")
 
-    pickup_locations = {
-        clean(item.get("pickup"), 120)
-        for item in delivery_requests
-    }
-    if len(pickup_locations) != 1:
-        raise ValueError("All batch deliveries must use the same pickup location.")
+    shared_fields = ("pickup", "pickupAddress", "pickupContactName", "pickupPhone", "deliveryWindow")
+    for field in shared_fields:
+        if len({clean(item.get(field)).casefold() for item in delivery_requests}) != 1:
+            raise ValueError("All batch deliveries must share one pickup address, contact and delivery window.")
 
-    if not all(
-        clean(item.get("dropoff"), 120) in LEKKI_AXIS_LOCATIONS
-        for item in delivery_requests
-    ):
-        raise ValueError(
-            "All batch destinations must be within the Lekki axis to receive the discount."
-        )
+    routing = load_batch_routing() if routing is None else validate_batch_routing(routing)
+    routing_version = batch_routing_version(routing)
+    location_zones = {location["id"]: location["zone"] for location in routing["locations"]}
+    location_areas = {location: area for area in routing["areas"] for location in area["locations"]}
+    pickup = clean(delivery_requests[0].get("pickup"), 120)
+    if pickup not in location_areas:
+        raise ValueError("Choose a supported pickup location.")
+    pickup_area = location_areas[pickup]
+    route_groups = batch_routing_groups(routing, pickup_area["id"])
+    destination_groups = {area: group for group in route_groups for area in group["areas"]}
+    quotes = []
+    grouped_indexes = {}
+    for index, item in enumerate(delivery_requests):
+        pickup = clean(item.get("pickup"), 120)
+        dropoff = clean(item.get("dropoff"), 120)
+        window = clean(item.get("deliveryWindow"), 40)
+        validate_delivery_window(window)
+        # The selected window controls the surcharge in both preview and booking.
+        priority = "Express" if window == "Express" else "Standard"
+        quote = estimate_delivery(pickup, dropoff, plan, priority, location_zones=location_zones)
+        destination_area = location_areas[dropoff]
+        group = destination_groups[destination_area["id"]]
+        axis = group["id"]
+        grouped_indexes.setdefault(axis, []).append(index)
+        quote.update({"pickup": pickup, "dropoff": dropoff})
+        quote.update({
+            "batchRoutingVersion": routing_version,
+            "pickupArea": pickup_area["id"], "pickupAreaLabel": pickup_area["label"],
+            "deliveryArea": destination_area["id"], "deliveryAreaLabel": destination_area["label"],
+        })
+        quotes.append(quote)
 
-    quotes = [
-        estimate_delivery(
-            clean(item.get("pickup"), 120),
-            clean(item.get("dropoff"), 120),
-            plan,
-            clean(item.get("priority"), 40) or "Standard"
-        )
-        for item in delivery_requests
-    ]
-    total_original_units = sum(quote["units"] for quote in quotes)
-    discount_rate = batch_discount_rate(len(quotes))
-    total_charged_units = max(
-        len(quotes),
-        math.ceil(
-            total_original_units * (1 - discount_rate)
-        )
-    )
+    groups = []
+    for axis, indexes in grouped_indexes.items():
+        originals = [quotes[index]["units"] for index in indexes]
+        original_units = sum(originals)
+        rate = batch_discount_rate(len(indexes))
+        percent = round(rate * 100)
+        charged_units = max(len(indexes), (original_units * (100 - percent) + 99) // 100)
+        saved_units = original_units - charged_units
+        # Allocate whole-unit savings without ever charging <1 or >original units.
+        capacities = [units - 1 for units in originals]
+        capacity = sum(capacities)
+        savings = [saved_units * spare // capacity if capacity else 0 for spare in capacities]
+        remainder = saved_units - sum(savings)
+        ranked = sorted(range(len(indexes)), key=lambda i: (saved_units * capacities[i] % capacity, -i), reverse=True) if capacity else []
+        for i in ranked[:remainder]:
+            savings[i] += 1
+        route_group = next(group for group in route_groups if group["id"] == axis)
+        label = route_group["label"]
+        for position, index in enumerate(indexes):
+            quote = quotes[index]
+            quote["originalUnits"] = quote["units"]
+            quote["originalBaseCost"] = quote["baseCost"]
+            quote["originalCost"] = quote["cost"]
+            quote["units"] -= savings[position]
+            quote["chargedUnits"] = quote["units"]
+            quote["batchAxis"] = axis
+            quote["batchAxisLabel"] = label
+            quote["batchDiscountRate"] = rate
+            quote["batchDiscountUnits"] = savings[position]
+            quote["vendorDiscountAmount"] = savings[position] * quote["unitPrice"]
+            quote["baseCost"] = quote["units"] * quote["unitPrice"]
+            quote["cost"] = quote["baseCost"] + quote["prioritySurcharge"]
+            # Keep the existing rider payout based on the original route price.
+        groups.append({
+            "axis": axis, "label": label, "deliveryCount": len(indexes),
+            "destinationAreas": [area["label"] for area in routing["areas"]
+                                 if area["id"] in {quotes[i]["deliveryArea"] for i in indexes}],
+            "deliveryIndexes": indexes, "discountRate": rate,
+            "originalUnits": original_units, "chargedUnits": charged_units,
+            "unitsSaved": saved_units,
+            "vendorSaving": sum(quotes[i]["vendorDiscountAmount"] for i in indexes),
+        })
 
-    remaining_units = total_charged_units
-    remaining_original_units = total_original_units
-    for quote in quotes:
-        if remaining_original_units == quote["units"]:
-            charged_units = remaining_units
-        else:
-            charged_units = max(
-                1,
-                round(
-                    quote["units"] /
-                    remaining_original_units *
-                    remaining_units
-                )
-            )
-        quote["originalUnits"] = quote["units"]
-        quote["units"] = charged_units
-        quote["chargedUnits"] = charged_units
-        quote["batchAxis"] = "lekki"
-        quote["batchDiscountRate"] = discount_rate
-        quote["batchDiscountUnits"] = quote["originalUnits"] - charged_units
-        quote["vendorDiscountAmount"] = (
-            quote["originalUnits"] - charged_units
-        ) * quote["unitPrice"]
-        quote["riderPayout"] = round(
-            (quote["baseCost"] + quote["prioritySurcharge"]) *
-            RIDER_PAYOUT_RATE
-        )
-        remaining_units -= charged_units
-        remaining_original_units -= quote["originalUnits"]
-
-    return {
-        "axis": "lekki",
-        "discountRate": discount_rate,
-        "originalUnits": total_original_units,
-        "chargedUnits": total_charged_units,
-        "unitsSaved": total_original_units - total_charged_units,
-        "vendorSaving": sum(quote["vendorDiscountAmount"] for quote in quotes),
+    result = {
+        "routingVersion": routing_version,
+        "pickupArea": pickup_area["id"], "pickupAreaLabel": pickup_area["label"],
+        "axis": groups[0]["axis"] if len(groups) == 1 else "mixed",
+        "discountRate": groups[0]["discountRate"] if len(groups) == 1 else None,
+        "originalUnits": sum(group["originalUnits"] for group in groups),
+        "chargedUnits": sum(group["chargedUnits"] for group in groups),
+        "unitsSaved": sum(group["unitsSaved"] for group in groups),
+        "vendorSaving": sum(group["vendorSaving"] for group in groups),
+        "prioritySurcharge": sum(quote["prioritySurcharge"] for quote in quotes),
+        "groups": groups,
         "deliveries": quotes,
     }
+    # Acknowledges exactly the reviewed grouping and prices; booking always
+    # recomputes server-side, so this hash never supplies trusted pricing.
+    result["quoteToken"] = hashlib.sha256(json.dumps(
+        {"quote": result, "requests": delivery_requests}, sort_keys=True, separators=(",", ":")
+    ).encode()).hexdigest()
+    return result
 
 
 def clean(value, limit=500):
@@ -418,12 +629,12 @@ def valid_email(value):
 
 
 def load_accounts():
-    if not ACCOUNTS_FILE.exists():
+    if not stored_exists(ACCOUNTS_FILE):
         return []
     try:
         # Accept files saved by Windows editors with a UTF-8 byte-order mark.
         # utf-8-sig also reads ordinary UTF-8 without changing account data.
-        return json.loads(ACCOUNTS_FILE.read_text(encoding="utf-8-sig"))
+        return read_stored_json(ACCOUNTS_FILE)
     except json.JSONDecodeError:
         return []
 
@@ -488,19 +699,12 @@ def save_admin_credentials(admins):
 
 def load_admin_credentials():
 
-    if not ADMIN_CREDENTIALS_FILE.exists():
+    if not stored_exists(ADMIN_CREDENTIALS_FILE):
         return []
 
     try:
 
-        content = ADMIN_CREDENTIALS_FILE.read_text(
-            encoding="utf-8"
-        ).strip()
-
-        if not content:
-            return []
-
-        data = json.loads(content)
+        data = read_stored_json(ADMIN_CREDENTIALS_FILE)
 
     except (json.JSONDecodeError, OSError):
 
@@ -609,6 +813,8 @@ def check_storage_health():
     safe to expose through a public endpoint. Detailed diagnostics (the
     actual resolved path) are logged server-side only, via log_startup_state().
     """
+    if DATABASE is not None:
+        return DATABASE.health()
     try:
         DATA_DIR.mkdir(parents=True, exist_ok=True)
         probe = DATA_DIR / ".storage_healthcheck.tmp"
@@ -629,7 +835,9 @@ def log_startup_state():
     an HTTP response body.
     """
     print(f"[startup] APP_ENV={APP_ENV}")
-    print(f"[startup] Storage directory resolved: {DATA_DIR}")
+    print(f"[startup] Storage backend: {'PostgreSQL' if DATABASE is not None else 'JSON files'}")
+    if DATABASE is None:
+        print(f"[startup] Storage directory resolved: {DATA_DIR}")
 
     health = check_storage_health()
     if health["reachable"] and health["writable"]:
@@ -653,13 +861,14 @@ def log_startup_state():
         "reset_tokens": RESET_TOKENS_FILE,
         "submissions": DATA_FILE,
     }
-    present = [name for name, path in required_files.items() if path.exists()]
-    missing = [name for name, path in required_files.items() if not path.exists()]
+    present = [name for name, path in required_files.items() if stored_exists(path)]
+    missing = [name for name, path in required_files.items() if not stored_exists(path)]
     print(f"[startup] Required data files loaded: {', '.join(present) if present else '(none yet)'}")
     if missing:
         print(f"[startup] Data files not yet present (will be created empty on first write): {', '.join(missing)}")
 
-    PROOF_DIR.mkdir(parents=True, exist_ok=True)
+    if DATABASE is None:
+        PROOF_DIR.mkdir(parents=True, exist_ok=True)
     print("[startup] Proof storage available")
 
 
@@ -731,10 +940,10 @@ def update_account(email, plan):
 
 
 def load_reset_tokens():
-    if not RESET_TOKENS_FILE.exists():
+    if not stored_exists(RESET_TOKENS_FILE):
         return {}
     try:
-        return json.loads(RESET_TOKENS_FILE.read_text(encoding="utf-8"))
+        return read_stored_json(RESET_TOKENS_FILE)
     except json.JSONDecodeError:
         return {}
 
@@ -850,10 +1059,10 @@ def plan_price(plan):
 
 
 def load_subscriptions():
-    if not SUBSCRIPTIONS_FILE.exists():
+    if not stored_exists(SUBSCRIPTIONS_FILE):
         return []
     try:
-        value = json.loads(SUBSCRIPTIONS_FILE.read_text(encoding="utf-8"))
+        value = read_stored_json(SUBSCRIPTIONS_FILE)
         return value if isinstance(value, list) else []
     except (json.JSONDecodeError, OSError):
         return []
@@ -926,9 +1135,9 @@ def deliveries_for_subscription(email, subscription):
 def save_submission(kind, payload):
     with locked_file(DATA_FILE):
         submissions = []
-        if DATA_FILE.exists():
+        if stored_exists(DATA_FILE):
             try:
-                submissions = json.loads(DATA_FILE.read_text(encoding="utf-8"))
+                submissions = read_stored_json(DATA_FILE)
             except json.JSONDecodeError:
                 submissions = []
         submissions.append({
@@ -942,10 +1151,10 @@ def save_submission(kind, payload):
 
 
 def load_deliveries():
-    if not DELIVERIES_FILE.exists():
+    if not stored_exists(DELIVERIES_FILE):
         return []
     try:
-        return json.loads(DELIVERIES_FILE.read_text(encoding="utf-8"))
+        return read_stored_json(DELIVERIES_FILE)
     except json.JSONDecodeError:
         return []
 
@@ -954,8 +1163,8 @@ def save_deliveries(deliveries):
     atomic_write_json(DELIVERIES_FILE, deliveries)
 
 
-def create_delivery(account_email, pickup, dropoff, units, details=None, order_ref=None, unit_price=None, plan=None, pricing=None):
-    deliveries = load_deliveries()
+def create_delivery(account_email, pickup, dropoff, units, details=None, order_ref=None, unit_price=None, plan=None, pricing=None, delivery_records=None):
+    deliveries = load_deliveries() if delivery_records is None else delivery_records
     new_id = (deliveries[-1]["id"] + 1) if deliveries else 1
     record = {
         "id": new_id,
@@ -993,7 +1202,8 @@ def create_delivery(account_email, pickup, dropoff, units, details=None, order_r
     if pricing:
         record["pricing"] = dict(pricing)
     deliveries.append(record)
-    save_deliveries(deliveries)
+    if delivery_records is None:
+        save_deliveries(deliveries)
     return record
 
 
@@ -1318,15 +1528,11 @@ def units_used_for_account(email):
 # =========================================================
 
 def load_riders():
-    if not RIDERS_FILE.exists():
+    if not stored_exists(RIDERS_FILE):
         return []
 
     try:
-        return json.loads(
-            RIDERS_FILE.read_text(
-                encoding="utf-8-sig"
-            )
-        )
+        return read_stored_json(RIDERS_FILE)
     except json.JSONDecodeError:
         return []
 
@@ -1336,19 +1542,12 @@ def save_riders(riders):
 
 def load_rider_notifications():
 
-    if not RIDER_NOTIFICATIONS_FILE.exists():
+    if not stored_exists(RIDER_NOTIFICATIONS_FILE):
         return []
 
     try:
 
-        content = RIDER_NOTIFICATIONS_FILE.read_text(
-            encoding="utf-8"
-        ).strip()
-
-        if not content:
-            return []
-
-        notifications = json.loads(content)
+        notifications = read_stored_json(RIDER_NOTIFICATIONS_FILE)
 
         if not isinstance(notifications, list):
             return []
@@ -1394,15 +1593,11 @@ def create_rider_notification(
     return notification
 
 def load_rider_payments():
-    if not RIDER_PAYMENTS_FILE.exists():
+    if not stored_exists(RIDER_PAYMENTS_FILE):
         return []
 
     try:
-        return json.loads(
-            RIDER_PAYMENTS_FILE.read_text(
-                encoding="utf-8"
-            )
-        )
+        return read_stored_json(RIDER_PAYMENTS_FILE)
     except json.JSONDecodeError:
         return []
 
@@ -1874,10 +2069,10 @@ def admin_summary():
 
 
 def saved_plan_for_email(email):
-    if not DATA_FILE.exists():
+    if not stored_exists(DATA_FILE):
         return None
     try:
-        submissions = json.loads(DATA_FILE.read_text(encoding="utf-8"))
+        submissions = read_stored_json(DATA_FILE)
     except json.JSONDecodeError:
         return None
     for submission in reversed(submissions):
@@ -2510,20 +2705,20 @@ def save_proof_file(order_id, kind, data_url):
         raise ValueError(f"{kind.capitalize()} upload is empty.")
     if len(raw) > MAX_PROOF_FILE_BYTES:
         raise ValueError(f"{kind.capitalize()} file is too large (max 5MB).")
-    PROOF_DIR.mkdir(parents=True, exist_ok=True)
     filename = f"{int(order_id)}-{kind}-{secrets.token_hex(8)}{extension}"
-    (PROOF_DIR / filename).write_bytes(raw)
+    if DATABASE is not None:
+        DATABASE.write_blob(filename, raw, mime)
+    else:
+        PROOF_DIR.mkdir(parents=True, exist_ok=True)
+        (PROOF_DIR / filename).write_bytes(raw)
     return filename
 
 
 def load_json_list(path):
-    if not path.exists():
+    if not stored_exists(path):
         return []
     try:
-        content = path.read_text(encoding="utf-8").strip()
-        if not content:
-            return []
-        data = json.loads(content)
+        data = read_stored_json(path)
         return data if isinstance(data, list) else []
     except (json.JSONDecodeError, OSError):
         return []
@@ -2599,16 +2794,18 @@ ADMIN_PERMISSIONS = {
     "super_admin": {"*"},
     "owner": {"*"},
     "operations_manager": {
+        "view_batch_routing", "manage_batch_routing",
         "view_orders", "manage_orders", "view_riders", "manage_riders",
         "view_vendors", "manage_vendors", "view_tickets", "manage_tickets",
         "view_reports", "export_data", "view_audit_log", "view_team",
     },
     "staff": {
+        "view_batch_routing", "manage_batch_routing",
         "view_orders", "manage_orders", "view_riders", "manage_riders",
         "view_vendors", "manage_vendors", "view_tickets", "manage_tickets",
         "view_reports", "export_data",
     },
-    "dispatcher": {"view_orders", "manage_orders", "view_riders", "view_reports"},
+    "dispatcher": {"view_orders", "manage_orders", "view_riders", "view_reports", "view_batch_routing"},
     "finance": {
         "view_finance", "manage_finance", "view_vendors", "view_reports",
         "export_data",
@@ -2618,6 +2815,7 @@ ADMIN_PERMISSIONS = {
         "view_reports",
     },
     "analyst": {
+        "view_batch_routing",
         "view_orders", "view_riders", "view_vendors", "view_finance",
         "view_tickets", "view_reports", "export_data",
     },
@@ -2894,6 +3092,25 @@ def build_export_csv(kind):
 
 
 class FiableHandler(SimpleHTTPRequestHandler):
+    def _database_request(self, handler):
+        # All writes made by a handler share a transaction. Buffer the complete
+        # HTTP response, including cookies, until the database commit succeeds.
+        output = self.wfile
+        buffered = io.BytesIO()
+        self.wfile = buffered
+        try:
+            with DATABASE.transaction():
+                handler()
+            response = buffered.getvalue()
+        except DatabaseUnavailable:
+            self.wfile = output
+            self._headers_buffer = []
+            self._json_response(503, {"error": "The database is temporarily unavailable. Please try again."})
+            return
+        finally:
+            self.wfile = output
+        output.write(response)
+
     def _json_response(self, status, body):
         encoded = json.dumps(body).encode("utf-8")
         self.send_response(status)
@@ -3007,6 +3224,11 @@ class FiableHandler(SimpleHTTPRequestHandler):
         self._json_response(200, {"message": "Webhook processed."})
 
     def do_POST(self):
+        if DATABASE is not None:
+            return self._database_request(self._do_POST)
+        return self._do_POST()
+
+    def _do_POST(self):
         path = urlparse(self.path).path
 
         # Paystack calls this directly (no browser session, no CSRF token,
@@ -3029,6 +3251,29 @@ class FiableHandler(SimpleHTTPRequestHandler):
             payload = self._read_json()
             if not isinstance(payload, dict):
                 raise ValueError("Request body must be an object")
+            if path in ("/api/admin/batch-routing", "/api/admin/batch-routing/preview"):
+                permission = "manage_batch_routing" if path == "/api/admin/batch-routing" else "view_batch_routing"
+                if not require_permission(self, permission):
+                    self._json_response(403, {"error": "You do not have permission to access these delivery routing controls."})
+                    return
+                if path.endswith("/preview"):
+                    # A dry run can include unsaved edits; it never creates orders.
+                    routing = validate_batch_routing(payload.get("config"))
+                    self._json_response(200, estimate_batch_deliveries(
+                        payload.get("deliveries"), "Basic", routing=routing
+                    ))
+                    return
+                config = validate_batch_routing(payload.get("config"))
+                with locked_file(BATCH_ROUTING_FILE):
+                    previous = load_batch_routing()
+                    if payload.get("version") != batch_routing_version(previous):
+                        self._json_response(409, {"error": "Routing rules have changed. Reload the saved rules before editing again."})
+                        return
+                    atomic_write_json(BATCH_ROUTING_FILE, config)
+                    audit_admin_action(self, "batch_routing_updated", "batch_routing",
+                                       previous=previous, new=config)
+                self._json_response(200, {"config": config, "version": batch_routing_version(config)})
+                return
             # =====================================================
             # RIDER LOGIN
             # =====================================================
@@ -6257,20 +6502,28 @@ class FiableHandler(SimpleHTTPRequestHandler):
                 if not account:
                     self._json_response(401, {"error": "Account not found"})
                     return
-                summary = summary_for_account(account)
-                if summary["subscriptionState"] not in ("active", "expiring_soon", "grace_period"):
-                    self._json_response(402, {"error": "Complete payment and activate your subscription before requesting deliveries."})
-                    return
-                with locked_file(ACCOUNTS_FILE, DELIVERIES_FILE):
+                with locked_file(ACCOUNTS_FILE, DELIVERIES_FILE, BATCH_ROUTING_FILE):
+                    account = next(item for item in load_accounts() if item["email"] == email)
+                    summary = summary_for_account(account)
+                    if summary["subscriptionState"] not in ("active", "expiring_soon", "grace_period"):
+                        self._json_response(402, {"error": "Complete payment and activate your subscription before requesting deliveries."})
+                        return
                     batch_quote = estimate_batch_deliveries(
                         requests,
                         summary.get("plan")
                     )
+                    if payload.get("quoteToken") != batch_quote["quoteToken"]:
+                        self._json_response(409, {
+                            "error": "Your batch quote has changed or needs review. Preview the delivery groups and confirm again.",
+                            "quoteChanged": True,
+                        })
+                        return
                     if summary["unitsRemaining"] < batch_quote["chargedUnits"]:
                         self._json_response(409, {"error": "Insufficient units for this batch delivery."})
                         return
 
                     created_deliveries = []
+                    delivery_records = load_deliveries()
                     batch_id = f"BATCH-{secrets.token_urlsafe(8)}"
                     for request, quote in zip(requests, batch_quote["deliveries"]):
                         required_fields = {
@@ -6282,6 +6535,7 @@ class FiableHandler(SimpleHTTPRequestHandler):
                             "recipientName": clean(request.get("recipientName"), 100),
                             "recipientPhone": clean(request.get("recipientPhone"), 40),
                             "deliveryAddress": clean(request.get("deliveryAddress"), 300),
+                            "packageDescription": clean(request.get("packageDescription"), 300),
                         }
                         if not all(required_fields.values()):
                             raise ValueError("Complete all required details for every batch delivery.")
@@ -6303,6 +6557,9 @@ class FiableHandler(SimpleHTTPRequestHandler):
                             "deliveryInstructions": clean(request.get("deliveryInstructions"), 300),
                         }
                         quote["batchId"] = batch_id
+                        quote["batchGroupId"] = f"{batch_id}-{quote['batchAxis']}"
+                        details["window"] = delivery_window
+                        details["recipient"] = required_fields["recipientName"]
                         delivery = create_delivery(
                             email,
                             required_fields["pickup"],
@@ -6311,15 +6568,16 @@ class FiableHandler(SimpleHTTPRequestHandler):
                             details,
                             unit_price=quote["unitPrice"],
                             plan=summary.get("plan"),
-                            pricing=quote
+                            pricing=quote,
+                            delivery_records=delivery_records
                         )
                         delivery["batchId"] = batch_id
+                        delivery["batchGroupId"] = quote["batchGroupId"]
+                        delivery["batchAxis"] = quote["batchAxis"]
+                        delivery["batchAxisLabel"] = quote["batchAxisLabel"]
                         created_deliveries.append(delivery)
 
-                    save_deliveries(
-                        load_deliveries()[:-len(created_deliveries)] +
-                        created_deliveries
-                    )
+                    save_deliveries(delivery_records)
                 self._json_response(201, {
                     "message": "Batch delivery requests received.",
                     "deliveries": created_deliveries,
@@ -6591,6 +6849,12 @@ class FiableHandler(SimpleHTTPRequestHandler):
             self._json_response(400, {"error": str(error)})
 
     def do_GET(self):
+        path = urlparse(self.path).path
+        if DATABASE is not None and (path.startswith("/api/") or path in {"/admin.html", "/admin-login.html"}):
+            return self._database_request(self._do_GET)
+        return self._do_GET()
+
+    def _do_GET(self):
         # =====================================================
         # BLOCK ACCESS TO SERVER INTERNALS / DATA FILES
         # These must never be reachable through static file serving.
@@ -6608,6 +6872,33 @@ class FiableHandler(SimpleHTTPRequestHandler):
         # =====================================================
         # PROTECT ADMIN DASHBOARD
         # =====================================================
+
+        if request_path == "/api/locations":
+            try:
+                config = load_batch_routing()
+                self._json_response(200, {
+                    "locations": sorted(config["locations"], key=lambda location: location["label"].casefold()),
+                })
+            except ValueError as error:
+                self._json_response(503, {"error": str(error)})
+            return
+
+        if request_path == "/api/admin/batch-routing":
+            if not require_permission(self, "view_batch_routing"):
+                self._json_response(403, {"error": "You do not have permission to view delivery routing."})
+                return
+            try:
+                config = load_batch_routing()
+                self._json_response(200, {
+                    "config": config, "version": batch_routing_version(config),
+                    "locations": sorted(location["id"] for location in config["locations"]),
+                    "pricingZones": PRICING_ZONE_LABELS,
+                    "standardLocationIds": sorted(LOCATION_ZONES),
+                    "canManage": bool(require_permission(self, "manage_batch_routing")),
+                })
+            except ValueError as error:
+                self._json_response(503, {"error": str(error)})
+            return
 
         if self.path == "/admin.html":
 
@@ -7326,7 +7617,8 @@ class FiableHandler(SimpleHTTPRequestHandler):
                     continue
                 if search:
                     haystack = " ".join(str(order.get(field, "")) for field in (
-                        "orderRef", "trackingCode", "accountEmail", "riderName", "vendorName"
+                        "orderRef", "trackingCode", "accountEmail", "riderName", "vendorName",
+                        "batchId", "batchGroupId", "batchAxisLabel"
                     )).lower()
                     if search not in haystack:
                         continue
@@ -7398,18 +7690,23 @@ class FiableHandler(SimpleHTTPRequestHandler):
                 self._json_response(403, {"error": "You are not authorized to view this file."})
                 return
 
-            file_path = PROOF_DIR / filename
-            if not file_path.exists():
-                self._json_response(404, {"error": "Not found."})
-                return
-
-            suffix = file_path.suffix.lower()
-            content_type = {
-                ".png": "image/png", ".jpg": "image/jpeg",
-                ".jpeg": "image/jpeg", ".webp": "image/webp",
-            }.get(suffix, "application/octet-stream")
-
-            data = file_path.read_bytes()
+            if DATABASE is not None:
+                try:
+                    data, content_type = DATABASE.read_blob(filename)
+                except FileNotFoundError:
+                    self._json_response(404, {"error": "Not found."})
+                    return
+            else:
+                file_path = PROOF_DIR / filename
+                if not file_path.exists():
+                    self._json_response(404, {"error": "Not found."})
+                    return
+                suffix = file_path.suffix.lower()
+                content_type = {
+                    ".png": "image/png", ".jpg": "image/jpeg",
+                    ".jpeg": "image/jpeg", ".webp": "image/webp",
+                }.get(suffix, "application/octet-stream")
+                data = file_path.read_bytes()
             self.send_response(200)
             self.send_header("Content-Type", content_type)
             self.send_header("Content-Length", str(len(data)))
@@ -7610,9 +7907,12 @@ class FiableHandler(SimpleHTTPRequestHandler):
 
 
 if __name__ == "__main__":
+    if DATABASE is not None:
+        DATABASE.initialize()
     log_startup_state()
-    migrate_subscriber_ids()
-    migrate_deliveries()
-    bootstrap_admin_from_environment()
+    with locked_file(ACCOUNTS_FILE, DELIVERIES_FILE, ADMIN_CREDENTIALS_FILE):
+        migrate_subscriber_ids()
+        migrate_deliveries()
+        bootstrap_admin_from_environment()
     print(f"Fiable server running on 0.0.0.0:{PORT}")
     ThreadingHTTPServer(("0.0.0.0", PORT), FiableHandler).serve_forever()

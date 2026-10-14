@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="portal.css">
   <link rel="stylesheet" href="admin.css?v=5">
   <link rel="stylesheet" href="admin-design.css?v=1">
+  <link rel="stylesheet" href="batch-routing.css?v=2">
   <style>
     body.admin-page-loading {
       visibility: hidden;
@@ -467,7 +468,7 @@
             </div>
 
             <div class="admin-filter-bar">
-              <input type="search" id="ordersSearchInput" placeholder="Search by order ref, tracking code, vendor, rider...">
+              <input type="search" id="ordersSearchInput" placeholder="Search by order, tracking code, vendor, rider or batch group...">
               <select id="ordersStatusFilter">
                 <option value="">All statuses</option>
                 <option value="requested">Pending</option>
@@ -1597,6 +1598,62 @@
           </div>
 
 
+          <article class="panel settings-panel hidden" id="batchRoutingPanel">
+            <div class="settings-section-header">
+              <div><h2>Delivery areas &amp; batch groups</h2>
+                <p class="muted">Choose which destination areas can share a discount group from each pickup area. Starting areas are proposed boundaries for dispatcher review.</p>
+              </div>
+            </div>
+            <p id="routingAccessNote" class="muted"></p>
+            <div class="routing-actions">
+              <button type="button" class="btn outline" id="routingReload">Reload saved rules</button>
+              <button type="button" class="btn primary" id="routingSave" disabled>Save routing rules</button>
+            </div>
+            <p id="routingMessage" role="status" aria-live="polite">Loading routing rules...</p>
+            <div id="routingEditor" hidden>
+              <details class="routing-section">
+                <summary>1. Delivery areas and location assignments</summary>
+                <p class="muted">Each location belongs to one delivery area. Add missing locations below and choose a pricing zone for their normal route charges.</p>
+                <div class="routing-add-location" id="routingAddLocationFields">
+                  <h3>Add a location</h3>
+                  <p class="muted">Use the neighbourhood or town name, such as Ogudu. Customers enter the house number and street separately.</p>
+                  <div class="routing-location-fields">
+                    <label>Location name<input id="routingLocationName" maxlength="100" placeholder="e.g. Ogudu"></label>
+                    <label>Pricing zone<select id="routingLocationZone"><option value="">Select a pricing zone</option></select></label>
+                    <label>Delivery area<select id="routingLocationArea"></select></label>
+                  </div>
+                  <p class="muted">The pricing zone controls normal route units; the delivery area controls batch grouping. You can test the new location before saving.</p>
+                  <button type="button" class="btn outline" id="routingAddLocation">Add location to draft</button>
+                  <p id="routingLocationMessage" role="status" aria-live="polite"></p>
+                </div>
+                <div id="routingAreas" class="routing-area-list"></div>
+                <button type="button" class="btn outline" id="routingAddArea">Add delivery area</button>
+                <div id="routingLocations" class="routing-location-list"></div>
+              </details>
+              <details class="routing-section" open>
+                <summary>2. Groups allowed from a pickup area</summary>
+                <label for="routingPickupArea">Pickup area</label>
+                <select id="routingPickupArea"></select>
+                <p class="muted">Areas start in separate groups. Give destination areas the same group name to combine them for this pickup area only. Validate combinations with your dispatcher.</p>
+                <div id="routingGroups" class="routing-location-list"></div>
+                <datalist id="routingGroupNames"></datalist>
+                <button type="button" class="btn outline" id="routingSeparate">Separate all groups for this pickup</button>
+              </details>
+              <section class="routing-section" aria-labelledby="routingTestHeading">
+                <h3 id="routingTestHeading">3. Try a batch without booking</h3>
+                <p class="muted">Tests use your current edits and Basic plan units. No orders are created and no units are deducted. Rules take effect for new quotes when saved; confirmed bookings retain their prices.</p>
+                <label for="routingTestPickup">Pickup location</label>
+                <select id="routingTestPickup"></select>
+                <div id="routingTestRows"></div>
+                <div class="routing-actions">
+                  <button type="button" class="btn outline" id="routingAddTest">Add destination</button>
+                  <button type="button" class="btn primary" id="routingTest">Test grouping &amp; savings</button>
+                </div>
+                <div id="routingTestResult" role="status" aria-live="polite"></div>
+              </section>
+            </div>
+          </article>
+
           <!-- =========================
               ACCOUNT INFORMATION
           ========================== -->
@@ -2084,7 +2141,8 @@
 
   <!-- Admin JavaScript -->
   <script src="csrf.js"></script>
-  <script src="admin.js?v=18"></script>
+  <script src="admin.js?v=19"></script>
+  <script src="batch-routing.js?v=2"></script>
 
   <!-- =====================================================
       ADMIN TOAST

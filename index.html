@@ -8,8 +8,9 @@
 <title>Fiable Logistics | Reliable Deliveries. Smarter Business Growth.</title>
 <link rel="stylesheet" href="fiable.css?v=5">
 <link rel="stylesheet" href="design.css?v=2">
+<link rel="stylesheet" href="home.css?v=1">
 </head>
-<body>
+<body class="home-page">
 <a class="skip-link" href="#main-content">Skip to content</a>
 <div class="topbar">
     <div class="container">
@@ -49,17 +50,49 @@
 </div>
 <div class="hero-note">Already expecting a parcel? <a href="track.html">Track your delivery →</a></div>
 </div>
-<div class="network-panel">
-<div class="network-header"><strong>Connected across Lagos.</strong><span>THE FIABLE NETWORK</span></div>
-<img class="network-art" src="images/delivery-network.svg" width="640" height="500" alt="Illustration of delivery routes connecting Ikeja, Yaba, Surulere, Lagos Island, Victoria Island and Lekki">
-<div class="network-footer"><span>Illustrated routes · Coverage subject to confirmation</span><a href="services.html#coverage">Explore coverage →</a></div>
+<section class="workspace-preview" aria-labelledby="workspace-title">
+<div class="workspace-top"><div><span class="workspace-brand">FIABLE</span><h2 id="workspace-title">Your delivery workspace</h2></div><span class="example-badge">Example preview</span></div>
+<div class="workspace-body">
+<div class="workspace-plan"><span>Growth plan</span><span>75 monthly units</span></div>
+<div class="workspace-stats">
+<div><svg class="site-icon" aria-hidden="true"><use href="images/site-icons.svg#wallet"></use></svg><strong>46<span> / 75</span></strong><span>Units remaining</span></div>
+<div><svg class="site-icon" aria-hidden="true"><use href="images/site-icons.svg#batch"></use></svg><strong>6</strong><span>Deliveries in this batch</span></div>
 </div>
+<div class="workspace-list-title"><strong>A few orders in your batch</strong><span>Individual tracking</span></div>
+<ul class="workspace-orders">
+<li><span class="order-example-icon"><svg class="site-icon" aria-hidden="true"><use href="images/site-icons.svg#package"></use></svg></span><div><strong>Egbeda → Chevron</strong><small>FL-0001</small></div><span class="example-status status-assigned">Rider assigned</span></li>
+<li><span class="order-example-icon"><svg class="site-icon" aria-hidden="true"><use href="images/site-icons.svg#package"></use></svg></span><div><strong>Egbeda → Ajah</strong><small>FL-0002</small></div><span class="example-status status-transit">On delivery</span></li>
+<li><span class="order-example-icon"><svg class="site-icon" aria-hidden="true"><use href="images/site-icons.svg#check"></use></svg></span><div><strong>Egbeda → Ikeja</strong><small>FL-0003</small></div><span class="example-status status-delivered">Delivered</span></li>
+</ul>
+<a class="workspace-saving" href="#batch-saver"><span><svg class="site-icon" aria-hidden="true"><use href="images/site-icons.svg#batch"></use></svg><strong>Batch Saver</strong><small>One pickup · 6 destinations</small></span><span><strong>29 units</strong><small>1 unit saved <span aria-hidden="true">↗</span></small></span></a>
+</div>
+<div class="workspace-bottom"><span>Illustrative orders and balance.</span><a href="portal.html">Open your portal <span aria-hidden="true">→</span></a></div>
+</section>
 </div>
 </section>
-<section class="service-strip" aria-label="Choose a delivery service"><div class="container">
-<a href="services.html#plans"><strong>Monthly delivery plans ↗</strong><span>For businesses sending orders every week.</span></a>
-<a href="get-started.html#quick-express"><strong>Express delivery ↗</strong><span>A single pickup, with your route confirmed first.</span></a>
-<a href="get-started.html?service=bulk#get-started"><strong>Bulk haulage ↗</strong><span>Tell us your load and the journey it needs to make.</span></a>
+<section id="delivery-services" class="section home-services" aria-labelledby="delivery-services-title"><div class="container">
+<div class="home-section-heading"><div><div class="eyebrow">A service for every order</div><h2 id="delivery-services-title">How can we move your business?</h2></div><a class="text-link" href="services.html">Explore our services <span aria-hidden="true">→</span></a></div>
+<div class="home-service-grid">
+<article class="home-service-card"><span class="service-card-icon"><svg class="site-icon" aria-hidden="true"><use href="images/site-icons.svg#subscription"></use></svg></span><h3>Monthly subscription</h3><p>A predictable delivery budget for businesses sending orders every week.</p><a class="btn btn-outline" href="services.html#plans">Choose a plan <span aria-hidden="true">→</span></a></article>
+<article class="home-service-card"><span class="service-card-icon"><svg class="site-icon" aria-hidden="true"><use href="images/site-icons.svg#single"></use></svg></span><h3>Single delivery</h3><p>One pickup and one destination. Send your details for route and price confirmation.</p><a class="btn btn-outline" href="get-started.html#quick-express">Request delivery <span aria-hidden="true">→</span></a></article>
+<article class="home-service-card home-service-featured"><span class="service-card-icon"><svg class="site-icon" aria-hidden="true"><use href="images/site-icons.svg#batch"></use></svg></span><h3>Batch Saver</h3><p>One pickup, multiple destinations. Subscribers can save units on qualifying groups.</p><a class="btn btn-primary" href="#batch-saver">See batch savings <span aria-hidden="true">→</span></a></article>
+<article class="home-service-card"><span class="service-card-icon"><svg class="site-icon" aria-hidden="true"><use href="images/site-icons.svg#haulage"></use></svg></span><h3>Bulk haulage</h3><p>Moving a larger load? Share your goods, quantity and route to request a quote.</p><a class="btn btn-outline" href="get-started.html?service=bulk#get-started">Request a quote <span aria-hidden="true">→</span></a></article>
+</div>
+</div></section>
+<section id="batch-saver" class="section home-batch" aria-labelledby="batch-saver-title"><div class="container home-batch-grid">
+<div class="home-batch-copy"><div class="eyebrow">Fiable Batch Saver · For subscribers</div><h2 id="batch-saver-title">One pickup.<br>A smarter batch.</h2><p>Add deliveries across Lagos in one request. We group destinations using your pickup and delivery areas, then calculate the units and savings for each eligible group.</p>
+<ol class="batch-explainer"><li><span>01</span><div><strong>Enter your pickup once</strong><p>One address, contact and delivery window for the batch.</p></div></li><li><span>02</span><div><strong>Add your destinations</strong><p>Include each recipient, address and package details.</p></div></li><li><span>03</span><div><strong>Review, confirm and track</strong><p>See the units before booking. Every delivery gets its own tracking code.</p></div></li></ol>
+<div class="batch-cta"><a class="btn btn-primary" href="portal.html?view=batch">Book a batch in your portal <span aria-hidden="true">→</span></a><a class="text-link" href="services.html#plans">New to Fiable? Choose a plan <span aria-hidden="true">↗</span></a></div>
+</div>
+<div class="batch-example" aria-labelledby="batch-example-title"><div class="batch-example-heading"><span class="service-card-icon"><svg class="site-icon" aria-hidden="true"><use href="images/site-icons.svg#batch"></use></svg></span><div><span class="eyebrow">Try an example</span><h3 id="batch-example-title">See how the units add up.</h3></div></div>
+<label for="batchExampleRoute">Six deliveries from Egbeda</label><select id="batchExampleRoute" aria-describedby="batch-example-note"><option value="mixed">4 Chevron + 2 Ikeja deliveries</option><option value="lekki">6 Chevron deliveries</option><option value="ikeja">6 Ikeja deliveries</option></select>
+<div id="batchExampleResult" role="status" aria-live="polite" aria-atomic="true">
+<div class="batch-example-groups"><div class="batch-example-group"><div><strong>Chevron / Ikota group</strong><span>4 deliveries · 5% tier</span></div><div><strong>24 → 23 units</strong><span>1 unit saved</span></div></div><div class="batch-example-group"><div><strong>Ikeja group</strong><span>2 deliveries · Normal units</span></div><div><strong>6 units</strong><span>Fewer than 3 in this group</span></div></div></div>
+<div class="batch-example-total"><span>Units for this batch</span><strong>29<span> / 30</span></strong></div><p class="batch-example-saving"><svg class="site-icon" aria-hidden="true"><use href="images/site-icons.svg#check"></use></svg>1 unit stays in your subscription.</p>
+</div>
+<p class="batch-example-note" id="batch-example-note">Illustrative routes from Egbeda. Final units are calculated in your portal. Discounts apply per eligible group and round up to whole units, with at least one unit per delivery.</p>
+<div class="batch-tier-list" aria-label="Discount tiers per eligible delivery group"><span><strong>3–5</strong>deliveries · 5%</span><span><strong>6–10</strong>deliveries · 10%</span><span><strong>11+</strong>deliveries · 15%</span></div>
+</div>
 </div></section>
 <section class="section">
 <div class="container">
@@ -101,20 +134,20 @@
 </div>
 <div class="steps">
 <div class="step">
-<h3>Choose Your Plan</h3>
-<p>Select the monthly delivery subscription that matches your business volume.</p>
+<h3>Choose your plan</h3>
+<p>Select your monthly capacity and activate your subscription with an upfront payment.</p>
 </div>
 <div class="step">
-<h3>Subscribe</h3>
-<p>Pay your monthly subscription upfront and receive your allocated delivery units.</p>
+<h3>Add your deliveries</h3>
+<p>Enter one delivery or build a batch from one pickup to multiple destinations.</p>
 </div>
 <div class="step">
-<h3>Book Deliveries</h3>
-<p>Submit delivery requests through the Fiable booking process.</p>
+<h3>Review your units</h3>
+<p>Check your route units and any batch savings, then confirm your request.</p>
 </div>
 <div class="step">
-<h3>We Deliver</h3>
-<p>We coordinate riders and track performance and delivery outcomes.</p>
+<h3>Track each order</h3>
+<p>We coordinate the riders. Follow delivery updates and your remaining units in your portal.</p>
 </div>
 </div>
 </div>
@@ -163,6 +196,10 @@
 <button>Where does Fiable deliver? <span>+</span>
 </button>
 <p>We operate across structured zones in Mainland, Island, Lekki and selected extended areas including Ikorodu, Badagry, Epe and Apapa.</p>
+</div>
+<div class="faq">
+<button>How does Batch Saver work? <span>+</span></button>
+<p>Subscribers can request three or more deliveries from one pickup address across supported locations. Destinations are grouped according to your pickup and delivery areas. Each group of 3–5 deliveries qualifies for 5%, 6–10 for 10%, and 11+ for 15% off route units. Groups of one or two use normal units. Charges round up to whole units with at least one unit per delivery, so some batches may have no unit saving. Review the result in your portal before confirming.</p>
 </div>
 <div class="faq">
 <button>Can unused units roll over? <span>+</span>
@@ -225,9 +262,9 @@
 <div class="footer-col">
 <strong>Services</strong>
 <a href="services.html#plans">Subscription Delivery</a>
-<a href="services.html#plans">Business Delivery</a>
-<a href="services.html#calculator">Express Delivery</a>
-<a href="services.html#vendors">Vendor Logistics</a>
+<a href="#batch-saver">Batch Saver</a>
+<a href="get-started.html#quick-express">Single Delivery</a>
+<a href="get-started.html?service=bulk#get-started">Bulk Haulage</a>
 </div>
 </div>
 <div class="container copyright">
@@ -237,8 +274,9 @@
 </footer>
 <div class="toast" id="toast" role="status">
 </div>
-<a class="whatsapp-contact" href="https://wa.me/2347015414492" target="_blank" rel="noopener noreferrer" aria-label="Chat with Fiable on WhatsApp (opens in a new tab)">Chat on WhatsApp &nearr;</a>
+<a class="whatsapp-contact" href="https://wa.me/2347015414492" target="_blank" rel="noopener noreferrer" aria-label="Chat with Fiable on WhatsApp (opens in a new tab)" title="Chat with Fiable on WhatsApp"><svg class="site-icon" aria-hidden="true"><use href="images/site-icons.svg#chat"></use></svg></a>
 <button class="back-to-top" id="backToTop" type="button" aria-label="Back to top">↑</button>
 <script src="site.js"></script>
+<script src="home.js?v=1"></script>
 </body>
 </html>

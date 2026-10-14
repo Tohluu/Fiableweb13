@@ -279,7 +279,7 @@ textarea{resize:vertical;min-block-size:85px}
     gap:15px
 }
 .mini-rule b{font-size:12px}.mini-rule span{color:var(--muted);font-size:11px;text-align:end}
-.batch-delivery-panel{margin-block-start:20px}
+.batch-delivery-panel{margin-block-start:20px;scroll-margin-block-start:100px}
 .batch-delivery-rows{display:grid;gap:14px;margin-block:20px}
 .batch-delivery-row{padding:16px;border:1px solid var(--line);border-radius:8px;background:#fafcff}
 .batch-delivery-row .form-grid{margin:0}
@@ -288,6 +288,7 @@ textarea{resize:vertical;min-block-size:85px}
 .batch-quote-preview{display:grid;gap:4px;margin-block-start:16px;padding:14px 16px;border:1px solid #9dc0f7;border-radius:8px;background:var(--blue-soft);font-size:13px}
 .batch-quote-preview span{color:var(--muted)}
 .batch-quote-preview b{color:var(--blue-dark)}
+.batch-quote-group{display:grid;gap:4px;padding-block:10px;border-block-end:1px solid var(--line)}
 .subscription-current{display:flex;align-items:center;justify-content:space-between}
 .label{
     display:block;

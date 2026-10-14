@@ -72,6 +72,8 @@ def main():
     import server
 
     print(f"[seed] APP_ENV={app_env}")
+    if server.DATABASE is not None:
+        raise RuntimeError("This legacy file seeder is disabled when DATABASE_URL is configured.")
     print(f"[seed] Target data directory: {server.DATA_DIR}")
 
     created = []

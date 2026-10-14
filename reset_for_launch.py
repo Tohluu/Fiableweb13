@@ -96,6 +96,8 @@ def main():
 
     import server
 
+    if server.DATABASE is not None:
+        raise RuntimeError("This legacy file reset is disabled when DATABASE_URL is configured.")
     print(f"[reset] Target data directory: {server.DATA_DIR}")
 
     # Preserve owner/super_admin admin accounts; clear nothing else here -

@@ -1,0 +1,10 @@
+.env
+.env.*
+!.env.example
+.venv/
+__pycache__/
+*.py[cod]
+database_exports/
+backups/
+*.dump
+*.sql.gz

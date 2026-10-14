@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="Fiable Logistics vendor portal">
   <title>Fiable Vendor Portal</title>
-  <link rel="stylesheet" href="portal.css?v=4">
+  <link rel="stylesheet" href="portal.css?v=5">
   <link rel="stylesheet" href="portal-design.css?v=1">
 </head>
 <body>
@@ -15,7 +15,7 @@
           <a class="auth-logo" href="index.html"><img src="images/Logo2.png" alt="Fiable Logistics"></a>
           <div class="eyebrow">Vendor portal</div>
           <h2>Welcome back.</h2>
-          <p class="muted">Log in to manage your subscription, deliveries and account.</p>
+          <p class="muted" id="portalLoginDescription">Log in to manage your subscription, deliveries and account.</p>
 
           <form id="loginForm">
             <label for="loginEmail">Email address or Subscriber ID</label>
@@ -405,30 +405,31 @@
             </aside>
           </div>
 
-          <article class="panel batch-delivery-panel">
+          <article class="panel batch-delivery-panel" id="batch-delivery">
             <div class="panel-head">
               <div>
                 <div class="eyebrow">Fiable Batch Saver</div>
-                <h3>Same-pickup Lekki axis deliveries</h3>
-                <p class="muted">Bundle three or more deliveries from one pickup point to Lekki-axis destinations and save up to 15% of route units.</p>
+                <h3 id="batchDeliveryHeading" tabindex="-1">Batch deliveries across all service areas</h3>
+                <p class="muted">Add three or more deliveries from one pickup address to any supported location. Your pickup and destination areas determine which deliveries can share a discount group.</p>
               </div>
             </div>
 
+            <p class="muted">Per eligible group: 3–5 deliveries qualify for 5%, 6–10 for 10%, and 11+ for 15% off route units. Groups of one or two use normal units. Charges round up to whole units, with at least one unit per delivery, so small groups may have no unit saving. Express surcharges are unchanged.</p>
             <form id="batchDeliveryForm">
               <div class="form-grid batch-shared-details">
                 <div><label for="batchPickup">Pickup location</label><select id="batchPickup" required></select></div>
                 <div><label for="batchDeliveryWindow">Delivery window</label><select id="batchDeliveryWindow" required><option value="" selected disabled>Select delivery window</option><option value="8:00 AM - 11:00 AM">8:00 AM - 11:00 AM</option><option value="12:00 PM - 3:00 PM">12:00 PM - 3:00 PM</option><option value="Express">Express</option><option value="Next Day Delivery">Next Day Delivery (8:00 AM - 11:00 AM)</option></select></div>
-                <div><label for="batchPickupContactName">Pickup contact name</label><input id="batchPickupContactName" required></div>
-                <div><label for="batchPickupPhone">Pickup phone</label><input id="batchPickupPhone" type="tel" required></div>
-                <div class="full-width"><label for="batchPickupAddress">Pickup address</label><input id="batchPickupAddress" required placeholder="House number, street, estate, landmark"></div>
+                <div><label for="batchPickupContactName">Pickup contact name</label><input id="batchPickupContactName" maxlength="100" required></div>
+                <div><label for="batchPickupPhone">Pickup phone</label><input id="batchPickupPhone" type="tel" maxlength="40" required></div>
+                <div class="full-width"><label for="batchPickupAddress">Pickup address</label><input id="batchPickupAddress" maxlength="300" required placeholder="House number, street, estate, landmark"></div>
               </div>
 
               <div id="batchDeliveryRows" class="batch-delivery-rows"></div>
 
               <div class="batch-delivery-actions">
                 <button type="button" class="btn outline" id="addBatchDeliveryBtn">Add destination</button>
-                <button type="button" class="btn outline" id="previewBatchQuoteBtn">Preview saving</button>
-                <button type="submit" class="btn primary" id="submitBatchDeliveryBtn">Submit batch</button>
+                <button type="button" class="btn outline" id="previewBatchQuoteBtn">Review units and savings</button>
+                <button type="submit" class="btn primary" id="submitBatchDeliveryBtn" disabled>Confirm batch</button>
               </div>
               <div id="batchQuotePreview" class="batch-quote-preview hidden" aria-live="polite"></div>
             </form>
@@ -742,28 +743,11 @@
 
   <script src="csrf.js"></script>
   <script>
-    const LOCATIONS = [
-      ["agege","Agege"],["ajeromi-ifelodun","Ajeromi-Ifelodun"],["egbeda","Egbeda"],["shasha","Shasha"],
-      ["igando","Igando"],["ayobo","Ayobo"],["ipaja","Ipaja"],["abule-egba","Abule Egba"],["agbado","Agbado"],
-      ["alagbado","Alagbado"],["idimu","Idimu"],["ikotun","Ikotun"],["amuwo-odofin","Amuwo-Odofin"],
-      ["apapa","Apapa"],["badagry","Badagry"],["epe","Epe"],["ibeju-lekki","Ibeju-Lekki"],
-      ["ifako-ijaiye","Ifako-Ijaiye"],["ikeja","Ikeja"],["ikorodu","Ikorodu"],["kosofe","Kosofe"],
-      ["lagos-island","Lagos Island"],["lagos-mainland","Lagos Mainland"],["yaba","Yaba"],["mushin","Mushin"],
-      ["ojo","Ojo"],["oshodi-isolo","Oshodi-Isolo"],["shomolu","Shomolu"],["surulere","Surulere"],
-      ["ajegunle","Ajegunle"],["victoria-island-vi","Victoria Island (VI)"],["ikoyi","Ikoyi"],
-      ["lekki-phase-1","Lekki Phase 1"],["marwa","Marwa"],["ikate-elegushi","Ikate Elegushi"],["ajah","Ajah"],["sangotedo","Sangotedo"],
-      ["oniru","Oniru"],["lekki-phase-2","Lekki Phase 2"],["chevron","Chevron"],["ikota","Ikota"],["vgc","VGC"],
-      ["osapa-london","Osapa London"],["jakande-lekki","Jakande (Lekki)"],["orchid-road","Orchid Road"],
-      ["abraham-adesanya","Abraham Adesanya"],["ilasan","Ilasan"]
-    ];
-    const LEKKI_AXIS_LOCATION_VALUES = new Set([
-      "lekki-phase-1", "marwa", "ikate-elegushi", "chevron", "ajah",
-      "ikota", "vgc", "osapa-london", "jakande-lekki", "orchid-road",
-      "abraham-adesanya", "ilasan"
-    ]);
-
+    const LOCATIONS = [];
     const PLAN_PRICES = { Basic: 67500, Growth: 105000, Business: 143000 };
     const state = { account: null, deliveries: [] };
+    let pendingBatchEntry = new URLSearchParams(window.location.search).get("view") === "batch";
+    if (pendingBatchEntry) document.getElementById("portalLoginDescription").textContent = "Log in to book a batch from one pickup to multiple destinations.";
 
     const $ = id => document.getElementById(id);
     const toast = message => {
@@ -782,7 +766,7 @@
       const text = await response.text();
       let data = {};
       try { data = text ? JSON.parse(text) : {}; } catch { throw new Error("The server returned an invalid response."); }
-      if (!response.ok) throw new Error(data.error || "Something went wrong.");
+      if (!response.ok) throw Object.assign(new Error(data.error || "Something went wrong."), { quoteChanged: data.quoteChanged });
       return data;
     }
 
@@ -1130,9 +1114,36 @@
       ["pickup","dropoff","batchPickup"].forEach(id => {
         const select = $(id);
         if (!select) return;
+        const selected = select.value;
         select.innerHTML = '<option value="">Select location</option>' +
-          LOCATIONS.map(([value,label]) => `<option value="${value}">${label}</option>`).join("");
+          batchDestinationOptions();
+        select.value = selected;
       });
+      document.querySelectorAll('.batch-dropoff').forEach(select => {
+        const selected = select.value;
+        select.innerHTML = '<option value="">Select destination</option>' + batchDestinationOptions();
+        select.value = selected;
+      });
+    }
+
+    let locationsRequest = null;
+    async function loadDeliveryLocations() {
+      if (locationsRequest) return locationsRequest;
+      if (batchSubmitting) return;
+      locationsRequest = (async () => {
+        try {
+          const data = await api('/api/locations', { cache: 'no-store' });
+          const updated = data.locations.map(location => [location.id, location.label]);
+          if (JSON.stringify(updated) !== JSON.stringify(LOCATIONS)) {
+            LOCATIONS.splice(0, LOCATIONS.length, ...updated);
+            populateLocations();
+            hideBatchQuote();
+          }
+        } catch (error) {
+          toast(`Unable to load delivery locations: ${error.message}`);
+        }
+      })();
+      try { await locationsRequest; } finally { locationsRequest = null; }
     }
 
     function updateAccountUI() {
@@ -2155,6 +2166,7 @@
         renderRecent();
         renderDeliveries();
         loadSubscriptionHistory(state.account.email);
+        openRequestedBatch();
       } catch (error) {
         clearSession();
         showLogin();
@@ -2181,6 +2193,16 @@
       window.scrollTo({ top:0, behavior:"smooth" });
       if (view === "support") loadVendorTickets();
       if (view === "subscription") loadUnitAdjustmentHistoryVendor();
+    }
+
+    function openRequestedBatch() {
+      if (!pendingBatchEntry || !state.account) return;
+      pendingBatchEntry = false;
+      switchView("request");
+      requestAnimationFrame(() => {
+        $("batchDeliveryHeading").focus({ preventScroll: true });
+        $("batch-delivery").scrollIntoView({ behavior: "instant", block: "start" });
+      });
     }
 
     function escapeHtml(value) {
@@ -2221,6 +2243,7 @@
       renderRecent();
       renderDeliveries();
       switchView("dashboard");
+      openRequestedBatch();
     }
 
     function startSessionTimer() {
@@ -2509,24 +2532,30 @@ $("resetBackLoginBtn").addEventListener("click", () => {
       }
     });
 
+    let batchRowSequence = 0;
+    let batchQuoteSequence = 0;
+    let reviewedBatchRequest = null;
+    let reviewedBatchQuoteToken = null;
+    let batchSubmitting = false;
+
     function batchDestinationOptions() {
-      return LOCATIONS
-        .filter(([value]) => LEKKI_AXIS_LOCATION_VALUES.has(value))
-        .map(([value, label]) => `<option value="${value}">${label}</option>`)
-        .join("");
+      return LOCATIONS.map(([value, label]) => `<option value="${escapeHtml(value)}">${escapeHtml(label)}</option>`).join("");
     }
 
     function addBatchDeliveryRow() {
       const rows = $("batchDeliveryRows");
+      if (rows.children.length >= 100) { toast("You can submit up to 100 deliveries in one batch."); return; }
       const row = document.createElement("section");
       row.className = "batch-delivery-row";
+      const prefix = `batch-row-${++batchRowSequence}`;
       row.innerHTML = `
         <div class="batch-delivery-row-heading"><strong>Destination</strong><button type="button" class="text-btn remove-batch-delivery-btn">Remove</button></div>
         <div class="form-grid">
-          <div><label>Destination</label><select class="batch-dropoff" required><option value="">Select Lekki-axis destination</option>${batchDestinationOptions()}</select></div>
-          <div><label>Recipient name</label><input class="batch-recipient-name" required></div>
-          <div><label>Recipient phone</label><input class="batch-recipient-phone" type="tel" required></div>
-          <div><label>Delivery address</label><input class="batch-delivery-address" required placeholder="House number, street, estate, landmark"></div>
+          <div><label for="${prefix}-dropoff">Destination</label><select id="${prefix}-dropoff" class="batch-dropoff" required><option value="">Select destination</option>${batchDestinationOptions()}</select></div>
+          <div><label for="${prefix}-name">Recipient name</label><input id="${prefix}-name" class="batch-recipient-name" maxlength="100" required></div>
+          <div><label for="${prefix}-phone">Recipient phone</label><input id="${prefix}-phone" class="batch-recipient-phone" type="tel" maxlength="40" required></div>
+          <div><label for="${prefix}-address">Delivery address</label><input id="${prefix}-address" class="batch-delivery-address" maxlength="300" required placeholder="House number, street, estate, landmark"></div>
+          <div class="full-width"><label for="${prefix}-package">Package details</label><input id="${prefix}-package" class="batch-package-description" maxlength="300" required placeholder="Items, quantity and approximate size or weight"></div>
         </div>
       `;
       row.querySelector(".remove-batch-delivery-btn").addEventListener("click", () => {
@@ -2537,12 +2566,16 @@ $("resetBackLoginBtn").addEventListener("click", () => {
           toast("A batch requires at least three deliveries.");
         }
       });
-      row.querySelector(".batch-dropoff").addEventListener("change", hideBatchQuote);
       rows.appendChild(row);
+      hideBatchQuote();
     }
 
     function hideBatchQuote() {
+      batchQuoteSequence++;
+      reviewedBatchRequest = null;
+      reviewedBatchQuoteToken = null;
       $("batchQuotePreview").classList.add("hidden");
+      $("submitBatchDeliveryBtn").disabled = true;
     }
 
     function batchRequestsFromForm() {
@@ -2558,37 +2591,61 @@ $("resetBackLoginBtn").addEventListener("click", () => {
         dropoff: row.querySelector(".batch-dropoff").value,
         recipientName: row.querySelector(".batch-recipient-name").value.trim(),
         recipientPhone: row.querySelector(".batch-recipient-phone").value.trim(),
-        deliveryAddress: row.querySelector(".batch-delivery-address").value.trim()
+        deliveryAddress: row.querySelector(".batch-delivery-address").value.trim(),
+        packageDescription: row.querySelector(".batch-package-description").value.trim()
       }));
     }
 
     async function previewBatchQuote() {
       const form = $("batchDeliveryForm");
+      form.querySelectorAll('input[required]').forEach(input => input.setCustomValidity(input.value.trim() ? '' : 'Please enter this detail.'));
       if (!form.reportValidity() || !state.account) return null;
+      hideBatchQuote();
+      const sequence = batchQuoteSequence;
+      const deliveries = batchRequestsFromForm();
+      const request = JSON.stringify(deliveries);
       const preview = $("batchQuotePreview");
       preview.classList.remove("hidden");
-      preview.textContent = "Calculating batch saving...";
+      preview.textContent = "Calculating delivery groups from your pickup area...";
       try {
         const quote = await api("/api/batch-delivery-quote", {
           method: "POST",
-          body: JSON.stringify({
-            email: state.account.email,
-            deliveries: batchRequestsFromForm()
-          })
+          body: JSON.stringify({ deliveries: JSON.parse(request) })
         });
-        preview.innerHTML = `<strong>Lekki axis batch saving</strong><span>${quote.originalUnits} route units reduced to ${quote.chargedUnits} units</span><b>${quote.unitsSaved} unit${quote.unitsSaved === 1 ? "" : "s"} saved, worth ${formatMoney(quote.vendorSaving)}</b>`;
+        if (sequence !== batchQuoteSequence || request !== JSON.stringify(batchRequestsFromForm())) return null;
+        const groups = quote.groups.map(group => {
+          const rate = Math.round(group.discountRate * 100);
+          const saving = !rate ? 'Normal units: fewer than 3 deliveries in this group.'
+            : group.unitsSaved ? `${rate}% tier: ${group.unitsSaved} unit${group.unitsSaved === 1 ? '' : 's'} saved`
+            : `${rate}% tier: no whole-unit saving after rounding`;
+          const destinations = group.deliveryIndexes.map(index => {
+            const delivery = deliveries[index];
+            return `${index + 1}. ${LOCATIONS.find(([value]) => value === delivery.dropoff)?.[1] || delivery.dropoff}`;
+          }).join('; ');
+          return `<div class="batch-quote-group"><strong>${escapeHtml(group.label)}</strong><span>${escapeHtml(destinations)}</span><span>${group.deliveryCount} ${group.deliveryCount === 1 ? 'delivery' : 'deliveries'}: ${group.originalUnits} to ${group.chargedUnits} units</span><span>${saving}</span></div>`;
+        }).join("");
+        preview.innerHTML = `<strong>Review your delivery groups</strong><span>Pickup area: ${escapeHtml(quote.pickupAreaLabel)}. Groups depend on your pickup and destination areas.</span>${groups}
+          <strong>Total: ${quote.chargedUnits} units from your subscription</strong>
+          <span>${quote.originalUnits} original route units; ${quote.unitsSaved} unit${quote.unitsSaved === 1 ? '' : 's'} saved (${formatMoney(quote.vendorSaving)})</span>
+          ${quote.prioritySurcharge ? `<span>Express surcharge: ${formatMoney(quote.prioritySurcharge)} total, separate from route units.</span>` : ''}
+          <span>Each delivery receives its own tracking code. Riders are assigned by our dispatch team.</span>`;
+        reviewedBatchRequest = request;
+        reviewedBatchQuoteToken = quote.quoteToken;
+        $("submitBatchDeliveryBtn").disabled = false;
         return quote;
       } catch (error) {
-        preview.textContent = error.message;
+        if (sequence === batchQuoteSequence) preview.textContent = error.message;
         return null;
       }
     }
 
     $("addBatchDeliveryBtn").addEventListener("click", addBatchDeliveryRow);
     $("previewBatchQuoteBtn").addEventListener("click", previewBatchQuote);
-    ["batchPickup", "batchDeliveryWindow", "batchPickupContactName", "batchPickupPhone", "batchPickupAddress"].forEach(id => {
-      $(id).addEventListener("change", hideBatchQuote);
+    $("batchDeliveryForm").addEventListener("input", event => {
+      event.target.setCustomValidity?.('');
+      hideBatchQuote();
     });
+    $("batchDeliveryForm").addEventListener("change", hideBatchQuote);
     function updateBatchDeliveryWindowOptions() {
       const deliveryWindow = $("batchDeliveryWindow");
       const lagosTime = new Intl.DateTimeFormat("en-GB", { timeZone: "Africa/Lagos", hour: "2-digit", hourCycle: "h23" }).formatToParts(new Date());
@@ -2602,17 +2659,26 @@ $("resetBackLoginBtn").addEventListener("click", () => {
 
     $("batchDeliveryForm").addEventListener("submit", async event => {
       event.preventDefault();
+      if (batchSubmitting) return;
       const form = event.currentTarget;
       if (!form.reportValidity() || !state.account) return;
+      const request = JSON.stringify(batchRequestsFromForm());
+      if (request !== reviewedBatchRequest) {
+        await previewBatchQuote();
+        toast("Review the units and savings, then confirm your batch.");
+        return;
+      }
       const submitButton = $("submitBatchDeliveryBtn");
+      batchSubmitting = true;
+      form.inert = true;
       submitButton.disabled = true;
       submitButton.textContent = "Submitting...";
       try {
         const result = await api("/api/batch-delivery-request", {
           method: "POST",
           body: JSON.stringify({
-            email: state.account.email,
-            deliveries: batchRequestsFromForm()
+            deliveries: JSON.parse(request),
+            quoteToken: reviewedBatchQuoteToken
           })
         });
         state.account = result.summary;
@@ -2628,10 +2694,16 @@ $("resetBackLoginBtn").addEventListener("click", () => {
         toast(`${result.deliveries.length} batch deliveries requested. ${result.batchQuote.unitsSaved} units saved.`);
         switchView("deliveries");
       } catch (error) {
+        if (error.quoteChanged) {
+          hideBatchQuote();
+          await previewBatchQuote();
+        }
         toast(error.message);
       } finally {
-        submitButton.disabled = false;
-        submitButton.textContent = "Submit batch";
+        submitButton.disabled = reviewedBatchRequest !== JSON.stringify(batchRequestsFromForm());
+        submitButton.textContent = "Confirm batch";
+        form.inert = false;
+        batchSubmitting = false;
       }
     });
 
@@ -2722,7 +2794,8 @@ $("resetBackLoginBtn").addEventListener("click", () => {
       }
     });
 
-    populateLocations();
+    loadDeliveryLocations();
+    window.addEventListener('focus', loadDeliveryLocations);
     refreshAccount();
   </script>
   <div
