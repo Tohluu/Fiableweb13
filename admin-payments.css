@@ -1,0 +1,22 @@
+.payment-overview-heading { gap: 20px; flex-wrap: wrap; }
+.payment-overview-controls { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+.payment-overview-controls label { display: grid; gap: 7px; margin: 0; font-weight: 600; }
+.payment-overview-controls select { min-inline-size: 185px; }
+.payment-overview-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-block: 18px 24px; }
+.payment-overview-cards .admin-stat-card { min-inline-size: 0; }
+.payment-overview-cards strong { font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.payment-overview-cards small { color: var(--muted); line-height: 1.5; }
+.payment-total-card { border-color: var(--blue); background: var(--blue-soft); }
+.payment-overview-year { display: grid; grid-template-columns: 1.3fr repeat(3, 1fr); gap: 24px; margin-block-end: 24px; align-items: center; }
+.payment-overview-year h2 { margin: 0 0 8px; }
+.payment-overview-year strong, .payment-overview-year span { display: block; }
+.payment-overview-year strong { font-size: 23px; margin-block-start: 8px; overflow-wrap: anywhere; }
+.payment-overview-year span { color: var(--muted); }
+.payment-overview-table { min-inline-size: 720px; }
+.payment-overview-table td:not(:first-child), .payment-overview-table th:not(:first-child) { text-align: end; font-variant-numeric: tabular-nums; }
+.payment-overview-table tr.payment-selected-month td { background: var(--blue-soft); }
+.payment-overview-notes { margin-block-start: 24px; }
+#paymentOverviewError { padding: 14px; border: 1px solid #d98d8d; color: #922525; background: #fff5f5; }
+#paymentOverviewError[hidden] { display: none; }
+@media (max-width: 1050px) { .payment-overview-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } .payment-overview-year { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 550px) { .payment-overview-cards, .payment-overview-year { grid-template-columns: minmax(0, 1fr); } .payment-overview-controls { inline-size: 100%; } .payment-overview-controls label { flex: 1; } }

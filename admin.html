@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="admin.css?v=5">
   <link rel="stylesheet" href="admin-design.css?v=1">
   <link rel="stylesheet" href="batch-routing.css?v=2">
+  <link rel="stylesheet" href="admin-payments.css?v=1">
   <style>
     body.admin-page-loading {
       visibility: hidden;
@@ -84,6 +85,11 @@
         >
           <span aria-hidden="true"><svg class="admin-nav-icon"><use href="images/admin-icons.svg#subscriptions"></use></svg></span>
           Subscriptions
+        </button>
+
+        <button class="nav-item" data-admin-view="admin-payments" type="button">
+          <span aria-hidden="true"><svg class="admin-nav-icon"><use href="images/admin-icons.svg#reports"></use></svg></span>
+          Payments overview
         </button>
 
         <button
@@ -468,7 +474,12 @@
             </div>
 
             <div class="admin-filter-bar">
-              <input type="search" id="ordersSearchInput" placeholder="Search by order, tracking code, vendor, rider or batch group...">
+              <input type="search" id="ordersSearchInput" placeholder="Search by order, tracking code, customer, phone, rider or batch group...">
+              <select id="ordersBookingTypeFilter" aria-label="Booking type">
+                <option value="">All booking types</option>
+                <option value="express">Website express bookings</option>
+                <option value="subscription">Subscription deliveries</option>
+              </select>
               <select id="ordersStatusFilter">
                 <option value="">All statuses</option>
                 <option value="requested">Pending</option>
@@ -497,7 +508,7 @@
                   <tr>
                     <th style="inline-size: 40px;"><input type="checkbox" id="selectAllOrdersCheckbox" aria-label="Select all orders"></th>
                     <th>Order</th>
-                    <th>Vendor</th>
+                    <th>Customer / Vendor</th>
                     <th>Pickup</th>
                     <th>Destination</th>
                     <th>Units</th>
@@ -535,10 +546,44 @@
         <!-- =========================
              SUBSCRIPTIONS
         ========================== -->
-        <section
-          class="view"
-          id="view-admin-subscriptions"
-        >
+        <section class="view" id="view-admin-payments">
+          <div class="section-title payment-overview-heading">
+            <div><div class="eyebrow">Finance</div><h1>Payments overview</h1><p class="muted">Subscription and website payments in one place.</p></div>
+            <div class="payment-overview-controls">
+              <label for="paymentOverviewMonth">View month<select id="paymentOverviewMonth"><option value="">Current month</option></select></label>
+              <button type="button" class="btn outline" id="refreshPaymentOverview">Refresh totals</button>
+            </div>
+          </div>
+          <p id="paymentOverviewStatus" class="muted" role="status">Choose Payments overview to load totals.</p>
+          <p id="paymentOverviewError" role="alert" hidden></p>
+          <div class="payment-overview-cards" id="paymentOverviewCards">
+            <article class="panel admin-stat-card"><span>Subscription payments</span><strong id="paymentSubscriptionRevenue">—</strong><small>Confirmed subscription receipts</small></article>
+            <article class="panel admin-stat-card"><span>Website payments</span><strong id="paymentWebsiteRevenue">—</strong><small id="paymentWebsiteReceiptCount">Confirmed express receipts</small></article>
+            <article class="panel admin-stat-card payment-total-card"><span>Total payments received</span><strong id="paymentTotalRevenue">—</strong><small>Subscriptions + website</small></article>
+            <article class="panel admin-stat-card"><span>Rider costs</span><strong id="paymentRiderCosts">—</strong><small>Earned on completed deliveries</small></article>
+            <article class="panel admin-stat-card"><span>After rider costs</span><strong id="paymentAfterRiderCosts">—</strong><small>Before other business expenses</small></article>
+            <article class="panel admin-stat-card"><span>Unpaid website bookings</span><strong id="paymentUnpaidWebsite">—</strong><small id="paymentUnpaidWebsiteCount">Booked in the selected month; excluded from revenue</small></article>
+          </div>
+          <article class="panel payment-overview-year">
+            <div><h2 id="paymentOverviewYearLabel">This year</h2><p class="muted">Payments received across both services.</p></div>
+            <div><span>Subscriptions</span><strong id="paymentYearSubscriptions">—</strong></div>
+            <div><span>Website</span><strong id="paymentYearWebsite">—</strong></div>
+            <div><span>Total received</span><strong id="paymentYearTotal">—</strong></div>
+          </article>
+          <article class="panel">
+            <div class="panel-heading"><div><h2>Monthly comparison</h2><p class="muted">Payment receipts and rider costs by month.</p></div></div>
+            <div class="admin-table-wrap"><table class="admin-table payment-overview-table">
+              <thead><tr><th>Month</th><th>Subscriptions</th><th>Website</th><th>Total received</th><th>Rider costs</th><th>After riders</th></tr></thead>
+              <tbody id="paymentOverviewMonths"><tr><td colspan="6" class="empty-state">Loading monthly totals…</td></tr></tbody>
+            </table></div>
+          </article>
+          <article class="panel payment-overview-notes">
+            <p><strong>All unpaid website bookings: <span id="paymentAllUnpaidWebsite">—</span></strong> <span id="paymentAllUnpaidWebsiteCount"></span></p>
+            <p class="muted">Receipts count in the month payment was received, using Lagos time. Unpaid website bookings exclude failed, cancelled and returned orders. Rider costs count in the month delivery was completed, whether or not the rider has been paid. Other business expenses are not included.</p>
+          </article>
+        </section>
+
+        <section class="view" id="view-admin-subscriptions">
 
           <div class="section-title">
 
@@ -588,7 +633,7 @@
             <div class="section-title">
               <div>
                 <h2>Revenue summary</h2>
-                <p class="muted">Revenue from paid subscription periods.</p>
+                <p class="muted">Subscription payments only. View Payments overview for combined subscription and website totals.</p>
               </div>
               <div class="subscription-revenue-controls">
                 <label class="subscription-month-filter">
@@ -2141,7 +2186,7 @@
 
   <!-- Admin JavaScript -->
   <script src="csrf.js"></script>
-  <script src="admin.js?v=19"></script>
+  <script src="admin.js?v=22"></script>
   <script src="batch-routing.js?v=2"></script>
 
   <!-- =====================================================

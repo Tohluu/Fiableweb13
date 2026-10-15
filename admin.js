@@ -190,8 +190,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       const actor = event.actorName || (event.actorType ? event.actorType.charAt(0).toUpperCase() + event.actorType.slice(1) : "System");
       return `
         <li class="${exceptionStatuses.has(event.status) ? "exception" : ""}">
-          <span class="timeline-status">${meta.label}</span>
-          <span class="timeline-meta">${at} · ${actor}${event.note ? ` · ${event.note}` : ""}</span>
+          <span class="timeline-status">${escapeSubscriptionValue(meta.label)}</span>
+          <span class="timeline-meta">${at} · ${escapeSubscriptionValue(actor)}${event.note ? ` · ${escapeSubscriptionValue(event.note)}` : ""}</span>
         </li>
       `;
     }).join("")}</ul>`;
@@ -246,6 +246,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     "admin-vendors": "view_vendors",
     "admin-orders": "view_orders",
     "admin-subscriptions": "view_finance",
+    "admin-payments": "view_finance",
     "admin-riders": "view_riders",
     "admin-team": "view_team",
     "admin-tickets": "view_tickets",
@@ -289,6 +290,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     targetView.classList.add("active");
+    if (viewName === "admin-payments" && adminCanView("view_finance")) loadAdminPaymentOverview();
 
     navItems.forEach(item => {
 
@@ -1270,6 +1272,68 @@ if (logoutBtn) {
     }[character]));
   }
 
+  let paymentOverview = null;
+  let paymentOverviewLoading = false;
+
+  async function loadAdminPaymentOverview() {
+    if (paymentOverviewLoading || !adminCanView("view_finance")) return;
+    paymentOverviewLoading = true;
+    const button = document.getElementById("refreshPaymentOverview");
+    const error = document.getElementById("paymentOverviewError");
+    button.disabled = true;
+    error.hidden = true;
+    document.getElementById("paymentOverviewCards").setAttribute("aria-busy", "true");
+    try {
+      paymentOverview = await api("/api/admin/finance/overview", { cache: "no-store" });
+      const select = document.getElementById("paymentOverviewMonth");
+      const selected = select.value || paymentOverview.currentMonth;
+      select.replaceChildren(...Object.keys(paymentOverview.monthly).map(month => new Option(
+        new Date(`${month}-01T00:00:00Z`).toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" }), month
+      )));
+      select.value = paymentOverview.monthly[selected] ? selected : paymentOverview.currentMonth;
+      renderAdminPaymentOverview();
+    } catch (failure) {
+      error.textContent = `${failure.message} Use Refresh totals to try again.`;
+      error.hidden = false;
+    } finally {
+      paymentOverviewLoading = false;
+      button.disabled = false;
+      document.getElementById("paymentOverviewCards").setAttribute("aria-busy", "false");
+    }
+  }
+
+  function renderAdminPaymentOverview() {
+    if (!paymentOverview) return;
+    const month = document.getElementById("paymentOverviewMonth").value;
+    const row = paymentOverview.monthly[month];
+    const money = amount => `₦${Number(amount || 0).toLocaleString("en-NG")}`;
+    const label = key => new Date(`${key}-01T00:00:00Z`).toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
+    const values = {
+      paymentSubscriptionRevenue: row.subscriptionRevenue, paymentWebsiteRevenue: row.websiteRevenue,
+      paymentTotalRevenue: row.totalRevenue, paymentRiderCosts: row.riderCosts,
+      paymentAfterRiderCosts: row.afterRiderCosts, paymentUnpaidWebsite: row.unpaidWebsiteAmount,
+      paymentYearSubscriptions: paymentOverview.yearly.subscriptionRevenue,
+      paymentYearWebsite: paymentOverview.yearly.websiteRevenue,
+      paymentYearTotal: paymentOverview.yearly.totalRevenue,
+      paymentAllUnpaidWebsite: paymentOverview.outstandingWebsite.amount,
+    };
+    Object.entries(values).forEach(([id, amount]) => { document.getElementById(id).textContent = money(amount); });
+    document.getElementById("paymentOverviewStatus").textContent = `Showing ${label(month)} · Amounts in naira`;
+    document.getElementById("paymentWebsiteReceiptCount").textContent = `${row.paidWebsiteCount} confirmed express ${row.paidWebsiteCount === 1 ? "receipt" : "receipts"}`;
+    document.getElementById("paymentUnpaidWebsiteCount").textContent = `${row.unpaidWebsiteCount} bookings created in this month; excluded from revenue`;
+    document.getElementById("paymentAllUnpaidWebsiteCount").textContent = `(${paymentOverview.outstandingWebsite.count} bookings across all months)`;
+    document.getElementById("paymentOverviewYearLabel").textContent = `${paymentOverview.currentMonth.slice(0, 4)} year to date`;
+    document.getElementById("paymentOverviewMonths").innerHTML = Object.entries(paymentOverview.monthly).map(([key, value]) => `
+      <tr class="${key === month ? "payment-selected-month" : ""}">
+        <td>${escapeSubscriptionValue(label(key))}</td><td>${money(value.subscriptionRevenue)}</td>
+        <td>${money(value.websiteRevenue)}</td><td><strong>${money(value.totalRevenue)}</strong></td>
+        <td>${money(value.riderCosts)}</td><td>${money(value.afterRiderCosts)}</td>
+      </tr>`).join("");
+  }
+
+  document.getElementById("paymentOverviewMonth")?.addEventListener("change", renderAdminPaymentOverview);
+  document.getElementById("refreshPaymentOverview")?.addEventListener("click", loadAdminPaymentOverview);
+
   async function loadAdminSubscriptionHistory() {
     const tableBody = document.getElementById("adminSubscriptionHistoryBody");
     const monthFilter = document.getElementById("adminSubscriptionMonthFilter");
@@ -1296,10 +1360,11 @@ if (logoutBtn) {
       const revenueMonthFilter = document.getElementById("adminRevenueMonthFilter");
       if (revenueMonthFilter) {
         const selectedRevenueMonth = revenueMonthFilter.value || "current";
-        revenueMonthFilter.innerHTML = '<option value="current">Current month</option>' + months.map(month => `<option value="${month}">${monthLabel(month)}</option>`).join("");
+        const revenueMonths = Object.keys(revenueSummary.monthly || {}).sort().reverse();
+        revenueMonthFilter.innerHTML = '<option value="current">Current month</option>' + revenueMonths.map(month => `<option value="${month}">${monthLabel(month)}</option>`).join("");
         revenueMonthFilter.value =
           selectedRevenueMonth === "current" ||
-          months.includes(selectedRevenueMonth)
+          revenueMonths.includes(selectedRevenueMonth)
             ? selectedRevenueMonth
             : "current";
         revenueMonthFilter.onchange = () => renderSubscriptionRevenue(records, revenueMonthFilter.value, revenueSummary);
@@ -1344,7 +1409,7 @@ if (logoutBtn) {
     document.getElementById("subscriptionYearRiderPayments").textContent = `₦${yearly.riderPayments.toLocaleString("en-NG")}`;
     document.getElementById("subscriptionYearProfit").textContent = `₦${yearly.profit.toLocaleString("en-NG")}`;
 
-    const currentMonth = new Date().toISOString().slice(0, 7);
+    const currentMonth = revenueSummary.currentMonth || new Date().toISOString().slice(0, 7);
     const displayedMonth = selectedMonth === "current" ? currentMonth : selectedMonth;
     const selectedTotals = revenueSummary.monthly?.[displayedMonth] || { revenue: 0, riderPayments: 0, profit: 0 };
     const currentMonthTotal = selectedTotals.revenue;
@@ -1361,7 +1426,7 @@ if (logoutBtn) {
     document.getElementById("selectedMonthRevenue").textContent = `₦${selectedTotals.revenue.toLocaleString("en-NG")}`;
     document.getElementById("selectedMonthRiderPayments").textContent = `₦${selectedTotals.riderPayments.toLocaleString("en-NG")}`;
     document.getElementById("selectedMonthProfit").textContent = `₦${selectedTotals.profit.toLocaleString("en-NG")}`;
-    const months = Object.entries(monthlyTotals).sort(([a], [b]) => b.localeCompare(a));
+    const months = Object.entries(revenueSummary.monthly || {}).map(([month, totals]) => [month, totals.revenue]).sort(([a], [b]) => b.localeCompare(a));
     monthRevenue.innerHTML = months.length ? months.map(([month, amount]) => {
       const date = new Date(`${month}-01T00:00:00Z`);
       const label = date.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
@@ -2390,6 +2455,7 @@ if (logoutBtn) {
 
       const search = document.getElementById("ordersSearchInput")?.value.trim() || "";
       const status = document.getElementById("ordersStatusFilter")?.value || "";
+      const bookingType = document.getElementById("ordersBookingTypeFilter")?.value || "";
       const pageSize = document.getElementById("ordersPageSize")?.value || "50";
 
       const params = new URLSearchParams({
@@ -2398,6 +2464,7 @@ if (logoutBtn) {
       });
       if (search) params.set("search", search);
       if (status) params.set("status", status);
+      if (bookingType) params.set("bookingType", bookingType);
 
       const response = await fetch(
         `/api/admin/orders?${params.toString()}`,
@@ -2461,7 +2528,7 @@ if (logoutBtn) {
 
 
         const account =
-          order.vendorName || "—";
+          escapeSubscriptionValue(order.vendorName || "—");
 
 
         return `
@@ -2475,6 +2542,7 @@ if (logoutBtn) {
             <!-- Order -->
             <td>
               <strong>${order.orderRef || "—"}</strong>
+              ${order.bookingType === "express" ? '<br><small class="express-order-label">Express · Website</small>' : ""}
             </td>
 
 
@@ -2590,6 +2658,10 @@ if (logoutBtn) {
     }, 350);
   });
   document.getElementById("ordersStatusFilter")?.addEventListener("change", () => {
+    ordersCurrentPage = 1;
+    loadAdminOrders();
+  });
+  document.getElementById("ordersBookingTypeFilter")?.addEventListener("change", () => {
     ordersCurrentPage = 1;
     loadAdminOrders();
   });
@@ -2867,7 +2939,7 @@ if (logoutBtn) {
               <!-- Vendor -->
               <td>
                 <strong>
-                  ${order.vendorName || "—"}
+                  ${escapeSubscriptionValue(order.vendorName || "—")}
                 </strong>
               </td>
 
@@ -3464,7 +3536,7 @@ if (logoutBtn) {
                 ${riderDeliveries.map(order => `
                   <tr>
                     <td>${order.orderRef || `#${order.id}`}</td>
-                    <td>${order.vendorName || "—"}</td>
+                    <td>${escapeSubscriptionValue(order.vendorName || "—")}</td>
                     <td>${order.pickup || "—"} → ${order.dropoff || "—"}</td>
                     <td>${order.units ?? 0}</td>
                     <td>${order.status || "—"}</td>
@@ -3757,6 +3829,29 @@ if (logoutBtn) {
 
     orderDetailsBody.innerHTML = `
 
+      ${order.bookingType === "express" ? `
+        <p class="express-order-label">Express delivery · Booked on the website · ${order.pricingStatus === "confirmed" ? "Delivery fee" : "Estimated fee"}: ₦${Number(order.cost || 0).toLocaleString("en-NG")} · ${order.paymentStatus === "paid" ? "Payment received" : "Payment pending"}</p>
+        <div class="vendor-detail-section">
+          <h3>Customer Payment</h3>
+          ${order.paymentStatus === "paid" ? `
+            <p><strong>Paid: ₦${Number(order.amountPaid ?? order.cost ?? 0).toLocaleString("en-NG")}</strong> · ${escapeSubscriptionValue(({bank_transfer: "Bank transfer", cash: "Cash", pos: "POS", paystack: "Paystack (online)"})[order.paymentMethod] || "Recorded payment")}</p>
+            <p class="muted">${escapeSubscriptionValue(order.paidAt ? new Date(order.paidAt).toLocaleString("en-GB") : "")}${order.paymentReference ? ` · Reference: ${escapeSubscriptionValue(order.paymentReference)}` : ""}</p>
+            ${order.paymentReviewRequired ? '<p role="alert">An additional online payment needs review. Check the payment records before arranging any refund.</p>' : ""}
+          ` : adminCanView("manage_finance") ? `
+            <p class="muted">Record payment after confirming receipt from the customer.</p>
+            <label for="expressPaymentMethod">Payment method</label>
+            <select id="expressPaymentMethod" class="form-control">
+              <option value="bank_transfer">Bank transfer</option>
+              <option value="cash">Cash</option>
+              <option value="pos">POS</option>
+            </select>
+            <label for="expressPaymentReference">Payment reference (optional)</label>
+            <input id="expressPaymentReference" class="form-control" maxlength="160" placeholder="Transfer reference or receipt number">
+            <button type="button" class="btn primary" id="markExpressPaymentReceived">Mark payment received · ₦${Number(order.cost || 0).toLocaleString("en-NG")}</button>
+            <p id="expressPaymentError" role="alert" hidden></p>
+          ` : '<p class="muted">Payment pending. A finance administrator can record receipt.</p>'}
+        </div>
+      ` : ""}
       <div class="vendor-detail-grid">
 
         <div class="vendor-detail-item">
@@ -3765,17 +3860,17 @@ if (logoutBtn) {
         </div>
 
         <div class="vendor-detail-item">
-          <span>Vendor</span>
-          <strong>${order.vendorName || "—"}</strong>
+          <span>${order.bookingType === "express" ? "Customer" : "Vendor"}</span>
+          <strong>${escapeSubscriptionValue(order.vendorName || "—")}</strong>
         </div>
 
         <div class="vendor-detail-item">
-          <span>Vendor Email</span>
-          <strong>${order.accountEmail || "—"}</strong>
+          <span>${order.bookingType === "express" ? "Customer Phone" : "Vendor Email"}</span>
+          <strong>${escapeSubscriptionValue((order.bookingType === "express" ? order.customerPhone : order.accountEmail) || "—")}</strong>
         </div>
 
         <div class="vendor-detail-item">
-          <span>Status</span>
+          <span>Delivery status</span>
           <strong>${statusLabel}</strong>
         </div>
 
@@ -3791,7 +3886,7 @@ if (logoutBtn) {
 
         <div class="vendor-detail-item">
           <span>Package Type</span>
-          <strong>${details.packageType || order.packageType || "—"}</strong>
+          <strong>${escapeSubscriptionValue(details.packageType || order.packageType || "—")}</strong>
         </div>
 
         <div class="vendor-detail-item">
@@ -3815,17 +3910,17 @@ if (logoutBtn) {
 
           <div class="vendor-detail-item">
             <span>Pickup Contact</span>
-            <strong>${details.pickupContactName || "—"}</strong>
+            <strong>${escapeSubscriptionValue(details.pickupContactName || "—")}</strong>
           </div>
 
           <div class="vendor-detail-item">
             <span>Pickup Phone</span>
-            <strong>${details.pickupPhone || "—"}</strong>
+            <strong>${escapeSubscriptionValue(details.pickupPhone || "—")}</strong>
           </div>
 
           <div class="vendor-detail-item">
             <span>Pickup Address</span>
-            <strong>${details.pickupAddress || "—"}</strong>
+            <strong>${escapeSubscriptionValue(details.pickupAddress || "—")}</strong>
           </div>
 
         </div>
@@ -3846,22 +3941,22 @@ if (logoutBtn) {
 
           <div class="vendor-detail-item">
             <span>Recipient</span>
-            <strong>${details.recipientName || "—"}</strong>
+            <strong>${escapeSubscriptionValue(details.recipientName || "—")}</strong>
           </div>
 
           <div class="vendor-detail-item">
             <span>Recipient Phone</span>
-            <strong>${details.recipientPhone || "—"}</strong>
+            <strong>${escapeSubscriptionValue(details.recipientPhone || "—")}</strong>
           </div>
 
           <div class="vendor-detail-item">
             <span>Delivery Address</span>
-            <strong>${details.deliveryAddress || "—"}</strong>
+            <strong>${escapeSubscriptionValue(details.deliveryAddress || "—")}</strong>
           </div>
 
           <div class="vendor-detail-item">
             <span>Delivery Window</span>
-            <strong>${details.deliveryWindow || "—"}</strong>
+            <strong>${escapeSubscriptionValue(details.deliveryWindow || "—")}</strong>
           </div>
 
         </div>
@@ -4040,17 +4135,17 @@ if (logoutBtn) {
 
           <div class="vendor-detail-item">
             <span>Package Description</span>
-            <strong>${details.packageDescription || "—"}</strong>
+            <strong>${escapeSubscriptionValue(details.packageDescription || "—")}</strong>
           </div>
 
           <div class="vendor-detail-item">
             <span>Pickup Instructions</span>
-            <strong>${details.pickupInstructions || "—"}</strong>
+            <strong>${escapeSubscriptionValue(details.pickupInstructions || "—")}</strong>
           </div>
 
           <div class="vendor-detail-item">
             <span>Delivery Instructions</span>
-            <strong>${details.deliveryInstructions || "—"}</strong>
+            <strong>${escapeSubscriptionValue(details.deliveryInstructions || "—")}</strong>
           </div>
 
         </div>
@@ -4058,6 +4153,33 @@ if (logoutBtn) {
       </div>
 
     `;
+
+    document.getElementById("markExpressPaymentReceived")?.addEventListener("click", async event => {
+      if (!confirm(`Confirm that you have received ₦${Number(order.cost || 0).toLocaleString("en-NG")} for ${order.orderRef}?`)) return;
+      const button = event.currentTarget;
+      const error = document.getElementById("expressPaymentError");
+      const method = document.getElementById("expressPaymentMethod").value;
+      const reference = document.getElementById("expressPaymentReference").value.trim();
+      button.disabled = true;
+      error.hidden = true;
+      try {
+        const response = await fetch("/api/admin/orders/express-payment", {
+          method: "POST", headers: { "Content-Type": "application/json" }, credentials: "same-origin",
+          body: JSON.stringify({ orderId: Number(order.id), amount: Number(order.cost), method, reference })
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || "Unable to record payment.");
+        Object.assign(order, result.order);
+        openOrderDetails(order);
+        loadAdminOrders();
+        if (paymentOverview) loadAdminPaymentOverview();
+        showAdminToast("Customer payment recorded.");
+      } catch (failure) {
+        error.textContent = failure.message;
+        error.hidden = false;
+        button.disabled = false;
+      }
+    });
 
     document.getElementById("copyTrackingCodeBtn")?.addEventListener("click", event => {
       const code = event.currentTarget.dataset.code;
@@ -5023,6 +5145,7 @@ if (logoutBtn) {
       ) {
         if (adminCanView("view_vendors")) loadAdminVendors();
         if (adminCanView("view_finance")) loadAdminSubscriptions();
+        if (document.getElementById("view-admin-payments")?.classList.contains("active") && adminCanView("view_finance")) loadAdminPaymentOverview();
         if (adminCanView("view_riders")) loadAdminRiders();
         if (adminCanView("view_team")) loadAdminTeam();
       }

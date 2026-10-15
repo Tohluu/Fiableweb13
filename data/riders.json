@@ -102,13 +102,13 @@
     "salt": "7dc8f401c94327cfabac6122bdd70b9c",
     "vehicle": "Car",
     "status": "available",
-    "totalDeliveries": 3,
-    "completedDeliveries": 3,
+    "totalDeliveries": 6,
+    "completedDeliveries": 6,
     "failedDeliveries": 0,
     "createdAt": "2026-08-26T20:32:08.744195+00:00",
     "passwordResetAt": "2026-10-13T10:39:20.465289+00:00",
     "mustChangePassword": false,
-    "lastLoginAt": "2026-10-13T18:10:36.326074+00:00"
+    "lastLoginAt": "2026-10-15T14:47:56.985491+00:00"
   },
   {
     "id": 9,

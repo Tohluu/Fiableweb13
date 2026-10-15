@@ -8,6 +8,7 @@
 <title>Get Started | Fiable Logistics</title>
 <link rel="stylesheet" href="fiable.css?v=5">
 <link rel="stylesheet" href="design.css?v=1">
+<link rel="stylesheet" href="express-booking.css?v=2">
 </head>
 <body>
 <a class="skip-link" href="#main-content">Skip to content</a>
@@ -43,14 +44,19 @@
 <div>
 <div class="eyebrow">One-off delivery</div>
 <h2>Need a single delivery?</h2>
-<p class="hero-copy">Start with your route and contact details. No account is required to enquire on WhatsApp.</p>
-<p>Express delivery is estimated at &#8358;2,000 per unit. Our team will confirm the route, price and availability before you book.</p>
+<p class="hero-copy">Book your express delivery here or continue on WhatsApp. No account is required.</p>
+<p>Express delivery is estimated at &#8358;2,000 per unit. Our team will confirm the route, final price and rider availability.</p>
 <p>Support hours: Monday-Saturday, 8:00 AM-5:00 PM.</p>
 </div>
 <div class="form-box">
 <h3>Request express delivery</h3>
-<p class="service-note">This opens a prepared WhatsApp message. Send it there to request confirmation from our team.</p>
+<p class="service-note">Choose how you would like to arrange your delivery.</p>
 <form id="quickExpressForm">
+<fieldset class="express-options">
+<legend>Booking option</legend>
+<label class="express-option"><input type="radio" name="bookingMethod" value="whatsapp" checked><span><strong>Continue on WhatsApp &nearr;</strong><small>Send your details to our team on WhatsApp.</small></span></label>
+<label class="express-option"><input type="radio" name="bookingMethod" value="website"><span><strong>Book on the website</strong><small>Get assigned to a rider immediately.</small></span></label>
+</fieldset>
 <label for="quickExpressName">Your name</label>
 <input id="quickExpressName" name="name" autocomplete="name" required maxlength="100">
 <label for="quickExpressPhone">Phone number</label>
@@ -61,8 +67,34 @@
 <input id="quickExpressDropoff" name="dropoff" required maxlength="300">
 <label for="quickExpressPackage">What are you sending?</label>
 <input id="quickExpressPackage" name="package" required maxlength="300" placeholder="Item, approximate size and weight">
-<button class="btn btn-primary" type="submit">Continue on WhatsApp &nearr;</button>
+<fieldset id="expressWebsiteFields" class="express-website-fields" hidden disabled>
+<legend>Website booking details</legend>
+<label for="expressPickupLocation">Pickup area</label>
+<select id="expressPickupLocation" name="pickupLocation" required><option value="">Choose pickup area</option></select>
+<label for="expressDropoffLocation">Delivery area</label>
+<select id="expressDropoffLocation" name="dropoffLocation" required><option value="">Choose delivery area</option></select>
+<button class="btn btn-outline" id="expressRetryLocations" type="button" hidden>Retry loading areas</button>
+<label for="expressRecipientName">Recipient name</label>
+<input id="expressRecipientName" name="recipientName" required maxlength="100" autocomplete="off">
+<label for="expressRecipientPhone">Recipient phone number</label>
+<input id="expressRecipientPhone" name="recipientPhone" type="tel" required maxlength="30" autocomplete="off">
+<fieldset class="express-options express-payment-options">
+<legend>How would you like to pay?</legend>
+<label class="express-option"><input id="expressPayOnline" type="radio" name="expressPaymentMode" value="online" disabled><span><strong>Pay online</strong><small>Complete your payment securely through Paystack.</small></span></label>
+<label class="express-option"><input type="radio" name="expressPaymentMode" value="later" checked><span><strong>Arrange payment with dispatch</strong><small>Book now and confirm payment with our team.</small></span></label>
+</fieldset>
+<p id="expressPaymentAvailability" class="service-note" role="status">Checking online payment availability…</p>
+<div id="expressPaymentEmailFields" hidden>
+<label for="expressPaymentEmail">Email for your payment receipt</label>
+<input id="expressPaymentEmail" name="paymentEmail" type="email" autocomplete="email" maxlength="160" disabled>
+</div>
+<p id="expressEstimate" class="service-note" role="status">Choose both areas to see your delivery estimate.</p>
+<p class="service-note">Your booking goes straight to our dispatch team for rider assignment. Assignment depends on rider availability. Choose Pay online to pay the displayed total through Paystack, or arrange payment with dispatch.</p>
+</fieldset>
+<button class="btn btn-primary" id="expressSubmit" type="submit">Continue on WhatsApp &nearr;</button>
+<p id="expressError" class="express-error" role="alert" hidden></p>
 </form>
+<div id="expressConfirmation" class="express-confirmation" role="status" tabindex="-1" hidden></div>
 </div>
 </div>
 </section>
@@ -232,7 +264,9 @@
 <div class="toast" id="toast" role="status">
 </div>
 <button class="back-to-top" id="backToTop" type="button" aria-label="Back to top">↑</button>
-<script src="site.js"></script>
+<script src="csrf.js"></script>
+<script src="site.js?v=3"></script>
+<script src="express-booking.js?v=2"></script>
 <script src="get-started.js?v=2"></script>
 </body>
 </html>

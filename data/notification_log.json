@@ -25,5 +25,32 @@
     "sent": false,
     "reason": "no_provider_configured",
     "at": "2026-10-13T11:01:30.997974+00:00"
+  },
+  {
+    "id": "QlqWHU-Nhsl8lQ",
+    "event": "delivery_otp",
+    "channel": "sms",
+    "recipient": "***4492",
+    "sent": false,
+    "reason": "no_provider_configured",
+    "at": "2026-10-15T09:16:05.940023+00:00"
+  },
+  {
+    "id": "Kp7BpRqv6o-PMA",
+    "event": "delivery_otp",
+    "channel": "sms",
+    "recipient": "***4860",
+    "sent": false,
+    "reason": "no_provider_configured",
+    "at": "2026-10-15T14:49:35.214349+00:00"
+  },
+  {
+    "id": "I9TN_dQPkr0uPQ",
+    "event": "delivery_otp",
+    "channel": "sms",
+    "recipient": "***2854",
+    "sent": false,
+    "reason": "no_provider_configured",
+    "at": "2026-10-15T14:50:04.222275+00:00"
   }
 ]

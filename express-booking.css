@@ -1,0 +1,18 @@
+.express-options, .express-website-fields { border: 0; padding: 0; margin: 0 0 20px; min-inline-size: 0; }
+.express-options legend, .express-website-fields legend { font-weight: 700; margin-block-end: 12px; }
+.express-options .express-option { display: flex; gap: 12px; align-items: flex-start; padding: 16px; margin: 0 0 10px; border: 1px solid #bfc8d1; border-radius: 4px; cursor: pointer; }
+.express-option:has(input:checked) { border-color: #1769e0; background: #eff5ff; }
+.express-options input[type="radio"] { inline-size: 18px; block-size: 18px; margin: 3px 0 0; flex: 0 0 18px; accent-color: #1769e0; }
+.express-option strong, .express-option small { display: block; }
+.express-option small { margin-block-start: 5px; font-size: 13px; line-height: 1.5; }
+.express-website-fields { margin-block-start: 24px; }
+.express-payment-options { margin-block-start: 20px; }
+.express-option:has(input:disabled) { opacity: .65; cursor: default; }
+.express-confirmation-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-block-start: 16px; }
+.express-confirmation-actions button { margin: 0; }
+.express-confirmation-error { color: #922525; }
+#quickExpressForm [hidden], #expressConfirmation[hidden] { display: none; }
+.express-error { color: #a01818; margin-block-start: 14px; }
+.express-confirmation { margin-block-start: 20px; padding: 20px; background: #eff8f2; border: 1px solid #9bc9aa; border-radius: 4px; overflow-wrap: anywhere; }
+.express-confirmation h4 { margin: 0 0 10px; }
+.express-confirmation a { display: inline-block; margin-block-start: 12px; }

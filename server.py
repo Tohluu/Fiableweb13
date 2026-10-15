@@ -487,6 +487,24 @@ def estimate_delivery(pickup, dropoff, plan=None, priority="Standard", location_
     }
 
 
+def estimate_express_delivery(pickup, dropoff):
+    estimate = estimate_delivery(pickup, dropoff, "Basic")
+    cost = estimate["units"] * EXPRESS_UNIT_PRICE
+    return {
+        **estimate, "plan": "", "unitPrice": EXPRESS_UNIT_PRICE,
+        "baseCost": cost, "cost": cost, "prioritySurcharge": 0,
+        "riderPayout": round(cost * RIDER_PAYOUT_RATE),
+    }
+
+
+def public_express_booking(order):
+    return {
+        "orderRef": order["orderRef"], "trackingCode": order["trackingCode"],
+        "status": order["status"], "estimatedCost": order["cost"],
+        "units": order["units"],
+    }
+
+
 def validate_delivery_window(window):
     valid_windows = {
         "8:00 AM - 11:00 AM",
@@ -1428,6 +1446,25 @@ def rider_payment_summary(month=None):
     return summaries
 
 
+def revenue_month(value):
+    parsed = parse_iso_date(value)
+    if not parsed:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone(timedelta(hours=1))).strftime("%Y-%m")
+
+
+def delivery_completed_at(delivery):
+    proof = delivery.get("proofOfDelivery") or {}
+    if proof.get("deliveredAt"):
+        return proof["deliveredAt"]
+    for event in reversed(delivery.get("timeline") or []):
+        if event.get("status") == "delivered" and event.get("at"):
+            return event["at"]
+    return delivery.get("updatedAt") or delivery.get("createdAt")
+
+
 def admin_revenue_summary():
     subscriptions = []
     for account in load_accounts():
@@ -1437,11 +1474,8 @@ def admin_revenue_summary():
     for subscription in subscriptions:
         if subscription.get("paymentStatus") != "paid":
             continue
-        paid_at = parse_iso_date(
-            subscription.get("periodStart") or subscription.get("paidAt")
-        )
-        if paid_at:
-            month = paid_at.strftime("%Y-%m")
+        month = revenue_month(subscription.get("paidAt") or subscription.get("periodStart"))
+        if month:
             monthly_revenue[month] = monthly_revenue.get(month, 0) + int(
                 subscription.get("amount", 0) or 0
             )
@@ -1449,13 +1483,12 @@ def admin_revenue_summary():
     monthly_rider_payments = {}
     accounts = load_accounts()
     for delivery in load_deliveries():
+        if delivery.get("bookingType") == "express":
+            continue
         if str(delivery.get("status", "")).lower() != "delivered":
             continue
-        delivered_at = parse_iso_date(
-            delivery.get("updatedAt") or delivery.get("createdAt")
-        )
-        if delivered_at:
-            month = delivered_at.strftime("%Y-%m")
+        month = revenue_month(delivery_completed_at(delivery))
+        if month:
             account = next(
                 (
                     item for item in accounts
@@ -1481,13 +1514,69 @@ def admin_revenue_summary():
         }
         for month in months
     }
-    current_year = str(datetime.now(timezone.utc).year)
+    current_month = revenue_month(now_iso())
+    current_year = current_month[:4]
     yearly = {
         "revenue": sum(value["revenue"] for month, value in monthly.items() if month.startswith(current_year)),
         "riderPayments": sum(value["riderPayments"] for month, value in monthly.items() if month.startswith(current_year)),
     }
     yearly["profit"] = yearly["revenue"] - yearly["riderPayments"]
-    return {"monthly": monthly, "yearly": yearly}
+    return {"monthly": monthly, "yearly": yearly, "currentMonth": current_month}
+
+
+def admin_payment_overview():
+    subscriptions = admin_revenue_summary()
+    monthly = {}
+
+    def totals(month):
+        return monthly.setdefault(month, {
+            "subscriptionRevenue": 0, "websiteRevenue": 0, "totalRevenue": 0,
+            "subscriptionRiderCosts": 0, "websiteRiderCosts": 0, "riderCosts": 0,
+            "afterRiderCosts": 0, "unpaidWebsiteAmount": 0, "unpaidWebsiteCount": 0,
+            "paidWebsiteCount": 0,
+        })
+
+    for month, summary in subscriptions["monthly"].items():
+        row = totals(month)
+        row["subscriptionRevenue"] = summary["revenue"]
+        row["subscriptionRiderCosts"] = summary["riderPayments"]
+
+    for delivery in load_deliveries():
+        if delivery.get("bookingType") != "express":
+            continue
+        if delivery.get("paymentStatus") == "paid":
+            month = revenue_month(delivery.get("paidAt"))
+            if month:
+                row = totals(month)
+                row["websiteRevenue"] += int(delivery.get("amountPaid", delivery.get("cost", 0)) or 0)
+                row["paidWebsiteCount"] += 1
+        elif delivery.get("status") not in {"cancelled", "failed", "returned"}:
+            month = revenue_month(delivery.get("createdAt"))
+            if month:
+                row = totals(month)
+                row["unpaidWebsiteAmount"] += int(delivery.get("cost", 0) or 0)
+                row["unpaidWebsiteCount"] += 1
+        if delivery.get("status") == "delivered":
+            month = revenue_month(delivery_completed_at(delivery))
+            if month:
+                totals(month)["websiteRiderCosts"] += rider_payment_for_delivery(delivery)
+
+    current_month = subscriptions["currentMonth"]
+    totals(current_month)
+    for row in monthly.values():
+        row["totalRevenue"] = row["subscriptionRevenue"] + row["websiteRevenue"]
+        row["riderCosts"] = row["subscriptionRiderCosts"] + row["websiteRiderCosts"]
+        row["afterRiderCosts"] = row["totalRevenue"] - row["riderCosts"]
+    # Count the subscription history once. Its payment-provider records are the
+    # same receipts and must not be added to it a second time.
+    yearly = {key: sum(row[key] for month, row in monthly.items() if month.startswith(current_month[:4] + "-"))
+              for key in totals(current_month)}
+    outstanding = {
+        "amount": sum(row["unpaidWebsiteAmount"] for row in monthly.values()),
+        "count": sum(row["unpaidWebsiteCount"] for row in monthly.values()),
+    }
+    return {"currentMonth": current_month, "monthly": dict(sorted(monthly.items(), reverse=True)),
+            "yearly": yearly, "outstandingWebsite": outstanding}
 
 
 def dashboard_stats_for_account(email):
@@ -2116,8 +2205,8 @@ DELIVERY_STATUS_LABELS = {
 PUBLIC_TRACKING_STATUS_MAP = {
     "requested": "Order Received",
     "assigned": "Rider Assigned",
-    "rider_accepted": "Rider Assigned",
-    "arriving_at_pickup": "Rider Assigned",
+    "rider_accepted": "Rider Accepted",
+    "arriving_at_pickup": "Arriving at Pickup",
     "picked_up": "Picked Up",
     "on_delivery": "In Transit",
     "delivered": "Delivered",
@@ -2609,6 +2698,76 @@ def build_receipt(payment):
     }
 
 
+def express_payment_result(payment, order):
+    return {
+        "status": payment.get("status"), "reviewRequired": bool(payment.get("reviewRequired")),
+        "reference": payment["reference"], "amount": payment["amount"],
+        "receiptNumber": payment.get("receiptId"), "paidAt": payment.get("paidAt"),
+        "booking": public_express_booking(order), "paymentStatus": order.get("paymentStatus", "pending"),
+    }
+
+
+def settle_express_payment(payment, payments, verification):
+    """Called under the payments + deliveries locks; only provider verification
+    can turn a guest checkout into a paid order. Returns the affected order."""
+    deliveries = load_deliveries()
+    order = next((item for item in deliveries if item.get("id") == payment.get("orderId")
+                  and item.get("bookingType") == "express"), None)
+    if not order:
+        payment.update({"status": "verification_pending", "failureReason": "order_not_found"})
+        return None
+    if payment.get("status") == "successful":
+        return order
+    data = (verification or {}).get("data") or {}
+    if not isinstance(data, dict):
+        data = {}
+    customer = data.get("customer") or {}
+    if not isinstance(customer, dict):
+        customer = {}
+    verified = (
+        (verification or {}).get("status") is True and data.get("status") == "success"
+        and data.get("reference") == payment["reference"]
+        and type(data.get("amount")) is int and data["amount"] == payment["amount"] * 100
+        and str(data.get("currency", "")).upper() == "NGN"
+        and str(customer.get("email", "")).lower() == payment["customerEmail"].lower()
+        and order.get("cost") == payment["amount"]
+    )
+    if not verified:
+        # An API outage or processing charge is inconclusive, never a receipt.
+        payment["status"] = "failed" if data.get("status") in ("failed", "abandoned", "reversed") else "verification_pending"
+        payment["failureReason"] = "provider_verification_incomplete"
+        return order
+    received_at = data.get("paid_at") if parse_iso_date(data.get("paid_at")) else now_iso()
+    payment.update({
+        "status": "successful", "verifiedAt": now_iso(), "paidAt": received_at,
+        "providerReference": data["reference"], "receiptId": next_receipt_number(payments),
+        "providerMetadata": {"channel": data.get("channel"), "paidAt": received_at},
+    })
+    payment.pop("failureReason", None)
+    if order.get("paymentStatus") == "paid":
+        # A late success after another payment needs reconciliation, not another
+        # credit to the same order's monthly revenue.
+        payment["reviewRequired"] = True
+        order["paymentReviewRequired"] = True
+        references = order.setdefault("additionalPaymentReferences", [])
+        if payment["reference"] not in references:
+            references.append(payment["reference"])
+        action = "express_duplicate_payment_review"
+    else:
+        order.update({
+            "paymentStatus": "paid", "amountPaid": payment["amount"], "paymentMethod": "paystack",
+            "paymentReference": payment["reference"], "paidAt": received_at,
+            "paymentRecordedBy": "paystack", "pricingStatus": "confirmed", "updatedAt": now_iso(),
+            "paymentReceiptId": payment["receiptId"],
+        })
+        action = "express_payment_received"
+    save_deliveries(deliveries)
+    append_audit_log(actor_email=None, actor_role="system", action=action,
+                     target_type="delivery", target_id=order["id"],
+                     new={"amount": payment["amount"], "method": "paystack", "reference": payment["reference"]})
+    return order
+
+
 def activate_subscription_from_payment(payment, payments):
     """The ONE place a verified successful payment turns into an active
     subscription. Called from both the webhook and the manual-verify
@@ -2807,7 +2966,7 @@ ADMIN_PERMISSIONS = {
     },
     "dispatcher": {"view_orders", "manage_orders", "view_riders", "view_reports", "view_batch_routing"},
     "finance": {
-        "view_finance", "manage_finance", "view_vendors", "view_reports",
+        "view_finance", "manage_finance", "view_orders", "view_vendors", "view_reports",
         "export_data",
     },
     "customer_support": {
@@ -3169,7 +3328,7 @@ class FiableHandler(SimpleHTTPRequestHandler):
             self._json_response(400, {"error": "Missing transaction reference"})
             return
 
-        with locked_file(PAYMENTS_FILE, ACCOUNTS_FILE, SUBSCRIPTIONS_FILE):
+        with locked_file(PAYMENTS_FILE, ACCOUNTS_FILE, SUBSCRIPTIONS_FILE, DELIVERIES_FILE):
             payments = load_payments()
             payment = find_payment_by_reference(payments, reference)
 
@@ -3190,6 +3349,11 @@ class FiableHandler(SimpleHTTPRequestHandler):
                 return
 
             verification = provider.verify_transaction(reference)
+            if payment.get("purpose") == "express":
+                settle_express_payment(payment, payments, verification)
+                save_payments(payments)
+                self._json_response(200, {"message": "Express payment verification processed."})
+                return
             verified_data = (verification or {}).get("data") or {}
 
             expected_kobo = int(round(payment["amount"] * 100))
@@ -3251,6 +3415,162 @@ class FiableHandler(SimpleHTTPRequestHandler):
             payload = self._read_json()
             if not isinstance(payload, dict):
                 raise ValueError("Request body must be an object")
+            if path == "/api/express/payments/initialize":
+                provider = get_payment_provider()
+                if not provider:
+                    self._json_response(503, {"error": "Online payments are currently unavailable. You can arrange payment with our dispatch team.", "paymentsEnabled": False})
+                    return
+                request_id = payload.get("requestId")
+                email = clean(payload.get("email"), 160).lower()
+                if not isinstance(request_id, str) or not re.fullmatch(r"[A-Za-z0-9_-]{20,80}", request_id):
+                    raise ValueError("Use the payment button from your booking confirmation.")
+                if not valid_email(email):
+                    raise ValueError("Enter a valid email address for your payment receipt.")
+                with locked_file(PAYMENTS_FILE, DELIVERIES_FILE):
+                    deliveries = load_deliveries()
+                    order = next((item for item in deliveries if item.get("bookingType") == "express"
+                                  and hmac.compare_digest(item.get("expressRequestId", ""), request_id)), None)
+                    if not order:
+                        self._json_response(404, {"error": "Booking not found."})
+                        return
+                    if order.get("paymentStatus") == "paid":
+                        self._json_response(409, {"error": "This delivery has already been paid for."})
+                        return
+                    if order.get("status") in {"cancelled", "failed", "returned"}:
+                        self._json_response(409, {"error": "Contact dispatch before paying for this delivery."})
+                        return
+                    payments = load_payments()
+                    existing = next((item for item in reversed(payments) if item.get("purpose") == "express"
+                                     and item.get("orderId") == order["id"]
+                                     and item.get("status") in {"pending", "verification_pending"}
+                                     and item.get("authorizationUrl")), None)
+                    if existing:
+                        self._json_response(200, {"reference": existing["reference"], "authorizationUrl": existing["authorizationUrl"], "testMode": PAYSTACK_IS_TEST_MODE})
+                        return
+                    amount = order.get("cost")
+                    if type(amount) is not int or amount <= 0:
+                        raise ValueError("Contact dispatch to confirm the delivery price before paying.")
+                    reference = generate_payment_reference()
+                    origin = f"{'https' if is_secure_request(self) else 'http'}://{self.headers.get('Host', '')}"
+                    callback = f"{origin}/get-started.html?expressPayment=return&reference={reference}#quick-express"
+                    cancel_url = f"{origin}/get-started.html?expressPayment=cancelled&reference={reference}#quick-express"
+                    payment = {"reference": reference, "purpose": "express", "orderId": order["id"],
+                               "orderRef": order["orderRef"], "customerEmail": email, "amount": amount,
+                               "currency": "NGN", "provider": "paystack", "status": "pending", "createdAt": now_iso()}
+                    payments.append(payment)
+                    save_payments(payments)
+                    response = provider.initialize_transaction(
+                        email=email, amount_kobo=amount * 100, reference=reference, callback_url=callback,
+                        metadata={"purpose": "express", "orderId": order["id"], "orderRef": order["orderRef"], "cancel_action": cancel_url},
+                    )
+                    url = ((response or {}).get("data") or {}).get("authorization_url", "")
+                    if not isinstance(url, str):
+                        url = ""
+                    parsed_url = urlparse(url)
+                    if (response or {}).get("status") is not True or parsed_url.scheme != "https" or parsed_url.hostname != "checkout.paystack.com" or parsed_url.username or parsed_url.password:
+                        payment["status"] = "failed"
+                        payment["failureReason"] = "initialization_failed"
+                        save_payments(payments)
+                        self._json_response(502, {"error": "Unable to start online payment. Your booking is saved; try again from its confirmation."})
+                        return
+                    payment["authorizationUrl"] = url
+                    order["onlinePaymentReference"] = reference
+                    save_payments(payments)
+                    save_deliveries(deliveries)
+                self._json_response(200, {"reference": reference, "authorizationUrl": url, "testMode": PAYSTACK_IS_TEST_MODE})
+                return
+
+            if path == "/api/express/payments/verify":
+                reference = clean(payload.get("reference"), 120)
+                if not re.fullmatch(r"FL-PAY-[a-f0-9]{20}", reference):
+                    raise ValueError("A valid payment reference is required.")
+                with locked_file(PAYMENTS_FILE, DELIVERIES_FILE):
+                    payments = load_payments()
+                    payment = find_payment_by_reference(payments, reference)
+                    if not payment or payment.get("purpose") != "express":
+                        self._json_response(404, {"error": "Express payment not found."})
+                        return
+                    order = next((item for item in load_deliveries() if item.get("id") == payment.get("orderId")
+                                  and item.get("bookingType") == "express"), None)
+                    if not order:
+                        self._json_response(404, {"error": "Booking not found. Contact dispatch with your payment reference."})
+                        return
+                    if payment.get("status") != "successful":
+                        provider = get_payment_provider()
+                        if not provider:
+                            self._json_response(503, {"error": "Payment confirmation is temporarily unavailable. Please check again shortly."})
+                            return
+                        order = settle_express_payment(payment, payments, provider.verify_transaction(reference))
+                        save_payments(payments)
+                    self._json_response(200, express_payment_result(payment, order))
+                return
+
+            if path == "/api/express/quote":
+                estimate = estimate_express_delivery(
+                    clean(payload.get("pickup"), 120), clean(payload.get("dropoff"), 120)
+                )
+                self._json_response(200, estimate)
+                return
+
+            if path == "/api/express/book":
+                required = {
+                    "pickup": 120, "dropoff": 120,
+                    "pickupContactName": 100, "pickupPhone": 30, "pickupAddress": 300,
+                    "recipientName": 100, "recipientPhone": 30, "deliveryAddress": 300,
+                    "packageDescription": 300,
+                }
+                details = {}
+                for field, limit in required.items():
+                    value = payload.get(field)
+                    if not isinstance(value, str) or not value.strip() or len(value.strip()) > limit:
+                        raise ValueError("Please complete all express delivery details within the field limits.")
+                    details[field] = value.strip()
+                for field in ("pickupPhone", "recipientPhone"):
+                    if not re.fullmatch(r"\+?[\d ()-]{7,30}", details[field]) or not 7 <= len(re.sub(r"\D", "", details[field])) <= 15:
+                        raise ValueError("Enter valid pickup and recipient phone numbers.")
+                request_id = payload.get("requestId")
+                if not isinstance(request_id, str) or not re.fullmatch(r"[A-Za-z0-9_-]{20,80}", request_id):
+                    raise ValueError("Refresh the page and try booking again.")
+                # The same token can safely retry a request whose response was lost.
+                # Persist it with the order so retries also survive server restarts.
+                fingerprint = hashlib.sha256(json.dumps(details, sort_keys=True).encode()).hexdigest()
+                with locked_file(DELIVERIES_FILE):
+                    deliveries = load_deliveries()
+                    existing = next((order for order in deliveries if order.get("expressRequestId") == request_id), None)
+                    if existing:
+                        if existing.get("expressRequestFingerprint") != fingerprint:
+                            self._json_response(409, {"error": "These booking details have changed. Start a new booking."})
+                            return
+                        self._json_response(200, public_express_booking(existing))
+                        return
+                    estimate = estimate_express_delivery(details["pickup"], details["dropoff"])
+                    if type(payload.get("quotedCost")) is not int or payload["quotedCost"] != estimate["cost"]:
+                        self._json_response(409, {"error": "The route estimate has changed. Review the updated estimate and book again."})
+                        return
+                    pickup = details.pop("pickup")
+                    dropoff = details.pop("dropoff")
+                    details.update({
+                        "priority": "Express", "window": "Express", "deliveryWindow": "Express",
+                        "packageType": "General", "recipient": details["recipientName"],
+                    })
+                    order = create_delivery(
+                        "", pickup, dropoff, estimate["units"], details,
+                        unit_price=EXPRESS_UNIT_PRICE, pricing=estimate, delivery_records=deliveries,
+                    )
+                    order.update({
+                        "bookingType": "express", "bookingSource": "website",
+                        "customerName": details["pickupContactName"], "customerPhone": details["pickupPhone"],
+                        "paymentStatus": "pending", "pricingStatus": "estimate",
+                        "expressRequestId": request_id, "expressRequestFingerprint": fingerprint,
+                    })
+                    order["timeline"][0].update({
+                        "actorType": "customer", "actorId": None,
+                        "actorName": details["pickupContactName"], "note": "Express delivery booked on the website.",
+                    })
+                    save_deliveries(deliveries)
+                self._json_response(201, public_express_booking(order))
+                return
+
             if path in ("/api/admin/batch-routing", "/api/admin/batch-routing/preview"):
                 permission = "manage_batch_routing" if path == "/api/admin/batch-routing" else "view_batch_routing"
                 if not require_permission(self, permission):
@@ -5295,6 +5615,51 @@ class FiableHandler(SimpleHTTPRequestHandler):
             # ADMIN MARK RIDER PAYMENT AS PAID
             # =====================================================
 
+            if path == "/api/admin/orders/express-payment":
+                admin = require_permission(self, "manage_finance")
+                if not admin:
+                    self._json_response(403, {"error": "You do not have permission to record customer payments."})
+                    return
+                order_id = payload.get("orderId")
+                amount = payload.get("amount")
+                method = payload.get("method")
+                reference = payload.get("reference", "")
+                if type(order_id) is not int or order_id <= 0 or type(amount) is not int or amount <= 0:
+                    raise ValueError("A valid order and positive whole-naira amount are required.")
+                if method not in ("bank_transfer", "cash", "pos"):
+                    raise ValueError("Choose bank transfer, cash or POS as the payment method.")
+                if not isinstance(reference, str) or len(reference.strip()) > 160:
+                    raise ValueError("The payment reference must be at most 160 characters.")
+                with locked_file(DELIVERIES_FILE):
+                    deliveries = load_deliveries()
+                    order = next((item for item in deliveries if item.get("id") == order_id), None)
+                    if not order:
+                        self._json_response(404, {"error": "Order not found."})
+                        return
+                    if order.get("bookingType") != "express":
+                        self._json_response(400, {"error": "This payment control is for website express bookings only."})
+                        return
+                    if amount != order.get("cost"):
+                        self._json_response(409, {"error": "The order amount has changed. Reload the order before recording payment."})
+                        return
+                    if order.get("paymentStatus") == "paid":
+                        self._json_response(200, {"message": "Payment already recorded.", "order": order})
+                        return
+                    order.update({
+                        "paymentStatus": "paid", "amountPaid": amount, "paymentMethod": method,
+                        "paymentReference": reference.strip(), "paidAt": now_iso(),
+                        "paymentRecordedBy": admin.get("email"), "pricingStatus": "confirmed",
+                        "updatedAt": now_iso(),
+                    })
+                    save_deliveries(deliveries)
+                    audit_admin_action(
+                        self, "express_payment_received", "delivery", order_id,
+                        previous={"paymentStatus": "pending"},
+                        new={"paymentStatus": "paid", "amount": amount, "method": method, "reference": reference.strip()},
+                    )
+                self._json_response(200, {"message": "Customer payment recorded.", "order": order})
+                return
+
             if path == "/api/admin/rider-payments/mark-paid":
 
                 admin = require_permission(self, "manage_finance")
@@ -5392,137 +5757,138 @@ class FiableHandler(SimpleHTTPRequestHandler):
                     )
                     return
 
-                deliveries = load_deliveries()
-                riders = load_riders()
+                with locked_file(DELIVERIES_FILE, RIDERS_FILE):
+                    deliveries = load_deliveries()
+                    riders = load_riders()
 
-                # Find the order
-                order = next(
-                    (
-                        item
-                        for item in deliveries
-                        if str(item.get("id", "")) == str(order_id)
-                    ),
-                    None
-                )
+                    # Find the order
+                    order = next(
+                        (
+                            item
+                            for item in deliveries
+                            if str(item.get("id", "")) == str(order_id)
+                        ),
+                        None
+                    )
 
-                if not order:
+                    if not order:
+                        self._json_response(
+                            404,
+                            {
+                                "error": "Order not found."
+                            }
+                        )
+                        return
+
+                    # Find the rider
+                    rider = next(
+                        (
+                            item
+                            for item in riders
+                            if str(item.get("id", "")) == str(rider_id)
+                        ),
+                        None
+                    )
+
+                    if not rider:
+                        self._json_response(
+                            404,
+                            {
+                                "error": "Rider not found."
+                            }
+                        )
+                        return
+
+                    # A rider must be signed in and not actively on a delivery.
+                    if (
+                        str(rider.get("id", "")) not in logged_in_rider_ids()
+                        or rider.get("status") == "on_delivery"
+                    ):
+                        self._json_response(
+                            400,
+                            {
+                                "error": "Rider is not available for assignment."
+                            }
+                        )
+                        return
+
+                    # Order must be assignable
+                    order_status = str(
+                        order.get("status", "")
+                    ).strip().lower()
+
+                    if order_status != "requested":
+                        self._json_response(
+                            400,
+                            {
+                                "error": "Only requested orders can be assigned to a rider."
+                            }
+                        )
+                        return
+
+                    # Assign rider to order
+                    order["riderId"] = rider["id"]
+                    order["riderRef"] = rider.get("riderRef", "")
+                    order["riderName"] = rider.get("name", "")
+                    order["riderPhone"] = rider.get("phone", "")
+
+                    # Order becomes assigned
+                    order["status"] = "assigned"
+                    order["updatedAt"] = datetime.now(
+                        timezone.utc
+                    ).isoformat()
+                    order["assignedAt"] = order["updatedAt"]
+                    append_delivery_event(
+                        order,
+                        "assigned",
+                        actor_type="admin",
+                        actor_id=admin.get("email"),
+                        actor_name=admin.get("name"),
+                        note=f"Assigned to {rider.get('name', 'rider')}",
+                    )
+
+                    # Rider becomes assigned
+                    rider["status"] = "assigned"
+
+                    save_deliveries(deliveries)
+                    save_riders(riders)
+
+                    audit_admin_action(
+                        self,
+                        action="rider_assigned",
+                        target_type="delivery",
+                        target_id=order.get("id"),
+                        previous=None,
+                        new={"riderId": rider.get("id"), "riderName": rider.get("name")},
+                    )
+
+
+                    # -------------------------------------------------
+                    # CREATE RIDER NOTIFICATION
+                    # -------------------------------------------------
+
+                    create_rider_notification(
+                        rider_id=rider["id"],
+                        notification_type="order_assigned",
+                        title="New Delivery Assigned",
+                        message=(
+                            f"Order #{order.get('id')} "
+                            "has been assigned to you."
+                        ),
+                        order_id=order.get("id")
+                    )
+
+
                     self._json_response(
-                        404,
+                        200,
                         {
-                            "error": "Order not found."
+                            "message": "Rider assigned successfully.",
+                            "order": order,
+                            "rider": rider
                         }
                     )
+
                     return
-
-                # Find the rider
-                rider = next(
-                    (
-                        item
-                        for item in riders
-                        if str(item.get("id", "")) == str(rider_id)
-                    ),
-                    None
-                )
-
-                if not rider:
-                    self._json_response(
-                        404,
-                        {
-                            "error": "Rider not found."
-                        }
-                    )
-                    return
-
-                # A rider must be signed in and not actively on a delivery.
-                if (
-                    str(rider.get("id", "")) not in logged_in_rider_ids()
-                    or rider.get("status") == "on_delivery"
-                ):
-                    self._json_response(
-                        400,
-                        {
-                            "error": "Rider is not available for assignment."
-                        }
-                    )
-                    return
-
-                # Order must be assignable
-                order_status = str(
-                    order.get("status", "")
-                ).strip().lower()
-
-                if order_status != "requested":
-                    self._json_response(
-                        400,
-                        {
-                            "error": "Only requested orders can be assigned to a rider."
-                        }
-                    )
-                    return
-
-                # Assign rider to order
-                order["riderId"] = rider["id"]
-                order["riderRef"] = rider.get("riderRef", "")
-                order["riderName"] = rider.get("name", "")
-                order["riderPhone"] = rider.get("phone", "")
-
-                # Order becomes assigned
-                order["status"] = "assigned"
-                order["updatedAt"] = datetime.now(
-                    timezone.utc
-                ).isoformat()
-                order["assignedAt"] = order["updatedAt"]
-                append_delivery_event(
-                    order,
-                    "assigned",
-                    actor_type="admin",
-                    actor_id=admin.get("email"),
-                    actor_name=admin.get("name"),
-                    note=f"Assigned to {rider.get('name', 'rider')}",
-                )
-
-                # Rider becomes assigned
-                rider["status"] = "assigned"
-
-                save_deliveries(deliveries)
-                save_riders(riders)
-
-                audit_admin_action(
-                    self,
-                    action="rider_assigned",
-                    target_type="delivery",
-                    target_id=order.get("id"),
-                    previous=None,
-                    new={"riderId": rider.get("id"), "riderName": rider.get("name")},
-                )
-
-
-                # -------------------------------------------------
-                # CREATE RIDER NOTIFICATION
-                # -------------------------------------------------
-
-                create_rider_notification(
-                    rider_id=rider["id"],
-                    notification_type="order_assigned",
-                    title="New Delivery Assigned",
-                    message=(
-                        f"Order #{order.get('id')} "
-                        "has been assigned to you."
-                    ),
-                    order_id=order.get("id")
-                )
-
-
-                self._json_response(
-                    200,
-                    {
-                        "message": "Rider assigned successfully.",
-                        "order": order,
-                        "rider": rider
-                    }
-                )
-
-                return
 
             # =====================================================
             # ADMIN BULK ASSIGN RIDER TO MULTIPLE DELIVERIES
@@ -6883,6 +7249,10 @@ class FiableHandler(SimpleHTTPRequestHandler):
                 self._json_response(503, {"error": str(error)})
             return
 
+        if request_path == "/api/express/payment-options":
+            self._json_response(200, {"paymentsEnabled": bool(get_payment_provider()), "testMode": PAYSTACK_IS_TEST_MODE})
+            return
+
         if request_path == "/api/admin/batch-routing":
             if not require_permission(self, "view_batch_routing"):
                 self._json_response(403, {"error": "You do not have permission to view delivery routing."})
@@ -7039,6 +7409,13 @@ class FiableHandler(SimpleHTTPRequestHandler):
                 "payments": [vendor_safe_payment(p) for p in own_payments],
                 "paymentsEnabled": bool(get_payment_provider()),
             })
+            return
+
+        if request_path == "/api/admin/finance/overview":
+            if not require_permission(self, "view_finance"):
+                self._json_response(403, {"error": "You do not have permission to view financial summaries."})
+                return
+            self._json_response(200, admin_payment_overview())
             return
 
         if self.path.startswith("/api/admin/finance/payments/export"):
@@ -7569,6 +7946,7 @@ class FiableHandler(SimpleHTTPRequestHandler):
             query = parse_qs(urlparse(self.path).query)
             search = clean((query.get("search", [""])[0]), 120).lower()
             status_filter = clean((query.get("status", [""])[0]), 40).lower()
+            booking_type = clean((query.get("bookingType", [""])[0]), 40).lower()
             vendor_filter = clean((query.get("vendor", [""])[0]), 160).lower()
             rider_filter = clean((query.get("rider", [""])[0]), 40)
             pickup_filter = clean((query.get("pickup", [""])[0]), 80).lower()
@@ -7603,8 +7981,10 @@ class FiableHandler(SimpleHTTPRequestHandler):
 
                 order = dict(delivery)
                 email = delivery.get("accountEmail", "").lower()
-                order["vendorName"] = vendor_names.get(email, "—")
+                order["vendorName"] = delivery.get("customerName", "—") if delivery.get("bookingType") == "express" else vendor_names.get(email, "—")
 
+                if booking_type and order.get("bookingType", "subscription") != booking_type:
+                    continue
                 if status_filter and str(order.get("status", "")).lower() != status_filter:
                     continue
                 if vendor_filter and vendor_filter not in email and vendor_filter not in order["vendorName"].lower():
@@ -7618,7 +7998,7 @@ class FiableHandler(SimpleHTTPRequestHandler):
                 if search:
                     haystack = " ".join(str(order.get(field, "")) for field in (
                         "orderRef", "trackingCode", "accountEmail", "riderName", "vendorName",
-                        "batchId", "batchGroupId", "batchAxisLabel"
+                        "batchId", "batchGroupId", "batchAxisLabel", "customerName", "customerPhone", "bookingType"
                     )).lower()
                     if search not in haystack:
                         continue

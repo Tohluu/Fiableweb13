@@ -358,5 +358,35 @@
     "orderId": 68,
     "read": false,
     "createdAt": "2026-10-13T11:00:57.354758+00:00"
+  },
+  {
+    "id": "_IVumujdRJ6DOgn2",
+    "riderId": 8,
+    "type": "order_assigned",
+    "title": "New Delivery Assigned",
+    "message": "Order #69 has been assigned to you.",
+    "orderId": 69,
+    "read": false,
+    "createdAt": "2026-10-15T09:14:49.957742+00:00"
+  },
+  {
+    "id": "I1GA0A6287P89gLi",
+    "riderId": 8,
+    "type": "order_assigned",
+    "title": "New Delivery Assigned",
+    "message": "Order #71 has been assigned to you.",
+    "orderId": 71,
+    "read": false,
+    "createdAt": "2026-10-15T14:48:10.497399+00:00"
+  },
+  {
+    "id": "vrUR9foooDmvWPcx",
+    "riderId": 8,
+    "type": "order_assigned",
+    "title": "New Delivery Assigned",
+    "message": "Order #70 has been assigned to you.",
+    "orderId": 70,
+    "read": false,
+    "createdAt": "2026-10-15T14:48:48.826992+00:00"
   }
 ]

@@ -1951,5 +1951,200 @@
     "previousValue": null,
     "newValue": null,
     "note": null
+  },
+  {
+    "id": "0HEr6aEg0JHh7JlX",
+    "at": "2026-10-15T07:13:30.372669+00:00",
+    "actorEmail": "toluwaloseoyinloye@gmail.com",
+    "actorRole": "owner",
+    "action": "admin_login",
+    "targetType": "admin",
+    "targetId": 2,
+    "previousValue": null,
+    "newValue": null,
+    "note": null
+  },
+  {
+    "id": "PytGeVV7k68qGWCv",
+    "at": "2026-10-15T09:12:42.045440+00:00",
+    "actorEmail": "toluwaloseoyinloye@gmail.com",
+    "actorRole": "owner",
+    "action": "admin_login",
+    "targetType": "admin",
+    "targetId": 2,
+    "previousValue": null,
+    "newValue": null,
+    "note": null
+  },
+  {
+    "id": "clR8l3sacklFcVOA",
+    "at": "2026-10-15T09:14:49.953130+00:00",
+    "actorEmail": "toluwaloseoyinloye@gmail.com",
+    "actorRole": "owner",
+    "action": "rider_assigned",
+    "targetType": "delivery",
+    "targetId": 69,
+    "previousValue": null,
+    "newValue": {
+      "riderId": 8,
+      "riderName": "Isreal Attah"
+    },
+    "note": null
+  },
+  {
+    "id": "QXV0htHJ0ovVRUuz",
+    "at": "2026-10-15T10:12:06.373807+00:00",
+    "actorEmail": "toluwaloseoyinloye@gmail.com",
+    "actorRole": "owner",
+    "action": "admin_login",
+    "targetType": "admin",
+    "targetId": 2,
+    "previousValue": null,
+    "newValue": null,
+    "note": null
+  },
+  {
+    "id": "9ymQjihwTm5oRsiV",
+    "at": "2026-10-15T10:12:18.702608+00:00",
+    "actorEmail": "toluwaloseoyinloye@gmail.com",
+    "actorRole": "owner",
+    "action": "express_payment_received",
+    "targetType": "delivery",
+    "targetId": 69,
+    "previousValue": {
+      "paymentStatus": "pending"
+    },
+    "newValue": {
+      "paymentStatus": "paid",
+      "amount": 12000,
+      "method": "bank_transfer",
+      "reference": ""
+    },
+    "note": null
+  },
+  {
+    "id": "5ui9I-87Eixbr_yB",
+    "at": "2026-10-15T10:23:01.183102+00:00",
+    "actorEmail": "toluwaloseoyinloye@gmail.com",
+    "actorRole": "owner",
+    "action": "admin_login",
+    "targetType": "admin",
+    "targetId": 2,
+    "previousValue": null,
+    "newValue": null,
+    "note": null
+  },
+  {
+    "id": "FZDxXZOMIMmV0tjS",
+    "at": "2026-10-15T10:26:15.071282+00:00",
+    "actorEmail": "toluwaloseoyinloye@gmail.com",
+    "actorRole": "owner",
+    "action": "rider_payment_recorded",
+    "targetType": "rider",
+    "targetId": 8,
+    "previousValue": null,
+    "newValue": {
+      "amount": 9600,
+      "month": "2026-10"
+    },
+    "note": null
+  },
+  {
+    "id": "7li8xwjbUVDH_gR0",
+    "at": "2026-10-15T14:16:53.026788+00:00",
+    "actorEmail": "toluwaloseoyinloye@gmail.com",
+    "actorRole": "owner",
+    "action": "admin_login",
+    "targetType": "admin",
+    "targetId": 2,
+    "previousValue": null,
+    "newValue": null,
+    "note": null
+  },
+  {
+    "id": "lfTN5KL1nZ7VfjIy",
+    "at": "2026-10-15T14:44:48.562924+00:00",
+    "actorEmail": "toluwaloseoyinloye@gmail.com",
+    "actorRole": "owner",
+    "action": "admin_login",
+    "targetType": "admin",
+    "targetId": 2,
+    "previousValue": null,
+    "newValue": null,
+    "note": null
+  },
+  {
+    "id": "3P7wD4lJkIvhHowI",
+    "at": "2026-10-15T14:48:10.529364+00:00",
+    "actorEmail": "toluwaloseoyinloye@gmail.com",
+    "actorRole": "owner",
+    "action": "rider_bulk_assigned",
+    "targetType": "delivery",
+    "targetId": [
+      71
+    ],
+    "previousValue": null,
+    "newValue": {
+      "riderId": 8,
+      "riderName": "Isreal Attah",
+      "count": 1
+    },
+    "note": null
+  },
+  {
+    "id": "YN0aCMAT_RC5OOCx",
+    "at": "2026-10-15T14:48:48.892105+00:00",
+    "actorEmail": "toluwaloseoyinloye@gmail.com",
+    "actorRole": "owner",
+    "action": "rider_bulk_assigned",
+    "targetType": "delivery",
+    "targetId": [
+      70
+    ],
+    "previousValue": null,
+    "newValue": {
+      "riderId": 8,
+      "riderName": "Isreal Attah",
+      "count": 1
+    },
+    "note": null
+  },
+  {
+    "id": "BVZgDVeMoNKLB5TG",
+    "at": "2026-10-15T14:59:02.803092+00:00",
+    "actorEmail": "toluwaloseoyinloye@gmail.com",
+    "actorRole": "owner",
+    "action": "express_payment_received",
+    "targetType": "delivery",
+    "targetId": 71,
+    "previousValue": {
+      "paymentStatus": "pending"
+    },
+    "newValue": {
+      "paymentStatus": "paid",
+      "amount": 12000,
+      "method": "bank_transfer",
+      "reference": ""
+    },
+    "note": null
+  },
+  {
+    "id": "62R1u0x7RmZj7wci",
+    "at": "2026-10-15T14:59:24.934280+00:00",
+    "actorEmail": "toluwaloseoyinloye@gmail.com",
+    "actorRole": "owner",
+    "action": "express_payment_received",
+    "targetType": "delivery",
+    "targetId": 70,
+    "previousValue": {
+      "paymentStatus": "pending"
+    },
+    "newValue": {
+      "paymentStatus": "paid",
+      "amount": 2000,
+      "method": "bank_transfer",
+      "reference": ""
+    },
+    "note": null
   }
 ]
