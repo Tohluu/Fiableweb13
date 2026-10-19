@@ -2146,5 +2146,90 @@
       "reference": ""
     },
     "note": null
+  },
+  {
+    "id": "sJYsqBW8ZQ2R3Kse",
+    "at": "2026-10-15T19:42:11.757586+00:00",
+    "actorEmail": "toluwaloseoyinloye@gmail.com",
+    "actorRole": "owner",
+    "action": "rider_payment_recorded",
+    "targetType": "rider",
+    "targetId": 8,
+    "previousValue": null,
+    "newValue": {
+      "amount": 11200,
+      "month": "2026-10"
+    },
+    "note": null
+  },
+  {
+    "id": "pVNFbbSdi2KfCI2C",
+    "at": "2026-10-16T07:49:10.067236+00:00",
+    "actorEmail": "toluwaloseoyinloye@gmail.com",
+    "actorRole": "owner",
+    "action": "admin_login",
+    "targetType": "admin",
+    "targetId": 2,
+    "previousValue": null,
+    "newValue": null,
+    "note": null
+  },
+  {
+    "id": "NuH2xKBvfgWHWcZk",
+    "at": "2026-10-16T07:50:12.671377+00:00",
+    "actorEmail": "toluwaloseoyinloye@gmail.com",
+    "actorRole": "owner",
+    "action": "express_payment_received",
+    "targetType": "delivery",
+    "targetId": 72,
+    "previousValue": {
+      "paymentStatus": "pending"
+    },
+    "newValue": {
+      "paymentStatus": "paid",
+      "amount": 12000,
+      "method": "bank_transfer",
+      "reference": ""
+    },
+    "note": null
+  },
+  {
+    "id": "HzrHaWEautxp6RAo",
+    "at": "2026-10-17T13:07:54.230931+00:00",
+    "actorEmail": "toluwaloseoyinloye@gmail.com",
+    "actorRole": "owner",
+    "action": "admin_login",
+    "targetType": "admin",
+    "targetId": 2,
+    "previousValue": null,
+    "newValue": null,
+    "note": null
+  },
+  {
+    "id": "NZ6PXx6ksFb382PX",
+    "at": "2026-10-17T13:09:56.595887+00:00",
+    "actorEmail": "toluwaloseoyinloye@gmail.com",
+    "actorRole": "owner",
+    "action": "rider_assigned",
+    "targetType": "delivery",
+    "targetId": 72,
+    "previousValue": null,
+    "newValue": {
+      "riderId": 8,
+      "riderName": "Isreal Attah"
+    },
+    "note": null
+  },
+  {
+    "id": "69dnBUv3FBnJ7seR",
+    "at": "2026-10-19T14:08:30.703340+00:00",
+    "actorEmail": "toluwaloseoyinloye@gmail.com",
+    "actorRole": "owner",
+    "action": "admin_login",
+    "targetType": "admin",
+    "targetId": 2,
+    "previousValue": null,
+    "newValue": null,
+    "note": null
   }
 ]

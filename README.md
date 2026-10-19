@@ -1,4 +1,11 @@
-# Fiable
+# Apexwings
+
+The website uses Apexwings Logistics branding and the selected blue A/wing logo
+from the bottom-left option in the supplied logo sheet. `images/apexwings-logo.png`
+contains the full logo and tagline; `images/apexwings-symbol.png` is the compact
+symbol used beside the website wordmark. Shared sizing lives in `brand.css`.
+Existing contact details, storage keys and infrastructure names are retained
+for compatibility.
 
 Run the local app with `python server.py`, then open `http://localhost:8080`.
 Restart the server after changing Python code.
@@ -54,7 +61,7 @@ Run `python -B tests/express_delivery_checks.py` for isolated booking-to-deliver
 
 ## PostgreSQL and Render hosting
 
-Fiable now supports Render Postgres. Set `DATABASE_URL` on the server to use
+Apexwings now supports Render Postgres. Set `DATABASE_URL` on the server to use
 PostgreSQL for app records and proof uploads. Set `REQUIRE_DATABASE=true` in
 production so a missing connection URL cannot start file-storage mode.
 Without `DATABASE_URL`, local development continues to use JSON files.

@@ -1,0 +1,53 @@
+/* ApexWings identity shared by the website and every portal. */
+.apex-brand {
+  display:inline-flex;
+  align-items:center;
+  justify-content:flex-start;
+  gap:8px;
+  inline-size:auto;
+  block-size:auto;
+  flex-shrink:0;
+  color:#0c2d51;
+  text-decoration:none;
+}
+.apex-brand:hover { text-decoration:none; }
+.apex-brand .apex-brand-symbol {
+  display:block;
+  inline-size:48px;
+  block-size:48px;
+  max-block-size:none;
+  object-fit:contain;
+  flex-shrink:0;
+  mix-blend-mode:multiply;
+}
+.apex-brand .apex-brand-name {
+  display:flex;
+  flex-direction:column;
+  color:#0c2d51;
+  font-family:"Segoe UI",Arial,sans-serif;
+  font-size:23px;
+  font-weight:750;
+  letter-spacing:-.045em;
+  line-height:1;
+}
+.apex-brand .apex-brand-name small {
+  display:block;
+  margin-block-start:7px;
+  font-size:8px;
+  font-weight:600;
+  letter-spacing:.23em;
+  line-height:1;
+}
+.auth-logo .apex-logo-full {
+  display:block;
+  inline-size:220px;
+  max-inline-size:100%;
+  block-size:auto;
+  mix-blend-mode:multiply;
+}
+.sidebar .apex-brand .apex-brand-symbol { inline-size:42px; block-size:42px; }
+.sidebar .apex-brand .apex-brand-name { font-size:21px; }
+@media(max-width:760px) {
+  .apex-brand .apex-brand-symbol { inline-size:42px; block-size:42px; }
+  .apex-brand .apex-brand-name { font-size:21px; }
+}

@@ -388,5 +388,15 @@
     "orderId": 70,
     "read": false,
     "createdAt": "2026-10-15T14:48:48.826992+00:00"
+  },
+  {
+    "id": "IacRs7xoylILWJTc",
+    "riderId": 8,
+    "type": "order_assigned",
+    "title": "New Delivery Assigned",
+    "message": "Order #72 has been assigned to you.",
+    "orderId": 72,
+    "read": false,
+    "createdAt": "2026-10-17T13:09:56.600779+00:00"
   }
 ]

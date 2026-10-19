@@ -3,16 +3,18 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Fiable Logistics vendor portal">
-  <title>Fiable Vendor Portal</title>
+  <meta name="description" content="Apexwings Logistics vendor portal">
+  <title>Apexwings Vendor Portal</title>
   <link rel="stylesheet" href="portal.css?v=5">
   <link rel="stylesheet" href="portal-design.css?v=1">
+<link rel="stylesheet" href="brand.css?v=1">
+<link rel="icon" type="image/png" href="images/apexwings-symbol.png">
 </head>
 <body>
   <div id="authGate" class="auth-gate">
       <section id="loginView" class="auth-screen hidden">
         <div class="auth-card">
-          <a class="auth-logo" href="index.html"><img src="images/Logo2.png" alt="Fiable Logistics"></a>
+          <a class="auth-logo" href="index.html"><img class="apex-logo-full" src="images/apexwings-logo.png" alt="ApexWings: Speed, Reliability, Trust" width="768" height="507"></a>
           <div class="eyebrow">Vendor portal</div>
           <h2>Welcome back.</h2>
           <p class="muted" id="portalLoginDescription">Log in to manage your subscription, deliveries and account.</p>
@@ -33,13 +35,13 @@
           </form>
 
           <button class="text-btn" id="forgotBtn" type="button">Forgot your password?</button>
-          <p class="auth-footer">New to Fiable? <a href="get-started.html">Become a vendor</a></p>
+          <p class="auth-footer">New to Apexwings? <a href="get-started.html">Become a vendor</a></p>
         </div>
       </section>
 
       <section id="forgotView" class="auth-screen hidden">
         <div class="auth-card">
-          <a class="auth-logo" href="index.html"><img src="images/Logo2.png" alt="Fiable Logistics"></a>
+          <a class="auth-logo" href="index.html"><img class="apex-logo-full" src="images/apexwings-logo.png" alt="ApexWings: Speed, Reliability, Trust" width="768" height="507"></a>
           <div class="eyebrow">Account recovery</div>
           <h2>Reset your password.</h2>
           <p class="muted">Enter your account email and we'll send you a secure password reset link.</p>
@@ -54,13 +56,12 @@
 
     <section id="resetView" class="auth-screen hidden">
         <div class="auth-card">
-            <a class="auth-logo" href="index.html">
-            <img src="images/Logo2.png" alt="Fiable Logistics">
+            <a class="auth-logo" href="index.html"><img class="apex-logo-full" src="images/apexwings-logo.png" alt="ApexWings: Speed, Reliability, Trust" width="768" height="507">
             </a>
             <div class="eyebrow">Account recovery</div>
             <h2>Create a new password.</h2>
             <p class="muted">
-            Enter a new password for your Fiable account.
+            Enter a new password for your Apexwings account.
             </p>
             <form id="resetForm">
                 <label for="resetPassword">New password</label>
@@ -116,8 +117,9 @@
   <div class="app-shell" id="appShell">
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-top">
-        <a class="brand" href="index.html">
-          <img src="images/Logo2.png" alt="Fiable Logistics">
+        <a class="brand apex-brand" href="index.html" aria-label="ApexWings Logistics home">
+          <img class="apex-brand-symbol" src="images/apexwings-symbol.png" alt="" width="48" height="48">
+          <span class="apex-brand-name">ApexWings<small>LOGISTICS</small></span>
         </a>
         <button class="close-sidebar" id="closeSidebar" type="button" aria-label="Close navigation">×</button>
       </div>
@@ -145,7 +147,7 @@
       <header class="topbar">
         <button class="menu-btn" id="menuBtn" type="button" aria-label="Open navigation">☰</button>
         <div>
-          <p class="topbar-kicker">Fiable Vendor Portal</p>
+          <p class="topbar-kicker">Apexwings Vendor Portal</p>
           <h1 id="pageTitle">Dashboard</h1>
         </div>
         <div class="user-chip">
@@ -167,7 +169,7 @@
             <div>
               <div class="eyebrow">Overview</div>
               <h2>Good to see you, <span id="welcomeName">Vendor</span>.</h2>
-              <p class="muted">Here is what is happening with your Fiable account.</p>
+              <p class="muted">Here is what is happening with your Apexwings account.</p>
             </div>
             <button class="btn primary" data-go="request" type="button">+ Request delivery</button>
           </div>
@@ -408,7 +410,7 @@
           <article class="panel batch-delivery-panel" id="batch-delivery">
             <div class="panel-head">
               <div>
-                <div class="eyebrow">Fiable Batch Saver</div>
+                <div class="eyebrow">Apexwings Batch Saver</div>
                 <h3 id="batchDeliveryHeading" tabindex="-1">Batch deliveries across all service areas</h3>
                 <p class="muted">Add three or more deliveries from one pickup address to any supported location. Your pickup and destination areas determine which deliveries can share a discount group.</p>
               </div>
@@ -497,7 +499,7 @@
             <div class="section-title compact">
               <div>
                 <h3>Unit adjustment history</h3>
-                <p class="muted">Manual adjustments made by Fiable to your unit balance, if any.</p>
+                <p class="muted">Manual adjustments made by Apexwings to your unit balance, if any.</p>
               </div>
             </div>
             <div id="unitAdjustmentHistoryVendor">
@@ -572,7 +574,7 @@
             <div>
               <div class="eyebrow">Profile</div>
               <h2>Account</h2>
-              <p class="muted">Your Fiable vendor account information.</p>
+              <p class="muted">Your Apexwings vendor account information.</p>
             </div>
           </div>
           <div class="account-grid">
@@ -599,7 +601,7 @@
                 <div>
                 <div class="eyebrow">Preferences</div>
                 <h2>Settings</h2>
-                <p class="muted">Manage your Fiable vendor account and preferences.</p>
+                <p class="muted">Manage your Apexwings vendor account and preferences.</p>
                 </div>
             </div>
 
@@ -969,7 +971,7 @@
       $("ticketDetailTitle").textContent = `${ticket.id} — ${TICKET_CATEGORY_LABELS[ticket.category] || ticket.category}`;
       const replies = (ticket.replies || []).map(reply => `
         <div class="ticket-message ${reply.from === "admin" ? "admin-reply" : ""}">
-          <div class="message-meta">${reply.from === "admin" ? "Fiable Support" : "You"} · ${reply.at ? new Date(reply.at).toLocaleString("en-GB") : ""}</div>
+          <div class="message-meta">${reply.from === "admin" ? "Apexwings Support" : "You"} · ${reply.at ? new Date(reply.at).toLocaleString("en-GB") : ""}</div>
           <div>${escapeHtml(reply.message)}</div>
         </div>
       `).join("");
@@ -1223,7 +1225,7 @@
 
         } else if (a.subscriptionState === "expired") {
             $("paymentText").textContent =
-            "Your subscription has expired. Please renew to continue using Fiable.";
+            "Your subscription has expired. Please renew to continue using Apexwings.";
 
         } else if (a.daysUntilRenewal != null) {
             $("paymentText").textContent =
@@ -2290,7 +2292,7 @@
       btn.textContent = "Logging in…";
       try {
         await login($("loginEmail").value.trim(), $("loginPassword").value);
-        toast("Welcome back to Fiable.");
+        toast("Welcome back to Apexwings.");
       } catch (error) {
         const loginError = $("loginError");
 

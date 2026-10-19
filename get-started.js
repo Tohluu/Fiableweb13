@@ -43,8 +43,8 @@ const updateServiceFields = () => {
     document.getElementById('serviceHeading').textContent = isBulk ? 'Tell us what needs to move.' : 'Ready to make delivery easier?';
     document.getElementById('serviceDescription').textContent = isBulk
         ? 'Share your load, route and preferred date to request a haulage quote. No account is required.'
-        : "Join Fiable's growing network of Lagos businesses and get access to structured, subscription-based delivery support.";
-    document.getElementById('serviceFormHeading').textContent = isBulk ? 'Request a bulk haulage quote' : 'Register for Fiable services';
+        : "Join Apexwings' growing network of Lagos businesses and get access to structured, subscription-based delivery support.";
+    document.getElementById('serviceFormHeading').textContent = isBulk ? 'Request a bulk haulage quote' : 'Register for Apexwings services';
     document.getElementById('serviceFormDescription').textContent = isBulk
         ? 'Complete the details below, then send the prepared message to our team on WhatsApp.'
         : 'Choose your service and create your vendor account. You can sign in after registration.';
@@ -75,7 +75,7 @@ vendorForm.addEventListener('submit', event => {
     const email = value('get-started-field-4');
     if (serviceType.value === 'bulk') {
         const message = [
-            'Hello Fiable, I would like a bulk haulage quote.',
+            'Hello Apexwings, I would like a bulk haulage quote.',
             `Name: ${name}`, `Business: ${businessName}`, `Phone: ${phone}`, `Email: ${email}`,
             `Goods: ${value('bulkDetails')}`, `Quantity and packaging: ${value('bulkQuantity')}`,
             `Estimated weight or dimensions: ${value('bulkSize')}`,

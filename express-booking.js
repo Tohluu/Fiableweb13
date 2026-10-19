@@ -222,7 +222,7 @@
     const data = new FormData(form);
     const value = name => (data.get(name) || '').trim();
     if (!website()) {
-      const message = ['Hello Fiable, I would like to request an express delivery.',
+      const message = ['Hello Apexwings, I would like to request an express delivery.',
         `Name: ${value('name')}`, `Phone: ${value('phone')}`,
         `Pickup: ${value('pickup')}`, `Destination: ${value('dropoff')}`,
         `Package: ${value('package')}`, 'Please confirm availability, price and delivery timing.'].join('\n');

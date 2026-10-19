@@ -13,7 +13,7 @@ h3 { font-size:17px; font-weight:650; }
 .sidebar-top { padding:0 8px 24px; }
 .sidebar-top .brand { display:flex; align-items:center; gap:10px; }
 .sidebar-top .brand img { inline-size:36px; block-size:46px; max-block-size:none; object-fit:contain; }
-.admin-wordmark { display:flex; flex-direction:column; font-size:20px; font-weight:800; letter-spacing:.09em; line-height:1; }
+.admin-wordmark { display:flex; flex-direction:column; font-size:17px; font-weight:800; letter-spacing:.05em; line-height:1; }
 .admin-wordmark small { font-size:8px; font-weight:600; letter-spacing:.25em; margin-block-start:7px; }
 .admin-label { margin:0 12px 14px; font-weight:600; letter-spacing:.14em; }
 .side-nav { gap:4px; }

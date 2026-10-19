@@ -2215,7 +2215,7 @@ PUBLIC_TRACKING_STATUS_MAP = {
     "returned": "Returned",
 }
 
-# Which proof-of-delivery methods Fiable currently requires. Toggle here;
+# Which proof-of-delivery methods Apexwings currently requires. Toggle here;
 # no other code changes are needed to relax/tighten requirements.
 PROOF_OF_DELIVERY_REQUIREMENTS = {
     "requireRecipientName": True,
@@ -2368,20 +2368,20 @@ class NotificationService:
     def send_delivery_otp(cls, phone, otp, order_ref):
         result = cls._send_sms(
             phone,
-            f"Fiable delivery {order_ref}: your OTP is {otp}. Only share this with your rider at handover.",
+            f"Apexwings delivery {order_ref}: your OTP is {otp}. Only share this with your rider at handover.",
         )
         _record_notification("delivery_otp", result["channel"], phone, result["sent"], result["reason"])
         return result
 
     @classmethod
     def send_delivery_update(cls, phone, order_ref, status_label):
-        result = cls._send_sms(phone, f"Fiable delivery {order_ref} update: {status_label}.")
+        result = cls._send_sms(phone, f"Apexwings delivery {order_ref} update: {status_label}.")
         _record_notification("delivery_update", result["channel"], phone, result["sent"], result["reason"])
         return result
 
     @classmethod
     def send_assignment_notification(cls, phone, order_ref):
-        result = cls._send_sms(phone, f"Fiable: you have been assigned delivery {order_ref}.")
+        result = cls._send_sms(phone, f"Apexwings: you have been assigned delivery {order_ref}.")
         _record_notification("assignment", result["channel"], phone, result["sent"], result["reason"])
         return result
 
@@ -2389,7 +2389,7 @@ class NotificationService:
     def send_low_units_alert(cls, email, units_remaining):
         result = cls._send_email(
             email, "Low delivery units remaining",
-            f"You have {units_remaining} units left on your Fiable subscription.",
+            f"You have {units_remaining} units left on your Apexwings subscription.",
         )
         _record_notification("low_units_alert", result["channel"], email, result["sent"], result["reason"])
         return result
@@ -2397,7 +2397,7 @@ class NotificationService:
     @classmethod
     def send_subscription_reminder(cls, email, renewal_date):
         result = cls._send_email(
-            email, "Your Fiable subscription renews soon",
+            email, "Your Apexwings subscription renews soon",
             f"Your subscription renews on {renewal_date}.",
         )
         _record_notification("subscription_reminder", result["channel"], email, result["sent"], result["reason"])
@@ -2425,7 +2425,7 @@ class NotificationService:
 # =========================================================
 # ADMIN MFA (TOTP - RFC 6238), stdlib-only implementation
 # =========================================================
-MFA_ISSUER = "Fiable Logistics"
+MFA_ISSUER = "Apexwings Logistics"
 MFA_TOTP_DIGITS = 6
 MFA_TOTP_PERIOD_SECONDS = 30
 MFA_TOTP_WINDOW = 1  # tolerate 1 step (30s) of clock drift each side
@@ -2547,7 +2547,7 @@ PAYMENTS_FILE = DATA_DIR / "payments.json"
 
 # Hard off-switch: until this is explicitly "true" (and a provider is
 # actually configured), no live/test transaction can be initialized. This
-# prevents an accidentally-live payment button while Fiable is still under
+# prevents an accidentally-live payment button while Apexwings is still under
 # development, regardless of what credentials happen to be present.
 PAYMENTS_ENABLED = os.environ.get("PAYMENTS_ENABLED", "false").strip().lower() == "true"
 PAYMENT_PROVIDER_NAME = os.environ.get("PAYMENT_PROVIDER", "paystack").strip().lower()
@@ -2684,7 +2684,7 @@ def build_receipt(payment):
     show the vendor."""
     return {
         "receiptNumber": payment.get("receiptId"),
-        "business": "Fiable Logistics",
+        "business": "Apexwings Logistics",
         "vendorEmail": payment.get("vendorEmail"),
         "plan": payment.get("plan"),
         "amount": payment.get("amount"),
@@ -7427,7 +7427,7 @@ class FiableHandler(SimpleHTTPRequestHandler):
             audit_admin_action(self, "export_data", "payments")
             self.send_response(200)
             self.send_header("Content-Type", "text/csv; charset=utf-8")
-            self.send_header("Content-Disposition", "attachment; filename=fiable-payments.csv")
+            self.send_header("Content-Disposition", "attachment; filename=apexwings-payments.csv")
             body = csv_text.encode("utf-8")
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
@@ -8294,5 +8294,5 @@ if __name__ == "__main__":
         migrate_subscriber_ids()
         migrate_deliveries()
         bootstrap_admin_from_environment()
-    print(f"Fiable server running on 0.0.0.0:{PORT}")
+    print(f"Apexwings server running on 0.0.0.0:{PORT}")
     ThreadingHTTPServer(("0.0.0.0", PORT), FiableHandler).serve_forever()
