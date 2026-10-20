@@ -8,8 +8,8 @@
 
   <link rel="stylesheet" href="portal.css">
   <link rel="stylesheet" href="admin.css?v=5">
-  <link rel="stylesheet" href="admin-design.css?v=2">
-  <link rel="stylesheet" href="batch-routing.css?v=2">
+  <link rel="stylesheet" href="admin-design.css?v=4">
+  <link rel="stylesheet" href="batch-routing.css?v=3">
   <link rel="stylesheet" href="admin-payments.css?v=1">
   <style>
     body.admin-page-loading {
@@ -1401,6 +1401,11 @@
           </div>
 
           <article class="panel">
+            <div id="adminTeamTools" class="routing-actions">
+              <label for="adminTeamSearch">Find a team member</label>
+              <input id="adminTeamSearch" type="search" placeholder="Search name, email or role">
+            </div>
+            <p id="adminTeamEmailStatus" class="muted" role="status"></p>
             <div class="table-wrap">
               <table class="admin-table admin-team-table">
                 <thead>
@@ -1409,11 +1414,12 @@
                     <th>Role</th>
                     <th>Status</th>
                     <th>Added</th>
+                    <th>Last sign-in</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody id="adminTeamBody">
-                  <tr><td colspan="5" class="empty-state">Loading team...</td></tr>
+                  <tr><td colspan="6" class="empty-state">Loading team...</td></tr>
                 </tbody>
               </table>
             </div>
@@ -1435,8 +1441,18 @@
               <input id="newAdminName" type="text" required placeholder="Admin name">
               <label for="newAdminEmail">Email</label>
               <input id="newAdminEmail" type="email" required placeholder="admin@example.com">
-              <label for="newAdminPassword">Initial password</label>
-              <input id="newAdminPassword" type="password" minlength="8" required placeholder="At least 8 characters">
+              <label for="newAdminDelivery">Account setup</label>
+              <select id="newAdminDelivery">
+                <option value="invite">Email invitation</option>
+                <option value="manual">Temporary password</option>
+              </select>
+              <div id="newAdminPasswordFields">
+                <label for="newAdminPassword">Initial password</label>
+                <div class="admin-password-field">
+                  <input id="newAdminPassword" type="password" minlength="8" autocomplete="new-password" placeholder="At least 8 characters">
+                  <button id="toggleNewAdminPassword" type="button" class="btn outline" aria-controls="newAdminPassword" aria-pressed="false">Show password</button>
+                </div>
+              </div>
               <label for="newAdminRole">Role</label>
               <select id="newAdminRole">
                 <option value="super_admin">Super Admin — full system access</option>
@@ -1446,7 +1462,8 @@
                 <option value="customer_support">Customer Support — support tickets</option>
                 <option value="analyst">Analyst — read-only reporting</option>
               </select>
-              <p class="muted" style="font-size:12px;margin:-4px 0 4px">The new admin must change this password on first login.</p>
+              <p id="newAdminSetupNote" class="muted" style="font-size:12px;margin:-4px 0 4px"></p>
+              <div id="newAdminPermissions" class="muted" aria-live="polite"></div>
               <div class="role-description-list">
                 <div><strong>Super Admin</strong> — full system administration.</div>
                 <div><strong>Operations Manager</strong> — orders, riders, vendors, operational reporting.</div>
@@ -1647,8 +1664,8 @@
 
           <article class="panel settings-panel hidden" id="batchRoutingPanel">
             <div class="settings-section-header">
-              <div><h2>Delivery areas &amp; batch groups</h2>
-                <p class="muted">Choose which destination areas can share a discount group from each pickup area. Starting areas are proposed boundaries for dispatcher review.</p>
+              <div><h2>Pricing zones, delivery areas &amp; batch groups</h2>
+                <p class="muted">Set route units, assign locations to pricing zones, and choose which delivery areas can share batch discounts.</p>
               </div>
             </div>
             <p id="routingAccessNote" class="muted"></p>
@@ -1659,8 +1676,16 @@
             <p id="routingMessage" role="status" aria-live="polite">Loading routing rules...</p>
             <div id="routingEditor" hidden>
               <details class="routing-section">
-                <summary>1. Delivery areas and location assignments</summary>
-                <p class="muted">Each location belongs to one delivery area. Add missing locations below and choose a pricing zone for their normal route charges.</p>
+                <summary>1. Pricing zone names and route units</summary>
+                <p class="muted">Rename the pricing zones below. Mainland North-West starts with Ayobo, Ipaja, Abule Egba, Agbado and Alagbado; Mainland North-East starts with Agege and Ifako-Ijaiye. Mainland North keeps Egbeda, Shasha, Igando, Idimu and Ikotun. Both Lekki corridors remain separate. Move locations between zones in the next section.</p>
+                <div id="routingPricingZones" class="routing-location-list"></div>
+                <h3>Units between pricing zones</h3>
+                <p class="muted">Enter 1–7 units for each zone pair. The same rate applies in both directions; a zone paired with itself covers journeys within that zone. New northern zones start from the higher former North/West charge, with a minimum of 2 units. This includes within-zone journeys. Review the starting values against your dispatch costs and adjust them before launch. Changes apply to new express, subscriber and batch quotes after saving.</p>
+                <div id="routingZoneUnits" class="routing-location-list"></div>
+              </details>
+              <details class="routing-section">
+                <summary>2. Delivery areas and location assignments</summary>
+                <p class="muted">Each location belongs to one delivery area and one pricing zone. You can change the pricing zone of any location, including standard locations.</p>
                 <div class="routing-add-location" id="routingAddLocationFields">
                   <h3>Add a location</h3>
                   <p class="muted">Use the neighbourhood or town name, such as Ogudu. Customers enter the house number and street separately.</p>
@@ -1678,7 +1703,7 @@
                 <div id="routingLocations" class="routing-location-list"></div>
               </details>
               <details class="routing-section" open>
-                <summary>2. Groups allowed from a pickup area</summary>
+                <summary>3. Groups allowed from a pickup area</summary>
                 <label for="routingPickupArea">Pickup area</label>
                 <select id="routingPickupArea"></select>
                 <p class="muted">Areas start in separate groups. Give destination areas the same group name to combine them for this pickup area only. Validate combinations with your dispatcher.</p>
@@ -1687,7 +1712,7 @@
                 <button type="button" class="btn outline" id="routingSeparate">Separate all groups for this pickup</button>
               </details>
               <section class="routing-section" aria-labelledby="routingTestHeading">
-                <h3 id="routingTestHeading">3. Try a batch without booking</h3>
+                <h3 id="routingTestHeading">4. Try a batch without booking</h3>
                 <p class="muted">Tests use your current edits and Basic plan units. No orders are created and no units are deducted. Rules take effect for new quotes when saved; confirmed bookings retain their prices.</p>
                 <label for="routingTestPickup">Pickup location</label>
                 <select id="routingTestPickup"></select>
@@ -2188,8 +2213,8 @@
 
   <!-- Admin JavaScript -->
   <script src="csrf.js"></script>
-  <script src="admin.js?v=22"></script>
-  <script src="batch-routing.js?v=2"></script>
+  <script src="admin.js?v=24"></script>
+  <script src="batch-routing.js?v=3"></script>
 
   <!-- =====================================================
       ADMIN TOAST

@@ -1,6 +1,10 @@
 document.addEventListener("DOMContentLoaded", () => {
 
   const $ = id => document.getElementById(id);
+  const recoveryParams = new URLSearchParams(window.location.hash.slice(1) || window.location.search);
+  const adminRecoveryToken = recoveryParams.get("reset");
+  const invitationSetup = recoveryParams.get("setup") === "1";
+  if (adminRecoveryToken) window.history.replaceState({}, document.title, "/admin-login.html");
 
   const form = $("adminLoginForm");
   const emailInput = $("adminEmail");
@@ -275,10 +279,6 @@ document.addEventListener("DOMContentLoaded", () => {
         throw new Error(data.error || "Unable to process request.");
       }
 
-      if (data.resetLink) {
-        window.location.href = data.resetLink;
-        return;
-      }
       alert(data.message || "If an account exists for this email, a password reset link has been created.");
       showLoginScreen();
 
@@ -336,8 +336,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const password = resetPasswordInput.value;
     const confirmPassword = resetConfirmPasswordInput.value;
-    const urlParams = new URLSearchParams(window.location.search);
-    const token = urlParams.get("reset");
+    const token = adminRecoveryToken;
 
     if (!token) {
       showResetError("Invalid reset link. Please request a new password reset.");
@@ -393,11 +392,12 @@ document.addEventListener("DOMContentLoaded", () => {
      CHECK FOR RESET TOKEN ON PAGE LOAD
   ========================================================= */
 
-  const urlParams = new URLSearchParams(window.location.search);
-  const resetToken = urlParams.get("reset");
-
-  if (resetToken) {
+  if (adminRecoveryToken) {
     showResetScreen();
+    if (invitationSetup) {
+      resetForm.querySelector("h2").textContent = "Set up your admin account";
+      resetSubmitBtn.textContent = "Set password";
+    }
   }
 
 });

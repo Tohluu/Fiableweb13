@@ -34,7 +34,8 @@ def validation_checks():
     unassigned = copy.deepcopy(custom)
     next(area for area in unassigned["areas"] if area["id"] == "ikeja")["locations"].remove("ogudu")
     invalid.append(unassigned)
-    changed_standard = copy.deepcopy(custom); changed_standard["locations"][0]["zone"] = "extended"; invalid.append(changed_standard)
+    changed_standard = copy.deepcopy(custom); changed_standard["locations"][0]["zone"] = "extended"
+    assert server.validate_batch_routing(changed_standard)["locations"][0]["zone"] == "extended"
     removed_standard = copy.deepcopy(default); removed_standard["locations"].pop(); invalid.append(removed_standard)
     for config in invalid:
         try:

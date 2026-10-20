@@ -9,6 +9,7 @@
 .routing-area-list, .routing-location-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 20px; margin: 16px 0; }
 .routing-area-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 8px; }
 .routing-section label { display: block; font-size: 13px; font-weight: 600; }
+.routing-section label > span { display: block; overflow-wrap: anywhere; }
 .routing-section label input, .routing-section label select { margin-top: 5px; }
 .routing-area-row small { display: block; color: #64748b; margin-top: 4px; }
 .routing-add-location { background: #f8fafc; border: 1px solid #e2e8ef; padding: 16px; margin: 16px 0; border-radius: 5px; }

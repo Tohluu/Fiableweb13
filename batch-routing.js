@@ -33,7 +33,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     editSequence++;
     invalidateTest();
     $('routingSave').disabled = !canManage || busy;
-    message('Unsaved changes. Test your groups, then save when ready.');
+    message('Unsaved changes. Test your pricing and groups, then save when ready.');
   }
   const areaOptions = selected => config.areas.map(area =>
     `<option value="${escape(area.id)}" ${area.id === selected ? 'selected' : ''}>${escape(area.label)}</option>`
@@ -56,6 +56,17 @@ document.addEventListener('DOMContentLoaded', async () => {
       const selected = select.value;
       select.innerHTML = locationOptions(selected);
     });
+  }
+
+  function renderPricing() {
+    pricingZones = config.pricingZones;
+    $('routingPricingZones').innerHTML = Object.entries(pricingZones).map(([id, label]) =>
+      `<label>Zone name<input data-zone-name="${escape(id)}" value="${escape(label)}" maxlength="100" ${canManage ? '' : 'disabled'}></label>`
+    ).join('');
+    $('routingZoneUnits').innerHTML = config.zoneUnits.map((route, index) =>
+      `<label><span data-zone-route-label="${index}">${escape(pricingZones[route.from])} ↔ ${escape(pricingZones[route.to])}</span>
+        <input data-zone-units="${index}" aria-label="Units: ${escape(pricingZones[route.from])} to ${escape(pricingZones[route.to])}" type="number" min="1" max="7" step="1" value="${route.units}" required ${canManage ? '' : 'disabled'}></label>`
+    ).join('');
   }
 
   function renderGroups() {
@@ -91,7 +102,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       return `<div class="routing-location-card">
         ${custom ? `<label>Location name<input data-location-name="${escape(location)}" value="${escape(item.label)}" maxlength="100" ${canManage ? '' : 'disabled'}></label>` : `<strong>${escape(item.label)}</strong>`}
         <label>Delivery area<select data-location="${escape(location)}" ${canManage ? '' : 'disabled'}>${areaOptions(area.id)}</select></label>
-        ${custom ? `<label>Pricing zone<select data-location-zone="${escape(location)}" ${canManage ? '' : 'disabled'}>${zoneOptions(item.zone)}</select></label>` : `<small>${escape(pricingZones[item.zone])}</small>`}
+        <label>Pricing zone<select data-location-zone="${escape(location)}" ${canManage ? '' : 'disabled'}>${zoneOptions(item.zone)}</select></label>
       </div>`;
     }).join('');
     $('routingPickupArea').innerHTML = areaOptions(pickup);
@@ -111,15 +122,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
       const data = await request('/api/admin/batch-routing');
       config = data.config; version = data.version; locations = data.locations; canManage = data.canManage;
-      pricingZones = data.pricingZones; standardLocationIds = data.standardLocationIds;
+      pricingZones = config.pricingZones; standardLocationIds = data.standardLocationIds;
       $('routingLocationName').value = '';
       $('routingLocationMessage').textContent = '';
       dirty = false; editSequence++; invalidateTest();
       $('routingEditor').hidden = false;
       $('routingSave').hidden = !canManage;
-      $('routingAccessNote').textContent = canManage ? 'You can edit and test these rules. Saved changes affect new batch quotes.'
+      $('routingAccessNote').textContent = canManage ? 'You can edit and test pricing zones and routing rules. Saved changes affect all new delivery quotes.'
         : 'You can inspect and test saved rules. An owner or operations manager can save changes.';
-      renderAreas();
+      renderPricing(); renderAreas();
       if (!$('routingTestRows').children.length) {
         $('routingTestPickup').innerHTML = locationOptions('egbeda');
         addTestRow('lekki-phase-1'); addTestRow('chevron'); addTestRow('sangotedo');
@@ -138,6 +149,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     const id = event.target.dataset.areaName;
     if (!id || !canManage) return;
     config.areas.find(area => area.id === id).label = event.target.value;
+    changed();
+  });
+
+  $('routingPricingZones').addEventListener('input', event => {
+    const id = event.target.dataset.zoneName;
+    if (!id || !canManage) return;
+    config.pricingZones[id] = event.target.value;
+    changed();
+  });
+  $('routingPricingZones').addEventListener('change', event => {
+    if (!event.target.dataset.zoneName || !canManage) return;
+    renderPricing(); renderAreas();
+  });
+  $('routingZoneUnits').addEventListener('input', event => {
+    const index = event.target.dataset.zoneUnits;
+    if (index === undefined || !canManage) return;
+    config.zoneUnits[Number(index)].units = event.target.value === '' ? null : Number(event.target.value);
     changed();
   });
   $('routingAreas').addEventListener('change', event => {
@@ -216,14 +244,22 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('routingReload').addEventListener('click', load);
   $('routingSave').addEventListener('click', async () => {
     if (!canManage || busy) return;
+    for (const input of $('routingZoneUnits').querySelectorAll('input')) {
+      if (!input.checkValidity()) {
+        input.closest('details').open = true;
+        input.reportValidity();
+        return;
+      }
+    }
     busy = true;
     $('routingSave').disabled = true; $('routingReload').disabled = true;
     $('routingEditor').inert = true;
     try {
       const data = await request('/api/admin/batch-routing', { config, version });
       config = data.config; version = data.version; dirty = false;
-      renderAreas();
-      message('Routing rules saved. New quotes will use these groups. Confirmed bookings keep their prices.');
+      invalidateTest();
+      renderPricing(); renderAreas();
+      message('Pricing and routing rules saved. New quotes use your zone units and groups. Confirmed bookings keep their prices.');
     } catch (error) { message(error.message, true); }
     finally {
       busy = false;

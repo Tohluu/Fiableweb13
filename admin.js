@@ -696,141 +696,180 @@ if (logoutBtn) {
   const addAdminForm = document.getElementById("addAdminForm");
   const addAdminBtn = document.getElementById("addAdminBtn");
   const addAdminMessage = document.getElementById("addAdminMessage");
-
-  function closeAddAdminModal() {
-    addAdminModal?.classList.remove("show");
-    addAdminModal?.setAttribute("aria-hidden", "true");
-  }
-
-  function openAddAdminModal() {
-    addAdminMessage.textContent = "";
-    addAdminForm?.reset();
-    addAdminModal?.classList.add("show");
-    addAdminModal?.setAttribute("aria-hidden", "false");
-  }
-
-  async function teamRequest(url, body) {
-    const response = await fetch(url, {
-      method: "POST",
-      credentials: "same-origin",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body)
-    });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || "Unable to update team.");
-    return data;
-  }
-
+  let teamState = null;
   const ADMIN_ROLE_LABELS = {
     super_admin: "Super Admin", operations_manager: "Operations Manager",
-    dispatcher: "Dispatcher", finance: "Finance",
-    customer_support: "Customer Support", analyst: "Analyst (Read Only)",
-    owner: "Super Admin", staff: "Operations Manager",
+    dispatcher: "Dispatcher", finance: "Finance", customer_support: "Customer Support",
+    analyst: "Analyst (Read Only)", owner: "Owner", staff: "Legacy Staff (Operations)"
   };
   const ADMIN_ASSIGNABLE_ROLES = [
     ["super_admin", "Super Admin"], ["operations_manager", "Operations Manager"],
     ["dispatcher", "Dispatcher"], ["finance", "Finance"],
-    ["customer_support", "Customer Support"], ["analyst", "Analyst (Read Only)"],
+    ["customer_support", "Customer Support"], ["analyst", "Analyst (Read Only)"]
   ];
-
+  const TEAM_PERMISSION_LABELS = {
+    view_batch_routing:"View pricing and routing", manage_batch_routing:"Edit pricing and routing",
+    view_orders:"View deliveries", manage_orders:"Manage deliveries and rider assignments",
+    view_riders:"View riders", manage_riders:"Manage riders", view_vendors:"View customers",
+    manage_vendors:"Manage customers and delivery units", view_tickets:"View support tickets",
+    manage_tickets:"Manage support tickets", view_reports:"View reports",
+    view_finance:"View payments and subscriptions", manage_finance:"Record payments and rider payouts",
+    export_data:"Export permitted reports", view_audit_log:"View activity log", view_team:"View team"
+  };
+  function teamPermissions(role) {
+    return (teamState?.roles?.[role]?.permissions || []).map(value => value === "*"
+      ? "Full access, including team management" : (TEAM_PERMISSION_LABELS[value] || value)).join("; ");
+  }
+  function setNewAdminPasswordVisible(visible) {
+    document.getElementById("newAdminPassword").type = visible ? "text" : "password";
+    const toggle = document.getElementById("toggleNewAdminPassword");
+    toggle.textContent = visible ? "Hide password" : "Show password";
+    toggle.setAttribute("aria-pressed", String(visible));
+  }
+  function updateAdminSetup() {
+    const delivery = document.getElementById("newAdminDelivery");
+    const password = document.getElementById("newAdminPassword");
+    const invitation = delivery.value === "invite";
+    document.getElementById("newAdminPasswordFields").hidden = invitation;
+    password.required = !invitation;
+    if (invitation) {
+      password.value = "";
+      setNewAdminPasswordVisible(false);
+    }
+    document.getElementById("newAdminSetupNote").textContent = invitation
+      ? "An invitation valid for 24 hours will be emailed. The admin chooses their own password."
+      : "Share the temporary password securely. The admin must change it on first login.";
+    document.getElementById("newAdminPermissions").textContent = teamPermissions(document.getElementById("newAdminRole").value);
+  }
+  function closeAddAdminModal() {
+    addAdminModal?.classList.remove("show");
+    addAdminModal?.setAttribute("aria-hidden", "true");
+    document.getElementById("newAdminPassword").value = "";
+    setNewAdminPasswordVisible(false);
+    addAdminBtn?.focus();
+  }
+  function openAddAdminModal() {
+    if (!teamState?.isOwner) return;
+    addAdminMessage.textContent = "";
+    addAdminForm?.reset();
+    setNewAdminPasswordVisible(false);
+    const delivery = document.getElementById("newAdminDelivery");
+    delivery.querySelector('option[value="invite"]').disabled = !teamState.emailReady;
+    delivery.value = teamState.emailReady ? "invite" : "manual";
+    updateAdminSetup();
+    addAdminModal?.classList.add("show");
+    addAdminModal?.setAttribute("aria-hidden", "false");
+    document.getElementById("newAdminName").focus();
+  }
+  async function teamRequest(url, body) {
+    const response = await fetch(url, { method:"POST", credentials:"same-origin",
+      headers:{"Content-Type":"application/json"}, body:JSON.stringify(body) });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Unable to update team.");
+    return data;
+  }
+  function renderAdminTeam() {
+    if (!teamState) return;
+    const tableBody = document.getElementById("adminTeamBody");
+    const data = teamState;
+    const search = (document.getElementById("adminTeamSearch")?.value || "").trim().toLowerCase();
+    const admins = (data.admins || []).filter(admin =>
+      `${admin.name} ${admin.email} ${admin.roleLabel} ${ADMIN_ROLE_LABELS[admin.role]} ${admin.status}`.toLowerCase().includes(search));
+    tableBody.innerHTML = admins.length ? admins.map(admin => {
+      const isCurrent = admin.email.toLowerCase() === (data.currentAdminEmail || "").toLowerCase();
+      const protectedOwner = admin.role === "owner";
+      const canManage = data.isOwner && !isCurrent && !protectedOwner;
+      const choices = admin.role === "staff" ? [["staff", ADMIN_ROLE_LABELS.staff], ...ADMIN_ASSIGNABLE_ROLES] : ADMIN_ASSIGNABLE_ROLES;
+      const roleControl = !canManage ? escapeSubscriptionValue(ADMIN_ROLE_LABELS[admin.role] || admin.roleLabel || admin.role)
+        : `<select class="admin-team-role" aria-label="Role for ${escapeSubscriptionValue(admin.email)}" data-email="${escapeSubscriptionValue(admin.email)}">${choices.map(([value,label]) => `<option value="${value}" ${admin.role === value ? "selected" : ""}>${label}</option>`).join("")}</select>`;
+      const pending = admin.status === "invited";
+      const expired = pending && admin.inviteExpiresAt && new Date(admin.inviteExpiresAt) <= new Date();
+      const badges = `${admin.mustChangePassword && !pending ? '<span class="admin-team-status revoked">Password change required</span>' : ''}
+        <small>${admin.mfaEnabled ? 'MFA on' : 'MFA off'}</small>
+        ${pending ? `<small>${admin.invitationStatus === 'failed' ? 'Invitation delivery failed' : expired ? 'Invitation expired' : 'Invitation pending'}</small>` : ''}`;
+      const email = escapeSubscriptionValue(admin.email);
+      const actions = [];
+      if (data.isOwner && pending) actions.push(`<button type="button" class="btn outline admin-team-email" data-email="${email}" data-action="resend-invitation" ${data.emailReady ? '' : 'disabled'}>Resend invitation</button>`);
+      if (data.isOwner && admin.status === "active") actions.push(`<button type="button" class="btn outline admin-team-email" data-email="${email}" data-action="reset-password" ${data.emailReady ? '' : 'disabled'}>Email password reset</button>`);
+      if (canManage) actions.push(`<button type="button" class="btn outline admin-team-access" data-email="${email}" data-action="${admin.status === 'revoked' ? 'restore' : 'revoke'}">${admin.status === 'revoked' ? 'Restore access' : 'Revoke access'}</button><button type="button" class="btn danger admin-team-delete" data-email="${email}">Delete</button>`);
+      return `<tr><td><strong>${email}</strong><div class="muted">${escapeSubscriptionValue(admin.name || '')}</div></td>
+        <td>${roleControl}<details><summary>Permissions</summary><p>${escapeSubscriptionValue(teamPermissions(admin.role))}</p></details></td>
+        <td><span class="admin-team-status">${escapeSubscriptionValue(admin.status)}</span>${badges}</td>
+        <td>${admin.createdAt ? new Date(admin.createdAt).toLocaleDateString('en-GB') : 'Unknown'}</td>
+        <td>${admin.lastLoginAt ? new Date(admin.lastLoginAt).toLocaleString('en-GB',{timeZone:'Africa/Lagos'}) : 'Not recorded'}</td>
+        <td>${actions.join(' ') || (isCurrent ? 'Your account' : protectedOwner ? 'Protected owner' : 'Read only')}</td></tr>`;
+    }).join("") : '<tr><td colspan="6" class="empty-state">No matching team members.</td></tr>';
+    tableBody.querySelectorAll(".admin-team-role").forEach(select => select.addEventListener("change", async () => {
+      if (select.value === "super_admin" && !window.confirm("Give this administrator full system and team-management access?")) { renderAdminTeam(); return; }
+      select.disabled = true;
+      try { await teamRequest("/api/admin/team/role",{email:select.dataset.email,role:select.value}); showAdminToast("Role updated. The administrator must sign in again."); }
+      catch(error) { showAdminToast(error.message,"error"); }
+      await loadAdminTeam();
+    }));
+    for (const [selector, path] of [[".admin-team-access",null],[".admin-team-delete","delete"],[".admin-team-email",null]]) {
+      tableBody.querySelectorAll(selector).forEach(button => button.addEventListener("click", async () => {
+        const action = path || button.dataset.action;
+        if (["delete","revoke"].includes(action) && !window.confirm(`${action === 'delete' ? 'Delete' : 'Revoke access for'} ${button.dataset.email}?`)) return;
+        button.disabled = true;
+        try { const result = await teamRequest(`/api/admin/team/${action}`,{email:button.dataset.email}); showAdminToast(result.message || "Team updated."); }
+        catch(error) { showAdminToast(error.message,"error"); }
+        await loadAdminTeam();
+      }));
+    }
+  }
   async function loadAdminTeam() {
     const tableBody = document.getElementById("adminTeamBody");
     if (!tableBody) return;
-
+    if (document.activeElement?.classList?.contains("admin-team-role") && !document.activeElement.disabled) return;
     try {
-      const response = await fetch("/api/admin/team", {
-        credentials: "same-origin",
-        cache: "no-store"
-      });
+      const response = await fetch("/api/admin/team",{credentials:"same-origin",cache:"no-store"});
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Unable to load team.");
-
+      teamState = data;
       addAdminBtn.disabled = !data.isOwner;
-      const admins = data.admins || [];
-      tableBody.innerHTML = admins.length ? admins.map(admin => {
-        const isCurrent = admin.email.toLowerCase() === (data.currentAdminEmail || "").toLowerCase();
-        const isProtectedOwner = admin.role === "owner" || admin.role === "super_admin";
-        const canManage = data.isOwner && !isCurrent && !isProtectedOwner;
-        const roleControl = isProtectedOwner
-          ? (admin.roleLabel || ADMIN_ROLE_LABELS[admin.role] || admin.role)
-          : `<select class="admin-team-role" data-email="${escapeSubscriptionValue(admin.email)}" ${canManage ? "" : "disabled"}>${ADMIN_ASSIGNABLE_ROLES.map(([value, label]) => `<option value="${value}" ${admin.role === value ? "selected" : ""}>${label}</option>`).join("")}</select>`;
-        const badges = [
-          admin.mustChangePassword ? '<span class="admin-team-status revoked" title="Must change password before using the dashboard">Temp password</span>' : "",
-          admin.mfaEnabled ? '<span class="admin-team-status active">MFA on</span>' : "",
-        ].join(" ");
-        return `
-          <tr>
-            <td><strong>${escapeSubscriptionValue(admin.email || "—")}</strong><div class="muted" style="font-size:12px">${escapeSubscriptionValue(admin.name || "")}</div></td>
-            <td><span class="admin-team-role-value">${roleControl}</span></td>
-            <td><span class="admin-team-status ${admin.status}">${escapeSubscriptionValue(admin.status)}</span> ${badges}</td>
-            <td>${admin.createdAt ? new Date(admin.createdAt).toLocaleDateString("en-GB") : "—"}</td>
-            <td>${canManage ? `<button type="button" class="btn outline admin-team-access" data-email="${escapeSubscriptionValue(admin.email)}" data-action="${admin.status === "revoked" ? "restore" : "revoke"}">${admin.status === "revoked" ? "Restore access" : "Revoke access"}</button><button type="button" class="btn danger admin-team-delete" data-email="${escapeSubscriptionValue(admin.email)}">Delete</button>` : isCurrent ? "You cannot change your own access." : "Protected"}</td>
-          </tr>
-        `;
-      }).join("") : '<tr><td colspan="5" class="empty-state">No administrators found.</td></tr>';
-
-      tableBody.querySelectorAll(".admin-team-role").forEach(select => {
-        select.addEventListener("change", async () => {
-          try {
-            await teamRequest("/api/admin/team/role", { email: select.dataset.email, role: select.value });
-            showAdminToast("Role updated successfully.");
-            loadAdminTeam();
-          } catch (error) {
-            showAdminToast(error.message, "error");
-            loadAdminTeam();
-          }
-        });
-      });
-
-
-      tableBody.querySelectorAll(".admin-team-access").forEach(button => {
-        button.addEventListener("click", async () => {
-          try {
-            await teamRequest(`/api/admin/team/${button.dataset.action}`, { email: button.dataset.email });
-            showAdminToast("Team access updated.");
-            loadAdminTeam();
-          } catch (error) {
-            showAdminToast(error.message, "error");
-          }
-        });
-      });
-
-      tableBody.querySelectorAll(".admin-team-delete").forEach(button => {
-        button.addEventListener("click", async () => {
-          if (!window.confirm("Remove this admin from the team?")) return;
-          try {
-            await teamRequest("/api/admin/team/delete", { email: button.dataset.email });
-            showAdminToast("Admin removed.");
-            loadAdminTeam();
-          } catch (error) {
-            showAdminToast(error.message, "error");
-          }
-        });
-      });
-    } catch (error) {
-      tableBody.innerHTML = `<tr><td colspan="5" class="empty-state">${escapeSubscriptionValue(error.message)}</td></tr>`;
-    }
+      document.getElementById("adminTeamEmailStatus").textContent = data.emailReady
+        ? "Outgoing email is configured for invitations and password resets. Delivery errors will be reported."
+        : "Email invitations and password resets are unavailable until outgoing email is configured. Temporary-password setup is available.";
+      renderAdminTeam();
+    } catch(error) { tableBody.innerHTML = `<tr><td colspan="6" class="empty-state">${escapeSubscriptionValue(error.message)}</td></tr>`; }
   }
-
-  addAdminBtn?.addEventListener("click", openAddAdminModal);
-  document.getElementById("closeAddAdmin")?.addEventListener("click", closeAddAdminModal);
-  document.getElementById("addAdminBackdrop")?.addEventListener("click", closeAddAdminModal);
-  addAdminForm?.addEventListener("submit", async event => {
+  document.getElementById("adminTeamSearch")?.addEventListener("input",renderAdminTeam);
+  document.getElementById("toggleNewAdminPassword")?.addEventListener("click", () => {
+    setNewAdminPasswordVisible(document.getElementById("newAdminPassword").type === "password");
+  });
+  document.getElementById("newAdminDelivery")?.addEventListener("change",updateAdminSetup);
+  document.getElementById("newAdminRole")?.addEventListener("change",updateAdminSetup);
+  addAdminBtn?.addEventListener("click",openAddAdminModal);
+  document.getElementById("closeAddAdmin")?.addEventListener("click",closeAddAdminModal);
+  document.getElementById("addAdminBackdrop")?.addEventListener("click",closeAddAdminModal);
+  document.addEventListener("keydown",event => {
+    if (!addAdminModal?.classList.contains("show")) return;
+    if (event.key === "Escape") closeAddAdminModal();
+    if (event.key === "Tab") {
+      const controls = [...addAdminModal.querySelectorAll('button,input,select')].filter(node => !node.disabled && node.getClientRects().length);
+      const first = controls[0], last = controls.at(-1);
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+    }
+  });
+  addAdminForm?.addEventListener("submit",async event => {
     event.preventDefault();
     addAdminMessage.textContent = "";
+    const button = addAdminForm.querySelector('[type="submit"]');
+    button.disabled = true;
     try {
-      const data = await teamRequest("/api/admin/team/add", {
-        name: document.getElementById("newAdminName").value.trim(),
-        email: document.getElementById("newAdminEmail").value.trim(),
-        password: document.getElementById("newAdminPassword").value,
-        role: document.getElementById("newAdminRole").value
+      const invitation = document.getElementById("newAdminDelivery").value === "invite";
+      const data = await teamRequest("/api/admin/team/add",{
+        name:document.getElementById("newAdminName").value.trim(),
+        email:document.getElementById("newAdminEmail").value.trim(),
+        password:invitation ? undefined : document.getElementById("newAdminPassword").value,
+        invite:invitation, role:document.getElementById("newAdminRole").value
       });
       closeAddAdminModal();
       await loadAdminTeam();
-      showAdminToast("Admin added successfully.");
-    } catch (error) {
-      addAdminMessage.textContent = error.message;
-    }
+      showAdminToast(data.message,data.invitationSent === false ? "error" : "success");
+    } catch(error) { addAdminMessage.textContent = error.message; }
+    finally { button.disabled = false; }
   });
 
   async function loadAdminVendors() {

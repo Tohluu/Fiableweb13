@@ -1,9 +1,299 @@
 {
+  "locationCatalogVersion": 1,
+  "pricingZones": {
+    "mainland-west": "Mainland West (Amuwo-Odofin / Ojo / Apapa)",
+    "mainland-north": "Mainland North (Egbeda / Shasha / Idimu / Ikotun)",
+    "mainland-north-west": "Mainland North-West (Ayobo / Ipaja / Baruwa)",
+    "mainland-north-east": "Mainland North-East (Agege / Ifako-Ijaiye / Abule Egba / Agbado)",
+    "mainland-central": "Mainland Central (Yaba / Mushin / Surulere)",
+    "mainland-east": "Mainland East (Ikeja / Kosofe / Oshodi)",
+    "island-central": "Central Island (VI / Ikoyi / Lekki Phase 1)",
+    "lekki-corridor-1": "Lekki Corridor 1 (Ikate / Chevron / Ikota)",
+    "lekki-corridor-2": "Lekki Corridor 2 (VGC / Ajah / Sangotedo)",
+    "extended": "Extended routes (Ikorodu / Epe / Badagry / Ibeju-Lekki)"
+  },
+  "zoneUnits": [
+    {
+      "from": "mainland-west",
+      "to": "mainland-west",
+      "units": 1
+    },
+    {
+      "from": "mainland-west",
+      "to": "mainland-north",
+      "units": 3
+    },
+    {
+      "from": "mainland-west",
+      "to": "mainland-north-west",
+      "units": 3
+    },
+    {
+      "from": "mainland-west",
+      "to": "mainland-north-east",
+      "units": 3
+    },
+    {
+      "from": "mainland-west",
+      "to": "mainland-central",
+      "units": 2
+    },
+    {
+      "from": "mainland-west",
+      "to": "mainland-east",
+      "units": 2
+    },
+    {
+      "from": "mainland-west",
+      "to": "island-central",
+      "units": 3
+    },
+    {
+      "from": "mainland-west",
+      "to": "lekki-corridor-1",
+      "units": 4
+    },
+    {
+      "from": "mainland-west",
+      "to": "lekki-corridor-2",
+      "units": 5
+    },
+    {
+      "from": "mainland-west",
+      "to": "extended",
+      "units": 7
+    },
+    {
+      "from": "mainland-north",
+      "to": "mainland-north",
+      "units": 1
+    },
+    {
+      "from": "mainland-north",
+      "to": "mainland-north-west",
+      "units": 2
+    },
+    {
+      "from": "mainland-north",
+      "to": "mainland-north-east",
+      "units": 2
+    },
+    {
+      "from": "mainland-north",
+      "to": "mainland-central",
+      "units": 3
+    },
+    {
+      "from": "mainland-north",
+      "to": "mainland-east",
+      "units": 3
+    },
+    {
+      "from": "mainland-north",
+      "to": "island-central",
+      "units": 5
+    },
+    {
+      "from": "mainland-north",
+      "to": "lekki-corridor-1",
+      "units": 6
+    },
+    {
+      "from": "mainland-north",
+      "to": "lekki-corridor-2",
+      "units": 6
+    },
+    {
+      "from": "mainland-north",
+      "to": "extended",
+      "units": 7
+    },
+    {
+      "from": "mainland-north-west",
+      "to": "mainland-north-west",
+      "units": 1
+    },
+    {
+      "from": "mainland-north-west",
+      "to": "mainland-north-east",
+      "units": 2
+    },
+    {
+      "from": "mainland-north-west",
+      "to": "mainland-central",
+      "units": 3
+    },
+    {
+      "from": "mainland-north-west",
+      "to": "mainland-east",
+      "units": 3
+    },
+    {
+      "from": "mainland-north-west",
+      "to": "island-central",
+      "units": 5
+    },
+    {
+      "from": "mainland-north-west",
+      "to": "lekki-corridor-1",
+      "units": 6
+    },
+    {
+      "from": "mainland-north-west",
+      "to": "lekki-corridor-2",
+      "units": 6
+    },
+    {
+      "from": "mainland-north-west",
+      "to": "extended",
+      "units": 7
+    },
+    {
+      "from": "mainland-north-east",
+      "to": "mainland-north-east",
+      "units": 1
+    },
+    {
+      "from": "mainland-north-east",
+      "to": "mainland-central",
+      "units": 3
+    },
+    {
+      "from": "mainland-north-east",
+      "to": "mainland-east",
+      "units": 2
+    },
+    {
+      "from": "mainland-north-east",
+      "to": "island-central",
+      "units": 5
+    },
+    {
+      "from": "mainland-north-east",
+      "to": "lekki-corridor-1",
+      "units": 6
+    },
+    {
+      "from": "mainland-north-east",
+      "to": "lekki-corridor-2",
+      "units": 6
+    },
+    {
+      "from": "mainland-north-east",
+      "to": "extended",
+      "units": 7
+    },
+    {
+      "from": "mainland-central",
+      "to": "mainland-central",
+      "units": 1
+    },
+    {
+      "from": "mainland-central",
+      "to": "mainland-east",
+      "units": 2
+    },
+    {
+      "from": "mainland-central",
+      "to": "island-central",
+      "units": 3
+    },
+    {
+      "from": "mainland-central",
+      "to": "lekki-corridor-1",
+      "units": 4
+    },
+    {
+      "from": "mainland-central",
+      "to": "lekki-corridor-2",
+      "units": 4
+    },
+    {
+      "from": "mainland-central",
+      "to": "extended",
+      "units": 7
+    },
+    {
+      "from": "mainland-east",
+      "to": "mainland-east",
+      "units": 1
+    },
+    {
+      "from": "mainland-east",
+      "to": "island-central",
+      "units": 4
+    },
+    {
+      "from": "mainland-east",
+      "to": "lekki-corridor-1",
+      "units": 5
+    },
+    {
+      "from": "mainland-east",
+      "to": "lekki-corridor-2",
+      "units": 5
+    },
+    {
+      "from": "mainland-east",
+      "to": "extended",
+      "units": 7
+    },
+    {
+      "from": "island-central",
+      "to": "island-central",
+      "units": 1
+    },
+    {
+      "from": "island-central",
+      "to": "lekki-corridor-1",
+      "units": 2
+    },
+    {
+      "from": "island-central",
+      "to": "lekki-corridor-2",
+      "units": 2
+    },
+    {
+      "from": "island-central",
+      "to": "extended",
+      "units": 7
+    },
+    {
+      "from": "lekki-corridor-1",
+      "to": "lekki-corridor-1",
+      "units": 1
+    },
+    {
+      "from": "lekki-corridor-1",
+      "to": "lekki-corridor-2",
+      "units": 2
+    },
+    {
+      "from": "lekki-corridor-1",
+      "to": "extended",
+      "units": 6
+    },
+    {
+      "from": "lekki-corridor-2",
+      "to": "lekki-corridor-2",
+      "units": 1
+    },
+    {
+      "from": "lekki-corridor-2",
+      "to": "extended",
+      "units": 6
+    },
+    {
+      "from": "extended",
+      "to": "extended",
+      "units": 2
+    }
+  ],
   "locations": [
     {
       "id": "agege",
       "label": "Agege",
-      "zone": "mainland-west"
+      "zone": "mainland-north-east"
     },
     {
       "id": "ajeromi-ifelodun",
@@ -28,27 +318,27 @@
     {
       "id": "ayobo",
       "label": "Ayobo",
-      "zone": "mainland-north"
+      "zone": "mainland-north-west"
     },
     {
       "id": "ipaja",
       "label": "Ipaja",
-      "zone": "mainland-north"
+      "zone": "mainland-north-west"
     },
     {
       "id": "abule-egba",
       "label": "Abule Egba",
-      "zone": "mainland-west"
+      "zone": "mainland-north-east"
     },
     {
       "id": "agbado",
       "label": "Agbado",
-      "zone": "mainland-west"
+      "zone": "mainland-north-east"
     },
     {
       "id": "alagbado",
       "label": "Alagbado",
-      "zone": "mainland-west"
+      "zone": "mainland-north-west"
     },
     {
       "id": "idimu",
@@ -88,7 +378,7 @@
     {
       "id": "ifako-ijaiye",
       "label": "Ifako-Ijaiye",
-      "zone": "mainland-north"
+      "zone": "mainland-north-east"
     },
     {
       "id": "ikeja",
@@ -138,12 +428,12 @@
     {
       "id": "shomolu",
       "label": "Shomolu",
-      "zone": "mainland-east"
+      "zone": "mainland-central"
     },
     {
       "id": "surulere",
       "label": "Surulere",
-      "zone": "mainland-east"
+      "zone": "mainland-central"
     },
     {
       "id": "ajegunle",
@@ -168,17 +458,17 @@
     {
       "id": "ikate-elegushi",
       "label": "Ikate Elegushi",
-      "zone": "lekki"
+      "zone": "lekki-corridor-1"
     },
     {
       "id": "ajah",
       "label": "Ajah",
-      "zone": "lekki"
+      "zone": "lekki-corridor-2"
     },
     {
       "id": "sangotedo",
       "label": "Sangotedo",
-      "zone": "lekki"
+      "zone": "lekki-corridor-2"
     },
     {
       "id": "oniru",
@@ -188,57 +478,227 @@
     {
       "id": "lekki-phase-2",
       "label": "Lekki Phase 2",
-      "zone": "lekki"
+      "zone": "lekki-corridor-2"
     },
     {
       "id": "chevron",
       "label": "Chevron",
-      "zone": "lekki"
+      "zone": "lekki-corridor-1"
     },
     {
       "id": "ikota",
       "label": "Ikota",
-      "zone": "lekki"
+      "zone": "lekki-corridor-1"
     },
     {
       "id": "vgc",
       "label": "VGC",
-      "zone": "lekki"
+      "zone": "lekki-corridor-2"
     },
     {
       "id": "osapa-london",
       "label": "Osapa London",
-      "zone": "lekki"
+      "zone": "lekki-corridor-1"
     },
     {
       "id": "jakande-lekki",
       "label": "Jakande (Lekki)",
-      "zone": "lekki"
+      "zone": "lekki-corridor-1"
     },
     {
       "id": "orchid-road",
       "label": "Orchid Road",
-      "zone": "lekki"
+      "zone": "lekki-corridor-1"
     },
     {
       "id": "abraham-adesanya",
       "label": "Abraham Adesanya",
-      "zone": "lekki"
+      "zone": "lekki-corridor-2"
     },
     {
       "id": "ilasan",
       "label": "Ilasan",
-      "zone": "lekki"
+      "zone": "lekki-corridor-1"
     },
     {
       "id": "marwa",
       "label": "Marwa",
-      "zone": "lekki"
+      "zone": "lekki-corridor-1"
     },
     {
       "id": "ogudu",
       "label": "Ogudu",
       "zone": "mainland-east"
+    },
+    {
+      "id": "baruwa",
+      "label": "Baruwa",
+      "zone": "mainland-north-west"
+    },
+    {
+      "id": "magodo",
+      "label": "Magodo",
+      "zone": "mainland-east"
+    },
+    {
+      "id": "ketu",
+      "label": "Ketu",
+      "zone": "mainland-east"
+    },
+    {
+      "id": "berger",
+      "label": "Ojodu Berger",
+      "zone": "mainland-east"
+    },
+    {
+      "id": "akowonjo",
+      "label": "Akowonjo",
+      "zone": "mainland-north"
+    },
+    {
+      "id": "dopemu",
+      "label": "Dopemu",
+      "zone": "mainland-north"
+    },
+    {
+      "id": "isheri-olofin",
+      "label": "Isheri-Olofin",
+      "zone": "mainland-north"
+    },
+    {
+      "id": "aboru",
+      "label": "Aboru",
+      "zone": "mainland-north-west"
+    },
+    {
+      "id": "abesan",
+      "label": "Abesan",
+      "zone": "mainland-north-west"
+    },
+    {
+      "id": "meiran",
+      "label": "Meiran",
+      "zone": "mainland-north-west"
+    },
+    {
+      "id": "iyana-ipaja",
+      "label": "Iyana Ipaja",
+      "zone": "mainland-north-west"
+    },
+    {
+      "id": "ogba",
+      "label": "Ogba",
+      "zone": "mainland-north-east"
+    },
+    {
+      "id": "omole-phase-1",
+      "label": "Omole Phase 1",
+      "zone": "mainland-east"
+    },
+    {
+      "id": "iju-ishaga",
+      "label": "Iju-Ishaga",
+      "zone": "mainland-north-east"
+    },
+    {
+      "id": "ojota",
+      "label": "Ojota",
+      "zone": "mainland-east"
+    },
+    {
+      "id": "maryland",
+      "label": "Maryland",
+      "zone": "mainland-east"
+    },
+    {
+      "id": "gbagada",
+      "label": "Gbagada",
+      "zone": "mainland-east"
+    },
+    {
+      "id": "ilupeju",
+      "label": "Ilupeju",
+      "zone": "mainland-east"
+    },
+    {
+      "id": "oregun",
+      "label": "Oregun",
+      "zone": "mainland-east"
+    },
+    {
+      "id": "opebi",
+      "label": "Opebi",
+      "zone": "mainland-east"
+    },
+    {
+      "id": "ebute-metta",
+      "label": "Ebute Metta",
+      "zone": "mainland-central"
+    },
+    {
+      "id": "oyingbo",
+      "label": "Oyingbo",
+      "zone": "mainland-central"
+    },
+    {
+      "id": "bariga",
+      "label": "Bariga",
+      "zone": "mainland-central"
+    },
+    {
+      "id": "festac-town",
+      "label": "Festac Town",
+      "zone": "mainland-west"
+    },
+    {
+      "id": "satellite-town",
+      "label": "Satellite Town",
+      "zone": "mainland-west"
+    },
+    {
+      "id": "mile-2",
+      "label": "Mile 2",
+      "zone": "mainland-west"
+    },
+    {
+      "id": "obalende",
+      "label": "Obalende",
+      "zone": "island-central"
+    },
+    {
+      "id": "marina",
+      "label": "Marina",
+      "zone": "island-central"
+    },
+    {
+      "id": "agungi",
+      "label": "Agungi",
+      "zone": "lekki-corridor-1"
+    },
+    {
+      "id": "ologolo",
+      "label": "Ologolo",
+      "zone": "lekki-corridor-1"
+    },
+    {
+      "id": "igbo-efon",
+      "label": "Igbo-Efon",
+      "zone": "lekki-corridor-1"
+    },
+    {
+      "id": "badore",
+      "label": "Badore",
+      "zone": "lekki-corridor-2"
+    },
+    {
+      "id": "ado",
+      "label": "Ado",
+      "zone": "lekki-corridor-2"
+    },
+    {
+      "id": "langbasa",
+      "label": "Langbasa",
+      "zone": "lekki-corridor-2"
     }
   ],
   "areas": [
@@ -306,8 +766,11 @@
       "id": "ikeja",
       "label": "Ikeja / Oshodi / Kosofe",
       "locations": [
+        "berger",
         "ikeja",
+        "ketu",
         "kosofe",
+        "magodo",
         "ogudu",
         "oshodi-isolo"
       ]
@@ -357,6 +820,7 @@
       "label": "Alimosho axis",
       "locations": [
         "ayobo",
+        "baruwa",
         "egbeda",
         "idimu",
         "igando",
@@ -408,6 +872,216 @@
       "label": "Ibeju-Lekki",
       "locations": [
         "ibeju-lekki"
+      ]
+    },
+    {
+      "id": "location-akowonjo",
+      "label": "Akowonjo",
+      "locations": [
+        "akowonjo"
+      ]
+    },
+    {
+      "id": "location-dopemu",
+      "label": "Dopemu",
+      "locations": [
+        "dopemu"
+      ]
+    },
+    {
+      "id": "location-isheri-olofin",
+      "label": "Isheri-Olofin",
+      "locations": [
+        "isheri-olofin"
+      ]
+    },
+    {
+      "id": "location-aboru",
+      "label": "Aboru",
+      "locations": [
+        "aboru"
+      ]
+    },
+    {
+      "id": "location-abesan",
+      "label": "Abesan",
+      "locations": [
+        "abesan"
+      ]
+    },
+    {
+      "id": "location-meiran",
+      "label": "Meiran",
+      "locations": [
+        "meiran"
+      ]
+    },
+    {
+      "id": "location-iyana-ipaja",
+      "label": "Iyana Ipaja",
+      "locations": [
+        "iyana-ipaja"
+      ]
+    },
+    {
+      "id": "location-ogba",
+      "label": "Ogba",
+      "locations": [
+        "ogba"
+      ]
+    },
+    {
+      "id": "location-omole-phase-1",
+      "label": "Omole Phase 1",
+      "locations": [
+        "omole-phase-1"
+      ]
+    },
+    {
+      "id": "location-iju-ishaga",
+      "label": "Iju-Ishaga",
+      "locations": [
+        "iju-ishaga"
+      ]
+    },
+    {
+      "id": "location-ojota",
+      "label": "Ojota",
+      "locations": [
+        "ojota"
+      ]
+    },
+    {
+      "id": "location-maryland",
+      "label": "Maryland",
+      "locations": [
+        "maryland"
+      ]
+    },
+    {
+      "id": "location-gbagada",
+      "label": "Gbagada",
+      "locations": [
+        "gbagada"
+      ]
+    },
+    {
+      "id": "location-ilupeju",
+      "label": "Ilupeju",
+      "locations": [
+        "ilupeju"
+      ]
+    },
+    {
+      "id": "location-oregun",
+      "label": "Oregun",
+      "locations": [
+        "oregun"
+      ]
+    },
+    {
+      "id": "location-opebi",
+      "label": "Opebi",
+      "locations": [
+        "opebi"
+      ]
+    },
+    {
+      "id": "location-ebute-metta",
+      "label": "Ebute Metta",
+      "locations": [
+        "ebute-metta"
+      ]
+    },
+    {
+      "id": "location-oyingbo",
+      "label": "Oyingbo",
+      "locations": [
+        "oyingbo"
+      ]
+    },
+    {
+      "id": "location-bariga",
+      "label": "Bariga",
+      "locations": [
+        "bariga"
+      ]
+    },
+    {
+      "id": "location-festac-town",
+      "label": "Festac Town",
+      "locations": [
+        "festac-town"
+      ]
+    },
+    {
+      "id": "location-satellite-town",
+      "label": "Satellite Town",
+      "locations": [
+        "satellite-town"
+      ]
+    },
+    {
+      "id": "location-mile-2",
+      "label": "Mile 2",
+      "locations": [
+        "mile-2"
+      ]
+    },
+    {
+      "id": "location-obalende",
+      "label": "Obalende",
+      "locations": [
+        "obalende"
+      ]
+    },
+    {
+      "id": "location-marina",
+      "label": "Marina",
+      "locations": [
+        "marina"
+      ]
+    },
+    {
+      "id": "location-agungi",
+      "label": "Agungi",
+      "locations": [
+        "agungi"
+      ]
+    },
+    {
+      "id": "location-ologolo",
+      "label": "Ologolo",
+      "locations": [
+        "ologolo"
+      ]
+    },
+    {
+      "id": "location-igbo-efon",
+      "label": "Igbo-Efon",
+      "locations": [
+        "igbo-efon"
+      ]
+    },
+    {
+      "id": "location-badore",
+      "label": "Badore",
+      "locations": [
+        "badore"
+      ]
+    },
+    {
+      "id": "location-ado",
+      "label": "Ado",
+      "locations": [
+        "ado"
+      ]
+    },
+    {
+      "id": "location-langbasa",
+      "label": "Langbasa",
+      "locations": [
+        "langbasa"
       ]
     }
   ],

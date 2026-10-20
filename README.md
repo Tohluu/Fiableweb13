@@ -10,6 +10,54 @@ for compatibility.
 Run the local app with `python server.py`, then open `http://localhost:8080`.
 Restart the server after changing Python code.
 
+## Admin team access and email setup
+
+**Admin → Team** supports role changes, access revocation/restoration, deletion,
+password-reset emails, invitation resends, search, last sign-in (Lagos time),
+MFA status and a permission summary for each role. The original Owner and your
+own role/access cannot be removed or changed here. Other Super Admin accounts
+can be managed by an Owner or Super Admin. Legacy Staff is displayed separately
+with its actual permissions. Role changes sign the affected person out.
+
+Choose **Email invitation** to send a 24-hour setup link. An invited account
+cannot sign in until its owner sets a password. Failed invitations remain
+pending and can be resent. **Temporary password** remains available for manual
+setup; the admin must choose a different password on first login.
+
+Configure these server environment variables to enable email invitations and
+password resets (the app does not automatically load `.env`):
+
+```text
+APP_BASE_URL=https://YOUR-DOMAIN
+EMAIL_PROVIDER=smtp
+EMAIL_FROM=accounts@YOUR-DOMAIN
+SMTP_HOST=your-provider-smtp-host
+SMTP_PORT=587
+SMTP_SECURITY=starttls
+SMTP_USERNAME=your-provider-username
+SMTP_PASSWORD=your-provider-password
+```
+
+Use your provider's real SMTP settings and authorized sender. Implicit TLS uses
+`SMTP_SECURITY=ssl` and `SMTP_PORT=465`. Production requires an HTTPS base URL;
+local development may use an HTTP localhost URL. The Team page shows whether
+email is configured and disables email-only actions when it is unavailable.
+Delivery failures are reported without claiming a successful send.
+
+Public admin recovery always returns the same acknowledgement for known and
+unknown accounts, without exposing a link. Admin links are stored as hashes,
+scoped to admin setup/recovery, single-use and time-limited. Older shared
+customer/rider reset links cannot reset an admin account. Resending replaces
+the previous admin link. Links travel in URL fragments and are removed from
+the address bar when opened. Recovery preserves MFA, revokes existing sessions
+and pending login challenges, and requires a fresh login. Revoking or deleting
+an account invalidates its links; restored pending invitations must be resent.
+
+`python -B tests/admin_team_checks.py` verifies account lifecycle, recovery,
+invitations, session invalidation, SMTP transport and concurrency using temporary
+records and mocked email. `node --test tests/admin_team_ui_checks.cjs` checks
+Team controls, permission display, legacy roles and recovery page behavior.
+
 ## Express delivery bookings
 
 The express form on `get-started.html#quick-express` offers WhatsApp enquiries
@@ -77,7 +125,38 @@ Validate a JSON backup without writing data with
 
 ## Trying delivery areas and batch groups
 
-Open **Admin → Settings → Delivery areas & batch groups**.
+Open **Admin → Settings → Pricing zones, delivery areas & batch groups**.
+
+In **Pricing zone names and route units**, rename any pricing zone and set
+1–7 units for every pair of zones. Prices are symmetric: a route has the same
+units in either direction. A zone paired with itself controls within-zone
+journeys, including bookings with the same pickup and destination location.
+Use **Delivery areas and location assignments** to change the pricing zone
+of any standard or custom location. Save with **Save routing rules**.
+
+The original Lekki zone is split into **Lekki Corridor 1** (Ikate, Ilasan,
+Marwa, Jakande, Osapa London, Chevron, Ikota and Orchid Road) and **Lekki
+Corridor 2** (VGC, Ajah, Abraham Adesanya, Sangotedo and Lekki Phase 2).
+Lekki Phase 1 remains in Central Island. These assignments are editable.
+Both corridors inherit the former zone's route units until edited. Existing
+routing files receive the split, names and route units when read, without
+changing their delivery areas, batch groups or stored orders.
+
+**Mainland North-West** starts with Ayobo, Ipaja, Abule Egba, Agbado and
+Alagbado. **Mainland North-East** starts with Agege and Ifako-Ijaiye. Mainland
+North retains Egbeda, Shasha, Igando, Idimu and Ikotun. Ikeja and Kosofe stay
+in Mainland East. These are editable operational groups, not measured road
+distance boundaries.
+
+Existing eight-zone settings are upgraded on read. Original zone-pair rates
+and custom zone names are preserved; only unchanged old default labels are
+updated. Standard locations move to the new northern zones only if they still
+have their former default assignment. Explicit assignments elsewhere are kept.
+New rows inherit the highest saved North/West rate for their constituent
+locations, with a minimum of 2 units, including within-zone journeys. With the
+original rates, Egbeda–Ipaja, Egbeda–Ifako-Ijaiye and within the new northern
+zones start at 3 units. Review and edit these starting charges before launch.
+Saved orders, delivery areas and batch discount groups are unchanged.
 
 1. Review the proposed delivery areas. Each supported location belongs to one
    area. You can rename areas, add an area and move locations into it, or remove
@@ -85,9 +164,8 @@ Open **Admin → Settings → Delivery areas & batch groups**.
    To add a missing neighbourhood or town, use **Add a location** in this section:
    enter its name, choose its pricing zone and delivery area, then select
    **Add location to draft**. The pricing zone determines normal route units;
-   the area determines batch grouping. Custom location names and pricing zones
-   can be edited in the location list. Standard locations keep their existing
-   pricing zones.
+   the area determines batch grouping. Custom location names and all location
+   pricing zones can be edited in the location list.
 2. Choose a pickup area. Destination areas start in separate discount groups.
    Give two or more areas the same group name to combine them for that pickup
    area only. Validate combinations with your dispatcher before saving.
@@ -99,6 +177,15 @@ Open **Admin → Settings → Delivery areas & batch groups**.
    and batch pickup/destination dropdowns when the customer refreshes the page
    or returns to its browser tab. Full
    street addresses are still entered separately for each delivery.
+
+The Lagos catalog includes 30 additional neighbourhoods across the mainland,
+island and both Lekki corridors. Existing settings receive these once, without
+overwriting saved prices, location assignments or batch groups. Matching IDs or
+names already added by an administrator are retained. New locations initially
+have separate delivery areas; combine areas only after reviewing dispatch routes.
+All 30 names, pricing zones and area assignments are editable in the location
+list above. Berger is clarified to Ojodu Berger, keeping its existing ID and zone.
+The catalog version is saved with routing settings so later admin edits persist.
 
 For example, test three Lekki Phase 1, three Chevron and three Sangotedo
 deliveries from Egbeda. They initially form three groups. For the Alimosho pickup
@@ -113,7 +200,7 @@ If rules or quoted prices change after a customer previews a batch, the customer
 must review a fresh quote before confirming. Existing orders retain their saved
 prices, group labels and routing version.
 
-Rules and the shared location list are stored in `DATA_DIR/batch_routing.json`, using the same persistent
+Pricing zones, route units, rules and the shared location list are stored in `DATA_DIR/batch_routing.json`, using the same persistent
 storage root as orders. A missing file uses the proposed defaults; an invalid
 file stops location loading and delivery quoting until repaired. Older routing
 files automatically receive the standard location list when read, preserving
@@ -121,6 +208,15 @@ their area assignments and pickup rules. Grouping uses selected locations and
 configured areas, without GPS, traffic or automatic road routing.
 
 ## Verification
+
+`python -B tests/lagos_location_checks.py` checks the 30-location rollout,
+existing settings and duplicate preservation, public quotes, express/batch
+bookings, and persisted admin edits without changing existing orders.
+
+`python -B tests/pricing_zone_checks.py` checks both corridors, legacy migration,
+all original route prices, editable route units and location assignments,
+draft previews, public/express/subscriber/batch pricing, invalid input,
+permissions, concurrent edits, stale quotes and preserved booking snapshots.
 
 `python -B tests/batch_delivery_checks.py` checks pricing, allocation and booking.
 `python -B tests/batch_routing_checks.py` checks pickup-specific grouping,

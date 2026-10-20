@@ -2,6 +2,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs
 import json
+from copy import deepcopy
 import re
 import hashlib
 import hmac
@@ -20,6 +21,9 @@ import urllib.parse
 from contextlib import contextmanager
 from datetime import datetime, timezone, timedelta
 import os
+import smtplib
+import ssl
+from email.message import EmailMessage
 from database import DatabaseUnavailable, configured_store
 
 # Deploy marker (no functional change) - used once to force a Railway
@@ -272,14 +276,227 @@ DEFAULT_DELIVERY_AREAS = {
 MAX_BATCH_DELIVERIES = 100
 MAX_DELIVERY_LOCATIONS = 500
 PRICING_ZONE_LABELS = {
-    "mainland-west": "Mainland West (Agege / Amuwo-Odofin / Apapa)",
-    "mainland-north": "Mainland North (Egbeda / Ipaja / Idimu)",
+    "mainland-west": "Mainland West (Amuwo-Odofin / Ojo / Apapa)",
+    "mainland-north": "Mainland North (Egbeda / Shasha / Idimu / Ikotun)",
+    "mainland-north-west": "Mainland North-West (Ayobo / Ipaja / Abule Egba / Agbado)",
+    "mainland-north-east": "Mainland North-East (Agege / Ifako-Ijaiye)",
     "mainland-central": "Mainland Central (Yaba / Mushin)",
     "mainland-east": "Mainland East (Ikeja / Kosofe / Oshodi)",
     "island-central": "Central Island (VI / Ikoyi / Lekki Phase 1)",
-    "lekki": "Lekki corridor (Chevron / Ajah / Sangotedo)",
+    "lekki-corridor-1": "Lekki Corridor 1 (Ikate / Chevron / Ikota)",
+    "lekki-corridor-2": "Lekki Corridor 2 (VGC / Ajah / Sangotedo)",
     "extended": "Extended routes (Ikorodu / Epe / Badagry / Ibeju-Lekki)",
 }
+
+# Keep existing prices when splitting the former Lekki zone. Administrators
+# can set separate corridor prices and move any location after migration.
+LEKKI_CORRIDOR_2_LOCATIONS = {
+    "vgc", "ajah", "abraham-adesanya", "sangotedo", "lekki-phase-2",
+}
+LOCATION_ZONES = {
+    location: ("lekki-corridor-2" if location in LEKKI_CORRIDOR_2_LOCATIONS else "lekki-corridor-1")
+    if zone == "lekki" else zone
+    for location, zone in LOCATION_ZONES.items()
+}
+
+MAINLAND_ZONE_MOVES = {
+    "ayobo": ("mainland-north", "mainland-north-west"),
+    "ipaja": ("mainland-north", "mainland-north-west"),
+    "abule-egba": ("mainland-west", "mainland-north-west"),
+    "agbado": ("mainland-west", "mainland-north-west"),
+    "alagbado": ("mainland-west", "mainland-north-west"),
+    "agege": ("mainland-west", "mainland-north-east"),
+    "ifako-ijaiye": ("mainland-north", "mainland-north-east"),
+}
+LOCATION_ZONES.update({location: target for location, (_, target) in MAINLAND_ZONE_MOVES.items()})
+NEW_MAINLAND_ZONES = {"mainland-north-west", "mainland-north-east"}
+
+# Seeded additions remain custom locations: administrators can edit their
+# names, pricing zones and delivery areas without changing application code.
+LAGOS_LOCATION_CATALOG_VERSION = 1
+LAGOS_LOCATION_ADDITIONS = [
+    ("akowonjo", "Akowonjo", "mainland-north"),
+    ("dopemu", "Dopemu", "mainland-north"),
+    ("isheri-olofin", "Isheri-Olofin", "mainland-north"),
+    ("aboru", "Aboru", "mainland-north-west"),
+    ("abesan", "Abesan", "mainland-north-west"),
+    ("meiran", "Meiran", "mainland-north-west"),
+    ("iyana-ipaja", "Iyana Ipaja", "mainland-north-west"),
+    ("ogba", "Ogba", "mainland-north-east"),
+    ("omole-phase-1", "Omole Phase 1", "mainland-north-east"),
+    ("iju-ishaga", "Iju-Ishaga", "mainland-north-east"),
+    ("ojota", "Ojota", "mainland-east"),
+    ("maryland", "Maryland", "mainland-east"),
+    ("gbagada", "Gbagada", "mainland-east"),
+    ("ilupeju", "Ilupeju", "mainland-east"),
+    ("oregun", "Oregun", "mainland-east"),
+    ("opebi", "Opebi", "mainland-east"),
+    ("ebute-metta", "Ebute Metta", "mainland-central"),
+    ("oyingbo", "Oyingbo", "mainland-central"),
+    ("bariga", "Bariga", "mainland-central"),
+    ("festac-town", "Festac Town", "mainland-west"),
+    ("satellite-town", "Satellite Town", "mainland-west"),
+    ("mile-2", "Mile 2", "mainland-west"),
+    ("obalende", "Obalende", "island-central"),
+    ("marina", "Marina", "island-central"),
+    ("agungi", "Agungi", "lekki-corridor-1"),
+    ("ologolo", "Ologolo", "lekki-corridor-1"),
+    ("igbo-efon", "Igbo-Efon", "lekki-corridor-1"),
+    ("badore", "Badore", "lekki-corridor-2"),
+    ("ado", "Ado", "lekki-corridor-2"),
+    ("langbasa", "Langbasa", "lekki-corridor-2"),
+]
+LEKKI_CORRIDOR_2_LOCATIONS.update(
+    key for key, _, zone in LAGOS_LOCATION_ADDITIONS if zone == "lekki-corridor-2"
+)
+
+
+def expand_lagos_location_catalog(config):
+    """Expand validated settings once, preserving all existing assignments."""
+    if config.get("locationCatalogVersion", 0) >= LAGOS_LOCATION_CATALOG_VERSION:
+        return config
+    config = deepcopy(config)
+    name_key = lambda label: re.sub(r"[\W_]+", " ", label, flags=re.UNICODE).strip().casefold()
+    ids = {item["id"] for item in config["locations"]}
+    names = {name_key(item["label"]) for item in config["locations"]}
+
+    def unused(base, existing):
+        value, suffix = base, 2
+        while value.casefold() in existing:
+            value = f"{base}-{suffix}"
+            suffix += 1
+        return value
+
+    for key, label, zone in LAGOS_LOCATION_ADDITIONS:
+        # An administrator may already have added this neighbourhood under
+        # another ID. Keep its spelling, pricing and area instead of duplicating.
+        if key in ids or name_key(label) in names:
+            continue
+        config["locations"].append({"id": key, "label": label, "zone": zone})
+        ids.add(key)
+        names.add(name_key(label))
+        area_id = unused(f"location-{key}", {area["id"] for area in config["areas"]})
+        area_label = unused(label, {area["label"].casefold() for area in config["areas"]})
+        config["areas"].append({"id": area_id, "label": area_label, "locations": [key]})
+        # Extend explicit pickup rules without combining new and old areas or
+        # changing existing discount eligibility. Unconfigured pickups use the
+        # normal one-group-per-area fallback.
+        for groups in config["pickupRules"].values():
+            groups.append({
+                "id": unused(area_id, {group["id"] for group in groups}),
+                "label": unused(area_label, {group["label"].casefold() for group in groups}),
+                "areas": [area_id],
+            })
+    for location in config["locations"]:
+        if location["id"] == "berger" and location["label"] == "Berger" and "ojodu berger" not in names:
+            location["label"] = "Ojodu Berger"
+    config["locationCatalogVersion"] = LAGOS_LOCATION_CATALOG_VERSION
+    return config
+
+
+def mainland_zone_sources(zone):
+    # Each added zone includes places formerly assigned to North and West.
+    return ("mainland-north", "mainland-west") if zone in NEW_MAINLAND_ZONES else (zone,)
+
+
+def default_zone_units(zones=None):
+    zones = list(PRICING_ZONE_LABELS if zones is None else zones)
+    routes = []
+    for index, origin in enumerate(zones):
+        for destination in zones[index:]:
+            candidates = []
+            for source in mainland_zone_sources(origin):
+                for target in mainland_zone_sources(destination):
+                    pair = frozenset("lekki" if zone.startswith("lekki-corridor-") else zone
+                                     for zone in (source, target))
+                    candidates.append(ZONE_UNIT_MATRIX.get(pair, EXTENDED_UNITS if "extended" in pair else 3))
+            units = max(candidates)
+            if origin in NEW_MAINLAND_ZONES or destination in NEW_MAINLAND_ZONES:
+                units = max(2, units)
+            routes.append({"from": origin, "to": destination, "units": units})
+    return routes
+
+
+def validate_zone_pricing(config, zone_labels=None):
+    zone_labels = PRICING_ZONE_LABELS if zone_labels is None else zone_labels
+    labels = config.get("pricingZones", zone_labels)
+    if not isinstance(labels, dict) or set(labels) != set(zone_labels):
+        raise ValueError("Keep all pricing zones, including both mainland northern zones and Lekki corridors.")
+    normalized, seen = {}, set()
+    for key in zone_labels:
+        label = labels[key]
+        if not isinstance(label, str) or not label.strip() or len(label.strip()) > 100:
+            raise ValueError("Pricing zone names must be 1–100 characters long.")
+        if label.strip().casefold() in seen:
+            raise ValueError("Pricing zone names must be unique.")
+        normalized[key] = label.strip()
+        seen.add(label.strip().casefold())
+    defaults = default_zone_units(zone_labels)
+    routes = config.get("zoneUnits", defaults)
+    expected = {frozenset((route["from"], route["to"])) for route in defaults}
+    if not isinstance(routes, list) or len(routes) != len(expected):
+        raise ValueError("Set delivery units for every pricing zone pair.")
+    values = {}
+    for route in routes:
+        if not isinstance(route, dict):
+            raise ValueError("Every zone route must include two zones and delivery units.")
+        origin, destination, units = route.get("from"), route.get("to"), route.get("units")
+        if not isinstance(origin, str) or not isinstance(destination, str):
+            raise ValueError("Choose valid pricing zones for every route.")
+        pair = frozenset((origin, destination))
+        if pair not in expected or pair in values:
+            raise ValueError("Each pricing zone pair must appear exactly once.")
+        if type(units) is not int or not 1 <= units <= 7:
+            raise ValueError("Route units must be whole numbers from 1 to 7.")
+        values[pair] = units
+    return normalized, [{**route, "units": values[frozenset((route["from"], route["to"]))]}
+                        for route in defaults]
+
+
+def upgrade_mainland_pricing(config):
+    previous_zones = {key: label for key, label in PRICING_ZONE_LABELS.items() if key not in NEW_MAINLAND_ZONES}
+    labels = config.get("pricingZones")
+    old_settings = isinstance(labels, dict) and set(labels) == set(previous_zones)
+    if "pricingZones" in config and not old_settings:
+        return config
+    upgraded = dict(config)
+    if old_settings:
+        # Validate the complete old matrix before adding rows. Never use an
+        # upgrade to silently repair invalid rates or lose custom prices.
+        old_labels, old_routes = validate_zone_pricing(config, previous_zones)
+        values = {frozenset((route["from"], route["to"])): route["units"] for route in old_routes}
+        renamed_defaults = {
+            "mainland-west": "Mainland West (Agege / Amuwo-Odofin / Apapa)",
+            "mainland-north": "Mainland North (Egbeda / Ipaja / Idimu)",
+        }
+        upgraded["pricingZones"] = {
+            key: PRICING_ZONE_LABELS[key] if key in NEW_MAINLAND_ZONES or old_labels.get(key) == renamed_defaults.get(key)
+            else old_labels[key]
+            for key in PRICING_ZONE_LABELS
+        }
+        routes = default_zone_units()
+        for route in routes:
+            origin, destination = route["from"], route["to"]
+            pair = frozenset((origin, destination))
+            if pair in values:
+                route["units"] = values[pair]
+            else:
+                # Preserve the highest previous charge for the constituent
+                # areas so the split never reduces an existing route price.
+                route["units"] = max(2, max(values[frozenset((source, target))]
+                    for source in mainland_zone_sources(origin)
+                    for target in mainland_zone_sources(destination)))
+        upgraded["zoneUnits"] = routes
+    catalog = config.get("locations")
+    if isinstance(catalog, list):
+        upgraded["locations"] = []
+        for location in catalog:
+            if isinstance(location, dict) and isinstance(location.get("id"), str):
+                move = MAINLAND_ZONE_MOVES.get(location["id"])
+                if move and location.get("zone") == move[0]:
+                    location = {**location, "zone": move[1]}
+            upgraded["locations"].append(location)
+    return upgraded
 
 
 def default_delivery_locations():
@@ -308,10 +525,10 @@ def validate_delivery_locations(locations):
         name_key = re.sub(r"[\W_]+", " ", label, flags=re.UNICODE).strip().casefold()
         if not name_key or name_key in names:
             raise ValueError("A location with that name already exists. Use a unique location name.")
+        if zone == "lekki":
+            zone = "lekki-corridor-2" if key in LEKKI_CORRIDOR_2_LOCATIONS else "lekki-corridor-1"
         if not isinstance(zone, str) or zone not in PRICING_ZONE_LABELS:
             raise ValueError("Choose a valid pricing zone for every location.")
-        if key in LOCATION_ZONES and zone != LOCATION_ZONES[key]:
-            raise ValueError("Existing standard locations must keep their original pricing zones.")
         seen.add(key)
         names.add(name_key)
         normalized.append({"id": key, "label": label.strip(), "zone": zone})
@@ -323,19 +540,27 @@ def validate_delivery_locations(locations):
 def default_batch_routing():
     # Starting areas for dispatcher review; no cross-area combinations until
     # an administrator explicitly configures them for a pickup area.
-    return {
+    return expand_lagos_location_catalog({
+        "pricingZones": dict(PRICING_ZONE_LABELS),
+        "zoneUnits": default_zone_units(),
         "locations": default_delivery_locations(),
         "areas": [{"id": key, "label": label, "locations": sorted(locations)}
                   for key, (label, locations) in DEFAULT_DELIVERY_AREAS.items()],
         "pickupRules": {},
-    }
+    })
 
 
 def validate_batch_routing(config):
     if not isinstance(config, dict):
         raise ValueError("Delivery routing must be an object.")
-    # Older saved routing files contain only areas and pickup rules.
-    catalog = validate_delivery_locations(config.get("locations", default_delivery_locations()))
+    config = upgrade_mainland_pricing(config)
+    catalog_version = config.get("locationCatalogVersion", 0)
+    if type(catalog_version) is not int or not 0 <= catalog_version <= LAGOS_LOCATION_CATALOG_VERSION:
+        raise ValueError("Unsupported delivery location catalog version.")
+    pricing_zones, zone_units = validate_zone_pricing(config)
+    # Older saved routing files contain only areas, pickup rules and locations.
+    fallback_catalog = default_batch_routing()["locations"] if catalog_version else default_delivery_locations()
+    catalog = validate_delivery_locations(config.get("locations", fallback_catalog))
     supported_locations = {location["id"] for location in catalog}
     areas = config.get("areas")
     rules = config.get("pickupRules")
@@ -388,7 +613,9 @@ def validate_batch_routing(config):
         if seen != area_ids:
             raise ValueError("Each destination area must appear in exactly one group per pickup area.")
         normalized_rules[pickup] = output
-    return {"locations": catalog, "areas": normalized, "pickupRules": normalized_rules}
+    return {"locationCatalogVersion": catalog_version,
+            "pricingZones": pricing_zones, "zoneUnits": zone_units,
+            "locations": catalog, "areas": normalized, "pickupRules": normalized_rules}
 
 
 def load_batch_routing():
@@ -398,7 +625,7 @@ def load_batch_routing():
         config = default_batch_routing()
     except (OSError, json.JSONDecodeError) as error:
         raise ValueError("Delivery routing could not be loaded. Contact an administrator.") from error
-    return validate_batch_routing(config)
+    return validate_batch_routing(expand_lagos_location_catalog(validate_batch_routing(config)))
 
 
 def batch_routing_version(config):
@@ -411,7 +638,8 @@ def batch_routing_groups(config, pickup_area):
         for area in config["areas"]
     ])
 
-# Distance-based unit matrix between zones.
+# Legacy zone-unit defaults used when upgrading saved settings.
+# Live quotes use the editable zoneUnits in the routing configuration.
 # Symmetric — order of pickup/dropoff doesn't matter.
 ZONE_UNIT_MATRIX = {
     frozenset(["mainland-west"]): 1,
@@ -449,19 +677,18 @@ ZONE_UNIT_MATRIX = {
 EXTENDED_UNITS = 7  # default for any route touching "extended", unless overridden above
 
 
-def estimate_delivery(pickup, dropoff, plan=None, priority="Standard", location_zones=None):
+def estimate_delivery(pickup, dropoff, plan=None, priority="Standard", location_zones=None, routing=None):
+    routing = load_batch_routing() if routing is None else routing
     if location_zones is None:
-        location_zones = {location["id"]: location["zone"] for location in load_batch_routing()["locations"]}
+        location_zones = {location["id"]: location["zone"] for location in routing["locations"]}
     pickup_zone = location_zones.get(pickup)
     dropoff_zone = location_zones.get(dropoff)
     if not pickup_zone or not dropoff_zone:
         raise ValueError("Pickup and delivery locations must be valid Lagos locations")
 
-    if pickup == dropoff:
-        units = 1
-    else:
-        pair = frozenset([pickup_zone, dropoff_zone])
-        units = ZONE_UNIT_MATRIX.get(pair, EXTENDED_UNITS if "extended" in pair else 3)
+    pair = frozenset((pickup_zone, dropoff_zone))
+    units = next(route["units"] for route in routing["zoneUnits"]
+                 if frozenset((route["from"], route["to"])) == pair)
 
     recommended = "Basic" if units <= 2 else "Growth" if units <= 4 else "Business"
     billed_plan = plan if plan in PLAN_UNIT_PRICES else recommended
@@ -483,7 +710,7 @@ def estimate_delivery(pickup, dropoff, plan=None, priority="Standard", location_
         "plan": billed_plan,
         "recommendedPlan": recommended,
         "riderPayout": round(cost * RIDER_PAYOUT_RATE),
-        "pricingVersion": PRICING_VERSION,
+        "pricingVersion": f"{PRICING_VERSION}-{batch_routing_version(routing)[:12]}",
     }
 
 
@@ -561,7 +788,7 @@ def estimate_batch_deliveries(delivery_requests, plan=None, routing=None):
         validate_delivery_window(window)
         # The selected window controls the surcharge in both preview and booking.
         priority = "Express" if window == "Express" else "Standard"
-        quote = estimate_delivery(pickup, dropoff, plan, priority, location_zones=location_zones)
+        quote = estimate_delivery(pickup, dropoff, plan, priority, location_zones=location_zones, routing=routing)
         destination_area = location_areas[dropoff]
         group = destination_groups[destination_area["id"]]
         axis = group["id"]
@@ -780,7 +1007,7 @@ def get_current_admin(handler):
 
 def require_owner(handler):
     admin = get_current_admin(handler)
-    return bool(admin) and admin.get("role") in ("owner", "super_admin")
+    return bool(admin) and admin.get("status") == "active" and admin.get("role") in ("owner", "super_admin")
 
 
 def purge_admin_sessions(email):
@@ -788,6 +1015,9 @@ def purge_admin_sessions(email):
     for token, session in list(ADMIN_SESSIONS.items()):
         if session.get("email", "").strip().lower() == normalized:
             ADMIN_SESSIONS.pop(token, None)
+    for token, challenge in list(globals().get("ADMIN_MFA_CHALLENGES", {}).items()):
+        if challenge.get("email", "").strip().lower() == normalized:
+            ADMIN_MFA_CHALLENGES.pop(token, None)
     
 def bootstrap_admin_from_environment():
     email = clean(os.environ.get("ADMIN_BOOTSTRAP_EMAIL"), 160).lower()
@@ -1020,6 +1250,60 @@ def consume_reset_token(token):
     save_reset_tokens(tokens)
 
     return data
+
+
+def admin_credential_version(admin):
+    return hashlib.sha256((str(admin.get("salt", "")) + ":" + str(admin.get("passwordHash", ""))).encode()).hexdigest()
+
+
+def invalidate_admin_links(email):
+    tokens = load_reset_tokens()
+    tokens = {key: value for key, value in tokens.items()
+              if not (key.startswith("admin:") and value.get("email") == email.lower())}
+    save_reset_tokens(tokens)
+
+
+def admin_email_ready():
+    base = os.environ.get("APP_BASE_URL", "").rstrip("/")
+    parsed = urlparse(base)
+    secure = parsed.scheme == "https" or (APP_ENV != "production" and parsed.scheme == "http"
+                                         and parsed.hostname in {"localhost", "127.0.0.1", "::1"})
+    return bool(smtp_settings() and secure and parsed.netloc and not parsed.username
+                and not parsed.password and not parsed.query and not parsed.fragment and parsed.path in {"", "/"})
+
+
+def deliver_admin_link(admin, purpose):
+    """Send only to the saved admin email. Never return raw links to callers."""
+    if not admin_email_ready():
+        return False
+    email = admin["email"].lower()
+    token = secrets.token_urlsafe(48)
+    key = "admin:" + hashlib.sha256(token.encode()).hexdigest()
+    now = datetime.now(timezone.utc)
+    expires = now + timedelta(minutes=1440 if purpose == "admin_invite" else RESET_TOKEN_EXPIRY_MINUTES)
+    invalidate_admin_links(email)
+    tokens = load_reset_tokens()
+    tokens[key] = {"email": email, "adminId": admin["id"], "purpose": purpose,
+                   "credentialVersion": admin_credential_version(admin), "expiresAt": expires.isoformat()}
+    save_reset_tokens(tokens)
+    url = os.environ["APP_BASE_URL"].rstrip("/") + "/admin-login.html#reset=" + token
+    invitation = purpose == "admin_invite"
+    if invitation:
+        url += "&setup=1"
+    result = NotificationService._send_email(email,
+        "Set up your ApexWings admin account" if invitation else "Reset your ApexWings admin password",
+        ("You have been invited to the ApexWings admin portal. Set your password using this link:\n" if invitation
+         else "A password reset was requested for your ApexWings admin account. Use this link:\n")
+        + url + "\n\nThis link can be used once and expires in " + ("24 hours." if invitation else "60 minutes.")
+        + "\nIf you were not expecting this message, ignore it.")
+    sent = bool(result.get("sent"))
+    if not sent:
+        tokens = load_reset_tokens(); tokens.pop(key, None); save_reset_tokens(tokens)
+    if invitation:
+        admin["invitationStatus"] = "sent" if sent else "failed"
+        admin["inviteExpiresAt"] = expires.isoformat() if sent else None
+    _record_notification(purpose, "email", email, sent, result.get("reason"))
+    return sent
 
 def mark_payment_complete(email):
     with locked_file(ACCOUNTS_FILE, SUBSCRIPTIONS_FILE):
@@ -1698,7 +1982,7 @@ def save_rider_payments(payments):
 # ADMIN SESSION FUNCTIONS
 # =========================================================
 
-def create_admin_session(email):
+def create_admin_session(email, credential_version=None):
     token = secrets.token_urlsafe(48)
 
     expires_at = (
@@ -1708,16 +1992,27 @@ def create_admin_session(email):
 
     ADMIN_SESSIONS[token] = {
         "email": email,
-        "expiresAt": expires_at
+        "expiresAt": expires_at,
+        "credentialVersion": credential_version or admin_credential_version(find_admin_by_email(load_admin_credentials(), email) or {}),
     }
 
     return token
 
 
-def issue_admin_session(handler, admin, message="Admin login successful."):
+def issue_admin_session(handler, admin, message="Admin login successful.", record_login=True):
     """Writes the session+CSRF cookies and JSON body for a fully-authenticated
     admin. Only ever called after password AND (if enabled) MFA succeed."""
-    session_token = create_admin_session(admin.get("email"))
+    if record_login:
+        with locked_file(ADMIN_CREDENTIALS_FILE):
+            admins = load_admin_credentials()
+            current = find_admin_by_email(admins, admin.get("email"))
+            if (not current or current.get("status") != "active" or not hmac.compare_digest(
+                    admin_credential_version(current), admin_credential_version(admin))):
+                handler._json_response(403, {"error": "This admin account is not active."})
+                return
+            current["lastLoginAt"] = now_iso()
+            save_admin_credentials(admins)
+    session_token = create_admin_session(admin.get("email"), admin_credential_version(admin))
     body = json.dumps({"message": message}).encode("utf-8")
     handler.send_response(200)
     handler.send_header("Content-Type", "application/json; charset=utf-8")
@@ -1765,6 +2060,12 @@ def get_admin_session(handler):
     now = datetime.now(timezone.utc)
 
     if expires_at <= now:
+        ADMIN_SESSIONS.pop(token, None)
+        return None
+
+    admin = find_admin_by_email(load_admin_credentials(), session.get("email"))
+    if not admin or admin.get("status") != "active" or not hmac.compare_digest(
+            session.get("credentialVersion", ""), admin_credential_version(admin)):
         ADMIN_SESSIONS.pop(token, None)
         return None
 
@@ -2341,6 +2642,24 @@ def _record_notification(event, channel, recipient, sent, reason):
     save_json_list(NOTIFICATION_LOG_FILE, entries)
 
 
+def smtp_settings():
+    if EMAIL_PROVIDER != "smtp":
+        return None
+    host, sender = os.environ.get("SMTP_HOST", "").strip(), os.environ.get("EMAIL_FROM", "").strip()
+    security = os.environ.get("SMTP_SECURITY", "starttls").lower()
+    username, password = os.environ.get("SMTP_USERNAME", ""), os.environ.get("SMTP_PASSWORD", "")
+    try:
+        port = int(os.environ.get("SMTP_PORT", "465" if security == "ssl" else "587"))
+    except ValueError:
+        return None
+    if not host or not valid_email(sender) or security not in {"ssl", "starttls"} or not 1 <= port <= 65535:
+        return None
+    if bool(username) != bool(password):
+        return None
+    return {"host": host, "sender": sender, "port": port, "security": security,
+            "username": username, "password": password}
+
+
 class NotificationService:
     """Stateless facade over SMS/WhatsApp/email. Safe to call with zero
     providers configured (today's default) - callers must check the
@@ -2360,9 +2679,27 @@ class NotificationService:
 
     @staticmethod
     def _send_email(to, subject, body):
-        if not EMAIL_PROVIDER:
+        settings = smtp_settings()
+        if not settings:
             return {"sent": False, "channel": "email", "reason": "no_provider_configured"}
-        return {"sent": False, "channel": "email", "reason": "provider_not_implemented"}
+        try:
+            message = EmailMessage()
+            message["From"], message["To"], message["Subject"] = settings["sender"], to, subject
+            message.set_content(body)
+            context = ssl.create_default_context()
+            client = smtplib.SMTP_SSL if settings["security"] == "ssl" else smtplib.SMTP
+            options = {"timeout": 15}
+            if settings["security"] == "ssl":
+                options["context"] = context
+            with client(settings["host"], settings["port"], **options) as connection:
+                if settings["security"] == "starttls":
+                    connection.starttls(context=context)
+                if settings["username"]:
+                    connection.login(settings["username"], settings["password"])
+                refused = connection.send_message(message)
+            return {"sent": not bool(refused), "channel": "email", "reason": "recipient_refused" if refused else "accepted"}
+        except (OSError, smtplib.SMTPException, ValueError):
+            return {"sent": False, "channel": "email", "reason": "delivery_failed"}
 
     @classmethod
     def send_delivery_otp(cls, phone, otp, order_ref):
@@ -2512,6 +2849,7 @@ def create_mfa_challenge(email):
     token = secrets.token_urlsafe(32)
     ADMIN_MFA_CHALLENGES[token] = {
         "email": email,
+        "credentialVersion": admin_credential_version(find_admin_by_email(load_admin_credentials(), email) or {}),
         "expiresAt": datetime.now(timezone.utc) + timedelta(seconds=MFA_CHALLENGE_EXPIRY_SECONDS),
         "attempts": 0,
     }
@@ -2526,6 +2864,11 @@ def pop_valid_mfa_challenge(token):
     if not challenge:
         return None
     if datetime.now(timezone.utc) > challenge["expiresAt"]:
+        ADMIN_MFA_CHALLENGES.pop(token, None)
+        return None
+    admin = find_admin_by_email(load_admin_credentials(), challenge.get("email", ""))
+    if not admin or admin.get("status") != "active" or not hmac.compare_digest(
+            challenge.get("credentialVersion", ""), admin_credential_version(admin)):
         ADMIN_MFA_CHALLENGES.pop(token, None)
         return None
     return challenge
@@ -2892,22 +3235,23 @@ def save_json_list(path, data):
 # =========================================================
 
 def append_audit_log(actor_email, actor_role, action, target_type=None, target_id=None, previous=None, new=None, note=None):
-    log = load_json_list(AUDIT_LOG_FILE)
-    entry = {
-        "id": secrets.token_urlsafe(12),
-        "at": now_iso(),
-        "actorEmail": actor_email,
-        "actorRole": actor_role,
-        "action": action,
-        "targetType": target_type,
-        "targetId": target_id,
-        "previousValue": previous,
-        "newValue": new,
-        "note": note,
-    }
-    log.append(entry)
-    save_json_list(AUDIT_LOG_FILE, log)
-    return entry
+    with locked_file(AUDIT_LOG_FILE):
+        log = load_json_list(AUDIT_LOG_FILE)
+        entry = {
+            "id": secrets.token_urlsafe(12),
+            "at": now_iso(),
+            "actorEmail": actor_email,
+            "actorRole": actor_role,
+            "action": action,
+            "targetType": target_type,
+            "targetId": target_id,
+            "previousValue": previous,
+            "newValue": new,
+            "note": note,
+        }
+        log.append(entry)
+        save_json_list(AUDIT_LOG_FILE, log)
+        return entry
 
 
 def audit_admin_action(handler, action, target_type=None, target_id=None, previous=None, new=None, note=None):
@@ -2938,7 +3282,7 @@ ADMIN_ROLE_LABELS = {
     "customer_support": "Customer Support",
     "analyst": "Analyst (Read Only)",
     "owner": "Super Admin",
-    "staff": "Operations Manager",
+    "staff": "Legacy Staff (Operations)",
 }
 
 # Roles that can be assigned to a NEW admin via the team-management
@@ -2997,6 +3341,169 @@ def require_permission(handler, permission):
     return admin
 
 
+def handle_admin_recovery(handler, path, payload):
+    email = clean(payload.get("email"), 160).lower()
+    generic = {"message": "If an active account exists, a recovery email will be sent when email delivery is available. Contact the account owner if it does not arrive."}
+    if path.endswith("forgot-password"):
+        key = rate_limit_key(handler, "admin-recovery")
+        if not is_login_rate_limited(key):
+            record_login_failure(key)
+            with locked_file(ADMIN_CREDENTIALS_FILE, RESET_TOKENS_FILE):
+                admins = load_admin_credentials()
+                admin = find_admin_by_email(admins, email) if valid_email(email) else None
+                if admin and admin.get("status") in {"active", "invited"}:
+                    deliver_admin_link(admin, "admin_invite" if admin.get("status") == "invited" else "admin_reset")
+                    if admin.get("status") == "invited":
+                        save_admin_credentials(admins)
+        handler._json_response(202, generic)
+        return
+    key = rate_limit_key(handler, "admin-reset")
+    if is_login_rate_limited(key):
+        handler._json_response(429, {"error": "Too many attempts. Please try again later."})
+        return
+    record_login_failure(key)
+    token = clean(payload.get("token"), 200)
+    password = clean(payload.get("password"), 128)
+    if not token or len(password) < 8 or password != clean(payload.get("confirmPassword"), 128):
+        raise ValueError("Enter matching passwords of at least 8 characters and use a valid recovery link.")
+    with locked_file(ADMIN_CREDENTIALS_FILE, RESET_TOKENS_FILE):
+        tokens = load_reset_tokens()
+        token_key = "admin:" + hashlib.sha256(token.encode()).hexdigest()
+        data = tokens.get(token_key, {})
+        admins = load_admin_credentials()
+        admin = find_admin_by_email(admins, data.get("email", ""))
+        expires = parse_iso_date(data.get("expiresAt"))
+        purpose = data.get("purpose")
+        allowed_status = "invited" if purpose == "admin_invite" else "active"
+        if (not admin or purpose not in {"admin_invite", "admin_reset"} or not expires
+                or expires <= datetime.now(timezone.utc) or admin.get("status") != allowed_status
+                or data.get("adminId") != admin.get("id")
+                or not hmac.compare_digest(data.get("credentialVersion", ""), admin_credential_version(admin))):
+            raise ValueError("This recovery link is invalid or expired. Request a new email.")
+        salt = secrets.token_hex(16)
+        admin.update({"salt": salt, "passwordHash": password_hash(password, salt),
+                      "passwordResetAt": now_iso(), "mustChangePassword": False, "status": "active"})
+        if purpose == "admin_invite":
+            admin["invitationStatus"] = "accepted"
+            admin["inviteAcceptedAt"] = now_iso()
+        save_admin_credentials(admins)
+        invalidate_admin_links(admin["email"])
+        purge_admin_sessions(admin["email"])
+        append_audit_log(admin["email"], admin.get("role"),
+                         "admin_invitation_accepted" if purpose == "admin_invite" else "admin_password_reset",
+                         "admin", admin["email"])
+    clear_login_attempts(key)
+    handler._json_response(200, {"message": "Password saved. Please log in."})
+
+
+def handle_admin_password_change(handler, payload):
+    with locked_file(ADMIN_CREDENTIALS_FILE, RESET_TOKENS_FILE):
+        current = get_current_admin(handler)
+        if not current or current.get("status") != "active":
+            handler._json_response(401, {"error": "Admin authentication required."})
+            return
+        password = clean(payload.get("currentPassword"), 128)
+        new_password = clean(payload.get("newPassword"), 128)
+        if not password or len(new_password) < 8 or password == new_password:
+            raise ValueError("Choose a different password of at least 8 characters.")
+        admins = load_admin_credentials()
+        target = find_admin_by_email(admins, current["email"])
+        if not hmac.compare_digest(target.get("passwordHash", ""), password_hash(password, target.get("salt", ""))):
+            handler._json_response(401, {"error": "Current password is incorrect."})
+            return
+        salt = secrets.token_hex(16)
+        target.update({"salt": salt, "passwordHash": password_hash(new_password, salt),
+                       "mustChangePassword": False, "passwordChangedAt": now_iso()})
+        save_admin_credentials(admins)
+        invalidate_admin_links(current["email"])
+        purge_admin_sessions(current["email"])
+        append_audit_log(current["email"], current.get("role"), "admin_password_changed", "admin", current["email"])
+        issue_admin_session(handler, target, "Admin password changed successfully.", record_login=False)
+
+
+def handle_admin_team(handler, path, payload):
+    with locked_file(ADMIN_CREDENTIALS_FILE, RESET_TOKENS_FILE):
+        if not require_owner(handler):
+            handler._json_response(403, {"error": "Only the owner or a Super Admin can manage the team."})
+            return
+        admins = load_admin_credentials()
+        email = clean(payload.get("email"), 160).lower()
+        role = clean(payload.get("role"), 40).lower()
+        actor = get_current_admin(handler)
+        target = find_admin_by_email(admins, email)
+        if path.endswith("/add"):
+            role = role or "operations_manager"
+            invitation = payload.get("invite") is True
+            password = clean(payload.get("password"), 128)
+            if not valid_email(email) or role not in ADMIN_ASSIGNABLE_ROLES:
+                raise ValueError("Enter a valid email address and role.")
+            if target:
+                raise ValueError("An admin with this email already exists.")
+            if invitation and not admin_email_ready():
+                handler._json_response(503, {"error": "Email invitations are unavailable. Configure outgoing email or use a temporary password."})
+                return
+            if not invitation and len(password) < 8:
+                raise ValueError("Initial password must be at least 8 characters.")
+            salt = secrets.token_hex(16)
+            target = {"id": max((int(item.get("id") or 0) for item in admins), default=0) + 1,
+                      "email": email, "name": clean(payload.get("name"), 120) or email.split("@")[0],
+                      "salt": salt, "passwordHash": password_hash(secrets.token_urlsafe(48) if invitation else password, salt),
+                      "role": role, "status": "invited" if invitation else "active", "mustChangePassword": True,
+                      "invitedBy": actor["email"], "createdAt": now_iso(), "mfaEnabled": False}
+            admins.append(target)
+            save_admin_credentials(admins)
+            sent = deliver_admin_link(target, "admin_invite") if invitation else None
+            save_admin_credentials(admins)
+            audit_admin_action(handler, "admin_account_created", "admin", target["id"], new=role)
+            handler._json_response(201, {"message": ("Invitation sent." if sent else "Account created; invitation delivery failed. Use Resend invitation.")
+                                         if invitation else "Admin added. Share the temporary password securely; it must be changed on first login.",
+                                         "invitationSent": sent})
+            return
+        if not target:
+            handler._json_response(404, {"error": "Admin not found."})
+            return
+        if path.endswith(("/reset-password", "/resend-invitation")):
+            invitation = path.endswith("/resend-invitation")
+            if target.get("status") != ("invited" if invitation else "active"):
+                raise ValueError("Restore this account's access first, or use its invitation action.")
+            if not admin_email_ready():
+                handler._json_response(503, {"error": "Outgoing email is not configured. Set up email delivery before sending account links."})
+                return
+            sent = deliver_admin_link(target, "admin_invite" if invitation else "admin_reset")
+            save_admin_credentials(admins)
+            audit_admin_action(handler, "admin_invitation_resent" if invitation else "admin_reset_requested", "admin", email, new="sent" if sent else "failed")
+            handler._json_response(200 if sent else 502, {"message": "Account email sent."} if sent else {"error": "Email delivery failed. No usable link was issued; please retry."})
+            return
+        if email == actor["email"].lower():
+            raise ValueError("You cannot change your own role or access.")
+        if target.get("role") == "owner":
+            raise ValueError("The account owner is protected and cannot be changed or removed.")
+        if path.endswith("/role"):
+            if role not in ADMIN_ASSIGNABLE_ROLES:
+                raise ValueError("Invalid role.")
+            previous = target.get("role")
+            target["role"] = role
+            save_admin_credentials(admins)
+            purge_admin_sessions(email)
+            audit_admin_action(handler, "admin_role_changed", "admin", email, previous=previous, new=role)
+        elif path.endswith(("/revoke", "/restore")):
+            previous = target.get("status")
+            target["status"] = "revoked" if path.endswith("/revoke") else ("invited" if target.get("invitationStatus") in {"sent", "failed"} else "active")
+            save_admin_credentials(admins)
+            purge_admin_sessions(email)
+            invalidate_admin_links(email)
+            audit_admin_action(handler, "admin_access_revoked" if path.endswith("/revoke") else "admin_access_restored", "admin", email, previous=previous, new=target["status"])
+        elif path.endswith("/delete"):
+            save_admin_credentials([admin for admin in admins if admin["email"].lower() != email])
+            purge_admin_sessions(email)
+            invalidate_admin_links(email)
+            audit_admin_action(handler, "admin_account_deleted", "admin", email)
+        else:
+            handler._json_response(404, {"error": "Unknown team action."})
+            return
+        handler._json_response(200, {"message": "Team access updated."})
+
+
 # =========================================================
 # HARD PASSWORD-CHANGE GATE
 # =========================================================
@@ -3005,6 +3512,7 @@ def require_permission(handler, permission):
 # static pages/assets are untouched so the change-password screen can load.
 ADMIN_PASSWORD_GATE_ALLOWLIST = {
     "/api/admin/change-password", "/api/admin/logout", "/api/admin/account",
+    "/api/admin/forgot-password", "/api/admin/reset-password",
 }
 RIDER_PASSWORD_GATE_ALLOWLIST = {
     "/api/rider/change-password", "/api/rider/logout", "/api/rider/account",
@@ -4538,12 +5046,11 @@ class FiableHandler(SimpleHTTPRequestHandler):
                     (item for item in load_accounts() if item["email"] == email),
                     None
                 ) if email else None
+                pickup, dropoff = clean(payload.get("pickup"), 80), clean(payload.get("dropoff"), 80)
                 result = estimate_delivery(
-                    clean(payload.get("pickup"), 80),
-                    clean(payload.get("dropoff"), 80),
-                    account.get("plan") if account else None,
+                    pickup, dropoff, account.get("plan"),
                     clean(payload.get("priority"), 40) or "Standard"
-                )
+                ) if account else estimate_express_delivery(pickup, dropoff)
                 self._json_response(200, result)
                 return
             if path in ("/api/vendor", "/api/contact"):
@@ -4657,7 +5164,7 @@ class FiableHandler(SimpleHTTPRequestHandler):
                     return
 
 
-                if matched_admin.get("status") == "revoked":
+                if matched_admin.get("status") != "active":
 
                     self._json_response(
                         403,
@@ -4684,54 +5191,10 @@ class FiableHandler(SimpleHTTPRequestHandler):
                     })
                     return
 
-                session_token = create_admin_session(matched_admin.get("email"))
-
-                append_audit_log(
-                    actor_email=matched_admin.get("email"),
-                    actor_role=matched_admin.get("role"),
-                    action="admin_login",
-                    target_type="admin",
-                    target_id=matched_admin.get("id"),
-                )
-
-
-                body = json.dumps({
-                    "message": "Admin login successful."
-                }).encode("utf-8")
-
-
-                self.send_response(200)
-
-                self.send_header(
-                    "Content-Type",
-                    "application/json; charset=utf-8"
-                )
-
-                self.send_header(
-                    "Set-Cookie",
-                    session_cookie(self, "fiable_admin_session", session_token, ADMIN_SESSION_EXPIRY_HOURS * 60 * 60)
-                )
-
-                self.send_header(
-                    "Set-Cookie",
-                    csrf_cookie(self, generate_csrf_token(), ADMIN_SESSION_EXPIRY_HOURS * 60 * 60)
-                )
-
-                self.send_header(
-                    "Content-Length",
-                    str(len(body))
-                )
-
-                self.end_headers()
-
-                self.wfile.write(body)
-
+                append_audit_log(matched_admin.get("email"), matched_admin.get("role"),
+                                 "admin_login", "admin", matched_admin.get("id"))
+                issue_admin_session(self, matched_admin)
                 return
-
-
-            # =====================================================
-            # ADMIN LOGOUT
-            # =====================================================
 
             if path == "/api/admin/logout":
 
@@ -4775,128 +5238,8 @@ class FiableHandler(SimpleHTTPRequestHandler):
             # ADMIN FORGOT PASSWORD
             # =====================================================
 
-            if path == "/api/admin/forgot-password":
-
-                email = clean(
-                    payload.get("email"),
-                    160
-                ).lower()
-
-                if not valid_email(email):
-                    self._json_response(
-                        202,
-                        {
-                            "message": "If an account exists for this email, a password reset link has been created."
-                        }
-                    )
-                    return
-
-                admin_creds = load_admin_credentials()
-
-                admin_exists = next(
-                    (
-                        item for item in admin_creds
-                        if item.get("email", "").lower() == email
-                    ),
-                    None
-                )
-
-                # Don't reveal whether an account exists
-                if not admin_exists:
-                    self._json_response(
-                        202,
-                        {
-                            "message": "If an account exists for this email, a password reset link has been created."
-                        }
-                    )
-                    return
-
-                token = create_reset_token(email)
-
-                save_submission("admin-password-reset", {
-                    "email": email,
-                    "token": token
-                })
-
-                # LOCAL DEVELOPMENT ONLY
-                reset_link = f"/admin-login.html?reset={token}"
-
-                self._json_response(
-                    202,
-                    {
-                        "message": "Password reset link created.",
-                        "resetLink": reset_link
-                    }
-                )
-
-                return
-
-            # =====================================================
-            # ADMIN RESET PASSWORD
-            # =====================================================
-
-            if path == "/api/admin/reset-password":
-
-                token = clean(
-                    payload.get("token"),
-                    200
-                )
-                password = clean(
-                    payload.get("password"),
-                    128
-                )
-                confirm_password = clean(
-                    payload.get("confirmPassword"),
-                    128
-                )
-
-                if not token:
-                    raise ValueError("Invalid or missing reset link")
-
-                if len(password) < 8:
-                    raise ValueError("Your password must be at least 8 characters")
-
-                if password != confirm_password:
-                    raise ValueError("Passwords do not match")
-
-                reset_data = verify_reset_token(token)
-
-                if not reset_data:
-                    raise ValueError(
-                        "This reset link is invalid or has expired. Please request a new one."
-                    )
-
-                email = reset_data["email"]
-
-                admin_creds = load_admin_credentials()
-
-                admin_found = False
-
-                for admin in admin_creds:
-                    if admin.get("email", "").lower() == email:
-                        salt = secrets.token_hex(16)
-
-                        admin["salt"] = salt
-                        admin["passwordHash"] = password_hash(password, salt)
-                        admin["passwordResetAt"] = datetime.now(timezone.utc).isoformat()
-
-                        admin_found = True
-                        break
-
-                if not admin_found:
-                    raise ValueError("Admin account not found")
-
-                save_admin_credentials(admin_creds)
-
-                consume_reset_token(token)
-
-                self._json_response(
-                    200,
-                    {
-                        "message": "Password reset successfully. Please log in with your new password."
-                    }
-                )
-
+            if path in ("/api/admin/forgot-password", "/api/admin/reset-password"):
+                handle_admin_recovery(self, path, payload)
                 return
 
             # =====================================================
@@ -4904,132 +5247,8 @@ class FiableHandler(SimpleHTTPRequestHandler):
             # =====================================================
 
             if path == "/api/admin/change-password":
-
-                current_admin_email = get_admin_email(self)
-
-                if not current_admin_email:
-
-                    self._json_response(
-                        401,
-                        {
-                            "error": "Admin authentication required."
-                        }
-                    )
-
-                    return
-
-
-                currentPassword = clean(
-                    payload.get("currentPassword"),
-                    128
-                )
-
-                newPassword = clean(
-                    payload.get("newPassword"),
-                    128
-                )
-
-
-                if not currentPassword or not newPassword:
-
-                    self._json_response(
-                        400,
-                        {
-                            "error": "Current and new passwords are required."
-                        }
-                    )
-
-                    return
-
-
-                if len(newPassword) < 8:
-
-                    self._json_response(
-                        400,
-                        {
-                            "error": "New password must be at least 8 characters."
-                        }
-                    )
-
-                    return
-
-
-                admins = load_admin_credentials()
-
-                target_admin = find_admin_by_email(admins, current_admin_email)
-
-                if not target_admin:
-
-                    self._json_response(
-                        500,
-                        {
-                            "error": "Unable to load admin credentials."
-                        }
-                    )
-
-                    return
-
-
-                stored_hash = target_admin.get("passwordHash")
-                stored_salt = target_admin.get("salt")
-
-
-                if not stored_hash or not stored_salt:
-
-                    self._json_response(
-                        500,
-                        {
-                            "error": "Admin credentials are incomplete."
-                        }
-                    )
-
-                    return
-
-
-                valid = hmac.compare_digest(
-                    stored_hash,
-                    password_hash(
-                        currentPassword,
-                        stored_salt
-                    )
-                )
-
-
-                if not valid:
-
-                    self._json_response(
-                        401,
-                        {
-                            "error": "Current password is incorrect."
-                        }
-                    )
-
-                    return
-
-
-                new_salt = secrets.token_hex(16)
-
-                target_admin["passwordHash"] = password_hash(
-                    newPassword,
-                    new_salt
-                )
-
-                target_admin["salt"] = new_salt
-                target_admin["mustChangePassword"] = False
-
-
-                save_admin_credentials(admins)
-
-
-                self._json_response(
-                    200,
-                    {
-                        "message": "Admin password changed successfully."
-                    }
-                )
-
+                handle_admin_password_change(self, payload)
                 return
-
 
             # =====================================================
             # ADMIN MFA (TOTP)
@@ -5251,243 +5470,12 @@ class FiableHandler(SimpleHTTPRequestHandler):
             # ADMIN TEAM MANAGEMENT
             # =====================================================
 
-            if path == "/api/admin/team/add":
-
-                if not require_owner(self):
-                    self._json_response(
-                        403,
-                        {"error": "Only the account owner can add admins."}
-                    )
-                    return
-
-                new_email = clean(payload.get("email"), 160).lower()
-                new_role = clean(payload.get("role"), 40).lower() or "staff"
-                initial_password = clean(payload.get("password"), 128)
-
-                if not valid_email(new_email):
-                    self._json_response(400, {"error": "Enter a valid email address."})
-                    return
-
-                if new_role not in ADMIN_ASSIGNABLE_ROLES:
-                    self._json_response(400, {"error": "Invalid role."})
-                    return
-
-                if len(initial_password) < 8:
-                    self._json_response(
-                        400,
-                        {"error": "Initial password must be at least 8 characters."}
-                    )
-                    return
-
-                admins = load_admin_credentials()
-
-                if find_admin_by_email(admins, new_email):
-                    self._json_response(
-                        400,
-                        {"error": "An admin with this email already exists."}
-                    )
-                    return
-
-                next_id = max((int(item.get("id") or 0) for item in admins), default=0) + 1
-                salt = secrets.token_hex(16)
-
-                new_admin = {
-                    "id": next_id,
-                    "email": new_email,
-                    "name": clean(payload.get("name"), 120) or new_email.split("@")[0],
-                    "passwordHash": password_hash(initial_password, salt),
-                    "salt": salt,
-                    "role": new_role,
-                    "status": "active",
-                    "invitedBy": get_admin_email(self),
-                    "mustChangePassword": True,
-                    "createdAt": datetime.now(timezone.utc).isoformat(),
-                }
-
-                admins.append(new_admin)
-                save_admin_credentials(admins)
-
-                saved_admins = load_admin_credentials()
-                if not find_admin_by_email(saved_admins, new_email):
-                    self._json_response(
-                        500,
-                        {"error": "Admin account could not be saved."}
-                    )
-                    return
-
-                audit_admin_action(
-                    self, "admin_account_created", "admin", new_admin["id"],
-                    new=new_role,
-                )
-
-                self._json_response(
-                    201,
-                    {
-                        "message": "Admin added successfully.",
-                        "admin": {
-                            "id": new_admin["id"],
-                            "email": new_admin["email"],
-                            "name": new_admin["name"],
-                            "role": new_admin["role"],
-                            "status": new_admin["status"],
-                            "createdAt": new_admin["createdAt"],
-                        },
-                    }
-                )
-                return
-
-            if path == "/api/admin/team/role":
-
-                if not require_owner(self):
-                    self._json_response(
-                        403,
-                        {"error": "Only the account owner can update roles."}
-                    )
-                    return
-
-                target_email = clean(payload.get("email"), 160).lower()
-                new_role = clean(payload.get("role"), 40).lower()
-
-                if new_role not in ADMIN_ASSIGNABLE_ROLES:
-                    self._json_response(400, {"error": "Invalid role."})
-                    return
-
-                current_admin_email_lower = (get_admin_email(self) or "").lower()
-
-                if target_email == current_admin_email_lower:
-                    self._json_response(
-                        400,
-                        {"error": "You cannot change your own access."}
-                    )
-                    return
-
-                admins = load_admin_credentials()
-                target_admin = find_admin_by_email(admins, target_email)
-
-                if not target_admin:
-                    self._json_response(404, {"error": "Admin not found."})
-                    return
-
-                if target_admin.get("role") in ("owner", "super_admin"):
-                    self._json_response(
-                        400,
-                        {"error": "The account owner's role cannot be changed."}
-                    )
-                    return
-
-                target_admin["role"] = new_role
-                save_admin_credentials(admins)
-
-                audit_admin_action(
-                    self, "admin_role_changed", "admin", target_email,
-                    previous=target_admin.get("role"), new=new_role,
-                )
-
-                self._json_response(200, {"message": "Role updated successfully."})
-                return
-
-            if path in ("/api/admin/team/revoke", "/api/admin/team/restore"):
-
-                if not require_owner(self):
-                    self._json_response(
-                        403,
-                        {"error": "Only the account owner can manage admin access."}
-                    )
-                    return
-
-                target_email = clean(payload.get("email"), 160).lower()
-                current_admin_email_lower = (get_admin_email(self) or "").lower()
-
-                if target_email == current_admin_email_lower:
-                    self._json_response(
-                        400,
-                        {"error": "You cannot change your own access."}
-                    )
-                    return
-
-                admins = load_admin_credentials()
-                target_admin = find_admin_by_email(admins, target_email)
-
-                if not target_admin:
-                    self._json_response(404, {"error": "Admin not found."})
-                    return
-
-                if target_admin.get("role") == "owner":
-                    self._json_response(
-                        400,
-                        {"error": "The account owner's access cannot be changed."}
-                    )
-                    return
-
-                target_admin["status"] = (
-                    "revoked" if path.endswith("revoke") else "active"
-                )
-
-                save_admin_credentials(admins)
-                purge_admin_sessions(target_email)
-
-                audit_admin_action(
-                    self,
-                    "admin_access_revoked" if path.endswith("revoke") else "admin_access_restored",
-                    "admin", target_email,
-                )
-
-                self._json_response(
-                    200,
-                    {
-                        "message": (
-                            "Access revoked successfully."
-                            if path.endswith("revoke")
-                            else "Access restored successfully."
-                        )
-                    }
-                )
-                return
-
-            if path == "/api/admin/team/delete":
-
-                if not require_owner(self):
-                    self._json_response(
-                        403,
-                        {"error": "Only the account owner can remove admins."}
-                    )
-                    return
-
-                target_email = clean(payload.get("email"), 160).lower()
-                current_admin_email_lower = (get_admin_email(self) or "").lower()
-
-                if target_email == current_admin_email_lower:
-                    self._json_response(
-                        400,
-                        {"error": "You cannot remove your own access."}
-                    )
-                    return
-
-                admins = load_admin_credentials()
-                target_admin = find_admin_by_email(admins, target_email)
-
-                if not target_admin:
-                    self._json_response(404, {"error": "Admin not found."})
-                    return
-
-                if target_admin.get("role") == "owner":
-                    self._json_response(
-                        400,
-                        {"error": "The account owner cannot be removed."}
-                    )
-                    return
-
-                admins = [
-                    item for item in admins
-                    if item.get("email", "").lower() != target_email
-                ]
-
-                save_admin_credentials(admins)
-                purge_admin_sessions(target_email)
-
-                audit_admin_action(self, "admin_account_deleted", "admin", target_email)
-
-                self._json_response(200, {"message": "Admin removed successfully."})
+            if path in {
+                "/api/admin/team/add", "/api/admin/team/role", "/api/admin/team/revoke",
+                "/api/admin/team/restore", "/api/admin/team/delete",
+                "/api/admin/team/reset-password", "/api/admin/team/resend-invitation",
+            }:
+                handle_admin_team(self, path, payload)
                 return
 
             # =====================================================
@@ -7262,7 +7250,7 @@ class FiableHandler(SimpleHTTPRequestHandler):
                 self._json_response(200, {
                     "config": config, "version": batch_routing_version(config),
                     "locations": sorted(location["id"] for location in config["locations"]),
-                    "pricingZones": PRICING_ZONE_LABELS,
+                    "pricingZones": config["pricingZones"],
                     "standardLocationIds": sorted(LOCATION_ZONES),
                     "canManage": bool(require_permission(self, "manage_batch_routing")),
                 })
@@ -7538,6 +7526,9 @@ class FiableHandler(SimpleHTTPRequestHandler):
                     "createdAt": admin.get("createdAt"),
                     "mustChangePassword": bool(admin.get("mustChangePassword", False)),
                     "mfaEnabled": bool(admin.get("mfaEnabled", False)),
+                    "lastLoginAt": admin.get("lastLoginAt"),
+                    "invitationStatus": admin.get("invitationStatus"),
+                    "inviteExpiresAt": admin.get("inviteExpiresAt"),
                 }
                 for admin in load_admin_credentials()
             ]
@@ -7546,6 +7537,9 @@ class FiableHandler(SimpleHTTPRequestHandler):
                 200,
                 {
                     "admins": admins,
+                    "emailReady": admin_email_ready(),
+                    "roles": {role: {"label": label, "permissions": sorted(ADMIN_PERMISSIONS.get(role, set()))}
+                              for role, label in ADMIN_ROLE_LABELS.items()},
                     "currentAdminEmail": current_admin.get("email", ""),
                     "isOwner": current_admin.get("role") in ("owner", "super_admin")
                 }

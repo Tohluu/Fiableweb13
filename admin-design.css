@@ -99,6 +99,14 @@ input[type="checkbox"],input[type="radio"] { accent-color:var(--blue); }
 .subscription-profit-summary { gap:16px; }
 .admin-team-role-control .admin-team-role { border-radius:4px; min-block-size:44px; font-size:13px; }
 .admin-team-role-control::after { pointer-events:none; }
+.admin-team-table td { vertical-align:top; }
+.admin-team-table td small { display:block; margin-block-start:5px; }
+.admin-team-table td details { margin-block-start:8px; max-inline-size:250px; }
+.admin-team-table td details p { white-space:normal; font-size:12px; line-height:1.6; }
+.admin-team-table td:last-child .btn { margin:0 6px 8px 0; }
+#adminTeamSearch { inline-size:min(100%,360px); min-block-size:44px; padding:10px 12px; border:1px solid var(--line); border-radius:4px; }
+#adminTeamTools { align-items:center; }
+#newAdminPermissions { font-size:12px; line-height:1.6; }
 .rider-action-buttons,.rider-payment-actions { display:flex; gap:8px; }
 .proof-of-delivery-photo { border-radius:4px; max-inline-size:100%; }
 .ticket-message { border-radius:4px; padding:16px; overflow-wrap:anywhere; }
@@ -120,6 +128,9 @@ input[type="checkbox"],input[type="radio"] { accent-color:var(--blue); }
 .admin-team-form label { margin:0; }
 #addRiderModal .vendor-detail-item,#editRiderModal .vendor-detail-item { padding:0; border:0; background:none; border-radius:0; }
 .admin-team-form input,.admin-team-form select { min-block-size:48px; padding:12px 13px; border-radius:4px; font-size:16px; }
+.admin-password-field { display:flex; align-items:center; gap:8px; }
+.admin-password-field input { flex:1; min-inline-size:0; inline-size:0; }
+.admin-password-field .btn { flex-shrink:0; min-block-size:48px; white-space:nowrap; }
 .modal-actions { display:flex; flex-wrap:wrap; gap:12px; padding-block-start:20px; border-block-start:1px solid var(--line); margin-block-start:24px; }
 .vendor-detail-grid,.form-grid { gap:20px; }
 .vendor-detail-item { min-inline-size:0; overflow-wrap:anywhere; }

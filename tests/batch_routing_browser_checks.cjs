@@ -77,7 +77,7 @@ const fs = require('node:fs');
     await waitFor(`document.getElementById('routingMessage').textContent.startsWith('Saved rules loaded')`);
     assert(await evaluate(`document.querySelector('[data-location-name="ogudu"]').value==='Ogudu'`));
     // Inspect the new location form at desktop and mobile widths.
-    await evaluate(`document.querySelector('#routingEditor > details').open=true;document.getElementById('routingAddLocationFields').scrollIntoView({behavior:'instant',block:'center'})`);
+    await evaluate(`document.getElementById('routingAddLocationFields').closest('details').open=true;document.getElementById('routingAddLocationFields').scrollIntoView({behavior:'instant',block:'center'})`);
     await capture('location-admin-desktop');
     await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
     await evaluate(`document.getElementById('routingAddLocationFields').scrollIntoView({behavior:'instant',block:'center'})`);
