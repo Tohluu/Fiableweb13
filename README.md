@@ -58,6 +58,50 @@ invitations, session invalidation, SMTP transport and concurrency using temporar
 records and mocked email. `node --test tests/admin_team_ui_checks.cjs` checks
 Team controls, permission display, legacy roles and recovery page behavior.
 
+## Bulk haulage payments
+
+Open **Admin → Payments overview → Bulk haulage payments**. Haulage enquiries
+still go through WhatsApp; they are not automatically saved as paid bookings.
+After agreeing a quote, an owner or finance administrator can record the customer,
+route, load, agreed amount and dates. Record each deposit or balance payment with
+the actual received date, method and optional reference. Each booking shows the
+quote, received total, remaining customer balance, payment status and receipt history.
+Search by customer, booking reference or route, or filter by payment status.
+Admins with financial viewing access can inspect the register without changing it.
+
+Confirmed haulage receipts count in the overview's monthly and annual receipts,
+using Lagos payment dates. An unpaid quote does not count as revenue. Outstanding
+haulage includes balances across all bookings, independently of the month selected.
+Use **Record a van payment or other expense** to record amounts already paid
+against a job. Categories include van payments, fuel, loading/unloading,
+tolls/parking and other expenses. Record the amount, paid date, recipient,
+description, method and optional reference. Multiple entries support van deposits
+and balance payments. Fully paid and unpaid customer bookings both accept expenses;
+costs may exceed receipts or the agreed quote. No expense is inferred from a quote.
+
+Each booking shows van payments, other expenses, total paid expenses and
+**net received = customer receipts − paid expenses**. Customer debt remains
+**agreed quote − customer receipts**; spending money does not reduce what the
+customer owes. Expense history retains the paid date and recording administrator.
+Monthly and annual cost totals use the Lagos paid date, independently of when
+customer receipts arrive, so a month or job can show a negative net received.
+The overview's **After recorded costs** subtracts rider costs and paid haulage
+expenses from receipts. Unrecorded operating costs are excluded, so this is not
+net profit. Existing bookings without expenses start at zero costs on read,
+without rewriting their records. Duplicate retries are idempotent,
+overpayments and reused payment references are rejected, and changes are audited.
+
+Records use `DATA_DIR/haulage_bookings.json` locally or the `haulage_bookings`
+PostgreSQL collection. The additive schema creates the table during server startup
+and includes it in database imports and backups. No previous WhatsApp payments
+are imported automatically. Restart the server after updating the application.
+
+`python -B tests/haulage_payment_checks.py` verifies partial and full receipts,
+van payments, expense categories, negative net receipts, legacy records,
+permissions, concurrency, persistence, monthly/annual totals and invalid input using
+temporary records. `node --test tests/haulage_payment_ui_checks.cjs` checks the
+payment view, search, receipt form, read-only access and failed-request retries.
+
 ## Express delivery bookings
 
 The express form on `get-started.html#quick-express` offers WhatsApp enquiries

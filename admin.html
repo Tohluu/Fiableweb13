@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="admin.css?v=5">
   <link rel="stylesheet" href="admin-design.css?v=4">
   <link rel="stylesheet" href="batch-routing.css?v=3">
-  <link rel="stylesheet" href="admin-payments.css?v=1">
+  <link rel="stylesheet" href="admin-payments.css?v=3">
   <style>
     body.admin-page-loading {
       visibility: hidden;
@@ -550,7 +550,7 @@
         ========================== -->
         <section class="view" id="view-admin-payments">
           <div class="section-title payment-overview-heading">
-            <div><div class="eyebrow">Finance</div><h1>Payments overview</h1><p class="muted">Subscription and website payments in one place.</p></div>
+            <div><div class="eyebrow">Finance</div><h1>Payments overview</h1><p class="muted">Subscription, website and bulk haulage payments in one place.</p></div>
             <div class="payment-overview-controls">
               <label for="paymentOverviewMonth">View month<select id="paymentOverviewMonth"><option value="">Current month</option></select></label>
               <button type="button" class="btn outline" id="refreshPaymentOverview">Refresh totals</button>
@@ -561,27 +561,86 @@
           <div class="payment-overview-cards" id="paymentOverviewCards">
             <article class="panel admin-stat-card"><span>Subscription payments</span><strong id="paymentSubscriptionRevenue">—</strong><small>Confirmed subscription receipts</small></article>
             <article class="panel admin-stat-card"><span>Website payments</span><strong id="paymentWebsiteRevenue">—</strong><small id="paymentWebsiteReceiptCount">Confirmed express receipts</small></article>
-            <article class="panel admin-stat-card payment-total-card"><span>Total payments received</span><strong id="paymentTotalRevenue">—</strong><small>Subscriptions + website</small></article>
+            <article class="panel admin-stat-card"><span>Bulk haulage payments</span><strong id="paymentHaulageRevenue">—</strong><small id="paymentHaulageReceiptCount">Confirmed haulage receipts</small></article>
+            <article class="panel admin-stat-card payment-total-card"><span>Total payments received</span><strong id="paymentTotalRevenue">—</strong><small>Subscriptions + website + haulage</small></article>
             <article class="panel admin-stat-card"><span>Rider costs</span><strong id="paymentRiderCosts">—</strong><small>Earned on completed deliveries</small></article>
-            <article class="panel admin-stat-card"><span>After rider costs</span><strong id="paymentAfterRiderCosts">—</strong><small>Before other business expenses</small></article>
+            <article class="panel admin-stat-card"><span>Haulage van payments</span><strong id="paymentHaulageVanPayments">—</strong><small>Paid in the selected month</small></article>
+            <article class="panel admin-stat-card"><span>Other haulage expenses</span><strong id="paymentHaulageOtherExpenses">—</strong><small>Fuel, loading, tolls and other paid costs</small></article>
+            <article class="panel admin-stat-card"><span>Haulage net received</span><strong id="paymentHaulageNetReceived">—</strong><small>Haulage receipts minus paid haulage costs</small></article>
+            <article class="panel admin-stat-card"><span>After recorded costs</span><strong id="paymentAfterRiderCosts">—</strong><small>Total receipts minus rider costs and paid haulage costs</small></article>
             <article class="panel admin-stat-card"><span>Unpaid website bookings</span><strong id="paymentUnpaidWebsite">—</strong><small id="paymentUnpaidWebsiteCount">Booked in the selected month; excluded from revenue</small></article>
+            <article class="panel admin-stat-card"><span>Outstanding haulage</span><strong id="paymentAllUnpaidHaulage">—</strong><small>Remaining balance across all haulage bookings</small></article>
           </div>
           <article class="panel payment-overview-year">
-            <div><h2 id="paymentOverviewYearLabel">This year</h2><p class="muted">Payments received across both services.</p></div>
+            <div><h2 id="paymentOverviewYearLabel">This year</h2><p class="muted">Payments received across all services.</p></div>
             <div><span>Subscriptions</span><strong id="paymentYearSubscriptions">—</strong></div>
             <div><span>Website</span><strong id="paymentYearWebsite">—</strong></div>
+            <div><span>Bulk haulage received</span><strong id="paymentYearHaulage">—</strong><span>Paid haulage costs</span><strong id="paymentYearHaulageExpenses">—</strong><span>Haulage net received</span><strong id="paymentYearHaulageNet">—</strong></div>
             <div><span>Total received</span><strong id="paymentYearTotal">—</strong></div>
           </article>
           <article class="panel">
-            <div class="panel-heading"><div><h2>Monthly comparison</h2><p class="muted">Payment receipts and rider costs by month.</p></div></div>
+            <div class="panel-heading"><div><h2>Monthly comparison</h2><p class="muted">Payment receipts, rider costs and paid haulage expenses by month.</p></div></div>
             <div class="admin-table-wrap"><table class="admin-table payment-overview-table">
-              <thead><tr><th>Month</th><th>Subscriptions</th><th>Website</th><th>Total received</th><th>Rider costs</th><th>After riders</th></tr></thead>
-              <tbody id="paymentOverviewMonths"><tr><td colspan="6" class="empty-state">Loading monthly totals…</td></tr></tbody>
+              <thead><tr><th>Month</th><th>Subscriptions</th><th>Website</th><th>Haulage</th><th>Total received</th><th>Rider costs</th><th>Van payments</th><th>Other haulage costs</th><th>After recorded costs</th></tr></thead>
+              <tbody id="paymentOverviewMonths"><tr><td colspan="9" class="empty-state">Loading monthly totals…</td></tr></tbody>
             </table></div>
           </article>
           <article class="panel payment-overview-notes">
             <p><strong>All unpaid website bookings: <span id="paymentAllUnpaidWebsite">—</span></strong> <span id="paymentAllUnpaidWebsiteCount"></span></p>
-            <p class="muted">Receipts count in the month payment was received, using Lagos time. Unpaid website bookings exclude failed, cancelled and returned orders. Rider costs count in the month delivery was completed, whether or not the rider has been paid. Other business expenses are not included.</p>
+            <p class="muted">Receipts and paid haulage expenses count in the month the money was received or paid, using Lagos dates. Unpaid customer balances are excluded from receipts. Rider costs count in the month delivery was completed, whether or not the rider has been paid. After recorded costs subtracts rider costs and paid haulage expenses; it excludes unrecorded expenses and is not net profit.</p>
+          </article>
+          <article class="panel" id="haulagePaymentsPanel" aria-labelledby="haulagePaymentsHeading">
+            <div class="panel-heading"><div><h2 id="haulagePaymentsHeading">Bulk haulage payments &amp; expenses</h2><p class="muted">All haulage bookings, independent of the overview month. Record customer payments, van payments and other expenses against each job. Net received is customer receipts minus paid job expenses; it can be negative before the customer pays.</p></div></div>
+            <p id="haulageMessage" role="status" aria-live="polite"></p>
+            <div id="haulageManage" hidden>
+              <details class="haulage-form-section"><summary>Add an agreed haulage booking</summary>
+                <form id="haulageBookingForm" class="haulage-form">
+                  <label>Customer / business<input id="haulageCustomer" maxlength="120" required></label>
+                  <label>Contact phone<input id="haulagePhone" type="tel" maxlength="40" required></label>
+                  <label>Pickup address<input id="haulagePickup" maxlength="300" required></label>
+                  <label>Destination address<input id="haulageDropoff" maxlength="300" required></label>
+                  <label>Agreed quote (₦)<input id="haulageQuote" type="number" min="1" max="1000000000" step="1" required></label>
+                  <label>Quote agreed on<input id="haulageQuoteDate" type="date" required></label>
+                  <label>Scheduled delivery date (optional)<input id="haulageScheduledDate" type="date"></label>
+                  <label>Load description<textarea id="haulageDescription" maxlength="1000" required></textarea></label>
+                  <label>Notes (optional)<textarea id="haulageNotes" maxlength="1000"></textarea></label>
+                  <div class="haulage-form-actions"><button type="submit" class="btn primary">Save haulage booking</button></div>
+                </form>
+              </details>
+              <details class="haulage-form-section" id="haulageReceiptDetails"><summary>Record a haulage payment</summary>
+                <form id="haulageReceiptForm" class="haulage-form">
+                  <label>Booking<select id="haulageReceiptBooking" required><option value="">Choose a booking</option></select></label>
+                  <p id="haulageSelectedBalance" class="muted"></p>
+                  <label>Amount received (₦)<input id="haulageReceiptAmount" type="number" min="1" max="1000000000" step="1" required></label>
+                  <label>Payment received on<input id="haulagePaidDate" type="date" required></label>
+                  <label>Payment method<select id="haulageReceiptMethod"><option value="bank_transfer">Bank transfer</option><option value="cash">Cash</option><option value="pos">POS</option></select></label>
+                  <label>Payment reference (optional)<input id="haulageReceiptReference" maxlength="160"></label>
+                  <div class="haulage-form-actions"><button type="submit" class="btn primary">Record payment received</button></div>
+                </form>
+              </details>
+              <details class="haulage-form-section"><summary>Record a van payment or other expense</summary>
+                <form id="haulageExpenseForm" class="haulage-form">
+                  <label>Booking<select id="haulageExpenseBooking" required><option value="">Choose a booking</option></select></label>
+                  <p id="haulageExpenseSummary" class="muted"></p>
+                  <label>Expense type<select id="haulageExpenseCategory"><option value="van_payment">Van payment</option><option value="fuel">Fuel</option><option value="loading">Loading / unloading</option><option value="tolls">Tolls / parking</option><option value="other">Other expense</option></select></label>
+                  <label>Amount paid (₦)<input id="haulageExpenseAmount" type="number" min="1" max="1000000000" step="1" required></label>
+                  <label>Paid on<input id="haulageExpenseDate" type="date" required></label>
+                  <label>Paid to<input id="haulageExpensePaidTo" maxlength="120" placeholder="Van owner, driver or supplier" required></label>
+                  <label>Description<input id="haulageExpenseDescription" maxlength="500" placeholder="e.g. van hire balance or loading labour" required></label>
+                  <label>Payment method<select id="haulageExpenseMethod"><option value="bank_transfer">Bank transfer</option><option value="cash">Cash</option><option value="pos">POS</option></select></label>
+                  <label>Payment reference (optional)<input id="haulageExpenseReference" maxlength="160"></label>
+                  <div class="haulage-form-actions"><button type="submit" class="btn primary">Record expense paid</button></div>
+                </form>
+              </details>
+            </div>
+            <div class="admin-filter-bar">
+              <input id="haulageSearch" type="search" aria-label="Search haulage bookings" placeholder="Search customer, reference or route">
+              <select id="haulageStatus" aria-label="Filter haulage payment status"><option value="all">All payment statuses</option><option value="unpaid">Unpaid</option><option value="part_paid">Part paid</option><option value="paid">Paid</option></select>
+            </div>
+            <div class="admin-table-wrap"><table class="admin-table haulage-payments-table">
+              <thead><tr><th>Booking / customer</th><th>Route / load</th><th>Agreed quote</th><th>Received</th><th>Customer balance</th><th>Paid expenses</th><th>Net received</th><th>Status / history</th></tr></thead>
+              <tbody id="haulagePaymentsBody"><tr><td colspan="8" class="empty-state">Open Payments overview to load haulage records.</td></tr></tbody>
+            </table></div>
           </article>
         </section>
 
@@ -2213,7 +2272,7 @@
 
   <!-- Admin JavaScript -->
   <script src="csrf.js"></script>
-  <script src="admin.js?v=24"></script>
+  <script src="admin.js?v=27"></script>
   <script src="batch-routing.js?v=3"></script>
 
   <!-- =====================================================

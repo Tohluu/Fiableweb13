@@ -221,6 +221,7 @@ ADMIN_CREDENTIALS_FILE = DATA_DIR / "admin_credentials.json"
 RESET_TOKENS_FILE = DATA_DIR / "reset_tokens.json"
 SUBSCRIPTIONS_FILE = DATA_DIR / "subscriptions.json"
 BATCH_ROUTING_FILE = DATA_DIR / "batch_routing.json"
+HAULAGE_BOOKINGS_FILE = DATA_DIR / "haulage_bookings.json"
 RESET_TOKEN_EXPIRY_MINUTES = 60
 
 LOCATION_ZONES = {
@@ -1646,6 +1647,8 @@ def rider_payment_summary(month=None):
                 "riderPayment": rider_payment,
                 "payable": rider_payment > 0,
                 "completedAt": delivery.get("updatedAt") or delivery.get("createdAt"),
+                "deliveredAt": delivery_completed_at(delivery)
+                if str(delivery.get("status", "")).lower() == "delivered" else None,
                 "deliveryMonth": delivery_month(delivery),
                 "paidAmount": 0,
             })
@@ -1808,6 +1811,167 @@ def admin_revenue_summary():
     return {"monthly": monthly, "yearly": yearly, "currentMonth": current_month}
 
 
+def load_haulage_bookings():
+    try:
+        records = read_stored_json(HAULAGE_BOOKINGS_FILE)
+    except FileNotFoundError:
+        return []
+    except (OSError, json.JSONDecodeError):
+        raise ValueError("Haulage records could not be loaded. Contact an administrator.") from None
+    if not isinstance(records, list) or any(
+        not isinstance(row, dict) or not isinstance(row.get("id"), str)
+        or any(not isinstance(row.get(field), str) for field in
+               ("createdAt", "reference", "customerName", "phone", "pickup", "dropoff", "description", "quoteDate", "scheduledDate"))
+        or type(row.get("quoteAmount")) is not int or row["quoteAmount"] <= 0
+        or not isinstance(row.get("receipts"), list)
+        or not isinstance(row.get("expenses", []), list)
+        or any(not isinstance(receipt, dict) or type(receipt.get("amount")) is not int
+               or receipt["amount"] <= 0 or not revenue_month(receipt.get("paidAt"))
+               or not isinstance(receipt.get("reference"), str)
+               for receipt in row["receipts"])
+        or any(not isinstance(expense, dict) or type(expense.get("amount")) is not int
+               or expense["amount"] <= 0 or not revenue_month(expense.get("paidAt"))
+               or not isinstance(expense.get("reference"), str)
+               or not isinstance(expense.get("category"), str) or expense["category"] not in HAULAGE_EXPENSE_CATEGORIES
+               or not isinstance(expense.get("description"), str)
+               or not isinstance(expense.get("paidTo"), str)
+               for expense in row.get("expenses", []))
+        for row in records
+    ):
+        raise ValueError("Haulage records are invalid. Contact an administrator.")
+    if len({row["id"] for row in records}) != len(records) or any(
+        sum(receipt["amount"] for receipt in row["receipts"]) > row["quoteAmount"] for row in records
+    ):
+        raise ValueError("Haulage records are invalid. Contact an administrator.")
+    return records
+
+
+HAULAGE_EXPENSE_CATEGORIES = {"van_payment": "Van payment", "fuel": "Fuel", "loading": "Loading / unloading",
+                              "tolls": "Tolls / parking", "other": "Other expense"}
+
+
+def haulage_payment_record(booking):
+    received = sum(receipt["amount"] for receipt in booking["receipts"])
+    expenses = booking.get("expenses", [])
+    van = sum(expense["amount"] for expense in expenses if expense["category"] == "van_payment")
+    other = sum(expense["amount"] for expense in expenses if expense["category"] != "van_payment")
+    return {**booking, "expenses": expenses, "vanPayments": van, "otherExpenses": other,
+            "totalExpenses": van + other, "netReceived": received - van - other,
+            "amountPaid": received, "outstanding": max(0, booking["quoteAmount"] - received),
+            "paymentStatus": "paid" if received >= booking["quoteAmount"] else "part_paid" if received else "unpaid"}
+
+
+def haulage_text(payload, field, label, maximum, required=True):
+    value = payload.get(field, "")
+    if not isinstance(value, str) or len(value.strip()) > maximum or (required and not value.strip()):
+        raise ValueError(f"{label} must be {'1' if required else '0'}–{maximum} characters long.")
+    return value.strip()
+
+
+def haulage_date(value, label):
+    if not isinstance(value, str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", value):
+        raise ValueError(f"Choose a valid {label}.")
+    try:
+        return datetime.fromisoformat(value).replace(hour=12, tzinfo=timezone(timedelta(hours=1)))
+    except ValueError:
+        raise ValueError(f"Choose a valid {label}.") from None
+
+
+def handle_admin_haulage(handler, path, payload):
+    admin = require_permission(handler, "manage_finance")
+    if not admin:
+        handler._json_response(403, {"error": "You do not have permission to record haulage payments."})
+        return
+    request_id = payload.get("requestId")
+    if not isinstance(request_id, str) or not re.fullmatch(r"[A-Za-z0-9_-]{20,80}", request_id):
+        raise ValueError("A valid request identifier is required. Refresh and try again.")
+    today = datetime.now(timezone(timedelta(hours=1))).date()
+    if path == "/api/admin/haulage":
+        values = {field: haulage_text(payload, field, label, maximum, required) for field, label, maximum, required in [
+            ("customerName", "Customer name", 120, True), ("phone", "Contact phone", 40, True),
+            ("pickup", "Pickup address", 300, True), ("dropoff", "Destination address", 300, True),
+            ("description", "Load description", 1000, True), ("notes", "Notes", 1000, False),
+        ]}
+        amount = payload.get("quoteAmount")
+        if type(amount) is not int or not 1 <= amount <= 1_000_000_000:
+            raise ValueError("Agreed quote must be a positive whole-naira amount, up to 1 billion.")
+        quote_date = haulage_date(payload.get("quoteDate"), "quote date")
+        if quote_date.date() > today:
+            raise ValueError("The agreed quote date cannot be in the future.")
+        scheduled = payload.get("scheduledDate", "")
+        if scheduled:
+            haulage_date(scheduled, "scheduled delivery date")
+        elif not isinstance(scheduled, str):
+            raise ValueError("Choose a valid scheduled delivery date.")
+        values.update(quoteAmount=amount, quoteDate=quote_date.date().isoformat(), scheduledDate=scheduled)
+        with locked_file(HAULAGE_BOOKINGS_FILE):
+            records = load_haulage_bookings()
+            previous = next((row for row in records if row.get("requestId") == request_id), None)
+            if previous:
+                if any(previous.get(key) != value for key, value in values.items()):
+                    handler._json_response(409, {"error": "This request was already used for different booking details."})
+                    return
+                handler._json_response(200, {"message": "Booking already recorded.", "booking": haulage_payment_record(previous)})
+                return
+            booking = {**values, "id": secrets.token_hex(12), "reference": f"AW-HAUL-{secrets.token_hex(5).upper()}",
+                       "requestId": request_id, "createdAt": now_iso(), "recordedBy": admin["email"], "receipts": [], "expenses": []}
+            records.append(booking)
+            atomic_write_json(HAULAGE_BOOKINGS_FILE, records, ensure_ascii=False)
+            audit_admin_action(handler, "haulage_booking_recorded", "haulage", booking["id"],
+                               new={"quoteAmount": amount, "reference": booking["reference"]})
+        handler._json_response(201, {"message": "Haulage booking recorded.", "booking": haulage_payment_record(booking)})
+        return
+    amount, method = payload.get("amount"), payload.get("method")
+    if type(amount) is not int or not 1 <= amount <= 1_000_000_000:
+        raise ValueError("Payment must be a positive whole-naira amount, up to 1 billion.")
+    if method not in ("bank_transfer", "cash", "pos"):
+        raise ValueError("Choose bank transfer, cash or POS as the payment method.")
+    paid_at = haulage_date(payload.get("paidDate"), "payment date")
+    if paid_at.date() > today:
+        raise ValueError("Payment date cannot be in the future.")
+    reference = haulage_text(payload, "reference", "Payment reference", 160, False)
+    booking_id = haulage_text(payload, "bookingId", "Booking", 80)
+    is_expense = path == "/api/admin/haulage/expense"
+    entry_field = "expenses" if is_expense else "receipts"
+    receipt_values = {"amount": amount, "method": method, "reference": reference, "paidAt": paid_at.isoformat()}
+    if is_expense:
+        category = payload.get("category")
+        if not isinstance(category, str) or category not in HAULAGE_EXPENSE_CATEGORIES:
+            raise ValueError("Choose a valid haulage expense category.")
+        receipt_values.update(category=category,
+                              description=haulage_text(payload, "description", "Expense description", 500),
+                              paidTo=haulage_text(payload, "paidTo", "Paid to", 120))
+    with locked_file(HAULAGE_BOOKINGS_FILE):
+        records = load_haulage_bookings()
+        booking = next((row for row in records if row["id"] == booking_id), None)
+        if not booking:
+            handler._json_response(404, {"error": "Haulage booking not found."})
+            return
+        for row in records:
+            for field in ("receipts", "expenses"):
+                for receipt in row.get(field, []):
+                    if receipt.get("requestId") == request_id:
+                        if field != entry_field or row["id"] != booking_id or any(receipt.get(key) != value for key, value in receipt_values.items()):
+                            handler._json_response(409, {"error": "This request was already used for a different payment or expense."})
+                            return
+                        handler._json_response(200, {"message": "Expense already recorded." if is_expense else "Payment already recorded.",
+                                                    "booking": haulage_payment_record(booking)})
+                        return
+                    if field == entry_field and reference and receipt.get("reference", "").casefold() == reference.casefold():
+                        handler._json_response(409, {"error": "That reference is already recorded. Check the payment and expense history."})
+                        return
+        if not is_expense and amount > haulage_payment_record(booking)["outstanding"]:
+            handler._json_response(409, {"error": "Payment exceeds the outstanding balance. Reload the booking and check the amount."})
+            return
+        receipt = {**receipt_values, "id": secrets.token_hex(12), "requestId": request_id,
+                   "recordedAt": now_iso(), "recordedBy": admin["email"]}
+        booking.setdefault(entry_field, []).append(receipt)
+        atomic_write_json(HAULAGE_BOOKINGS_FILE, records, ensure_ascii=False)
+        audit_admin_action(handler, "haulage_expense_recorded" if is_expense else "haulage_payment_received", "haulage", booking_id, new=receipt_values)
+    handler._json_response(201, {"message": "Haulage expense recorded." if is_expense else "Haulage payment recorded.",
+                                "booking": haulage_payment_record(booking)})
+
+
 def admin_payment_overview():
     subscriptions = admin_revenue_summary()
     monthly = {}
@@ -1817,7 +1981,9 @@ def admin_payment_overview():
             "subscriptionRevenue": 0, "websiteRevenue": 0, "totalRevenue": 0,
             "subscriptionRiderCosts": 0, "websiteRiderCosts": 0, "riderCosts": 0,
             "afterRiderCosts": 0, "unpaidWebsiteAmount": 0, "unpaidWebsiteCount": 0,
-            "paidWebsiteCount": 0,
+            "paidWebsiteCount": 0, "haulageRevenue": 0, "haulageReceiptCount": 0,
+            "haulageVanPayments": 0, "haulageOtherExpenses": 0, "haulageExpenses": 0,
+            "haulageNetReceived": 0, "totalRecordedCosts": 0, "afterRecordedCosts": 0,
         })
 
     for month, summary in subscriptions["monthly"].items():
@@ -1845,12 +2011,26 @@ def admin_payment_overview():
             if month:
                 totals(month)["websiteRiderCosts"] += rider_payment_for_delivery(delivery)
 
+    haulage = [haulage_payment_record(row) for row in load_haulage_bookings()]
+    for booking in haulage:
+        for receipt in booking["receipts"]:
+            row = totals(revenue_month(receipt["paidAt"]))
+            row["haulageRevenue"] += receipt["amount"]
+            row["haulageReceiptCount"] += 1
+        for expense in booking["expenses"]:
+            row = totals(revenue_month(expense["paidAt"]))
+            field = "haulageVanPayments" if expense["category"] == "van_payment" else "haulageOtherExpenses"
+            row[field] += expense["amount"]
     current_month = subscriptions["currentMonth"]
     totals(current_month)
     for row in monthly.values():
-        row["totalRevenue"] = row["subscriptionRevenue"] + row["websiteRevenue"]
+        row["totalRevenue"] = row["subscriptionRevenue"] + row["websiteRevenue"] + row["haulageRevenue"]
         row["riderCosts"] = row["subscriptionRiderCosts"] + row["websiteRiderCosts"]
         row["afterRiderCosts"] = row["totalRevenue"] - row["riderCosts"]
+        row["haulageExpenses"] = row["haulageVanPayments"] + row["haulageOtherExpenses"]
+        row["haulageNetReceived"] = row["haulageRevenue"] - row["haulageExpenses"]
+        row["totalRecordedCosts"] = row["riderCosts"] + row["haulageExpenses"]
+        row["afterRecordedCosts"] = row["totalRevenue"] - row["totalRecordedCosts"]
     # Count the subscription history once. Its payment-provider records are the
     # same receipts and must not be added to it a second time.
     yearly = {key: sum(row[key] for month, row in monthly.items() if month.startswith(current_month[:4] + "-"))
@@ -1860,7 +2040,9 @@ def admin_payment_overview():
         "count": sum(row["unpaidWebsiteCount"] for row in monthly.values()),
     }
     return {"currentMonth": current_month, "monthly": dict(sorted(monthly.items(), reverse=True)),
-            "yearly": yearly, "outstandingWebsite": outstanding}
+            "yearly": yearly, "outstandingWebsite": outstanding,
+            "outstandingHaulage": {"amount": sum(row["outstanding"] for row in haulage),
+                                   "count": sum(row["outstanding"] > 0 for row in haulage)}}
 
 
 def dashboard_stats_for_account(email):
@@ -5603,6 +5785,10 @@ class FiableHandler(SimpleHTTPRequestHandler):
             # ADMIN MARK RIDER PAYMENT AS PAID
             # =====================================================
 
+            if path in ("/api/admin/haulage", "/api/admin/haulage/receipt", "/api/admin/haulage/expense"):
+                handle_admin_haulage(self, path, payload)
+                return
+
             if path == "/api/admin/orders/express-payment":
                 admin = require_permission(self, "manage_finance")
                 if not admin:
@@ -7403,7 +7589,22 @@ class FiableHandler(SimpleHTTPRequestHandler):
             if not require_permission(self, "view_finance"):
                 self._json_response(403, {"error": "You do not have permission to view financial summaries."})
                 return
-            self._json_response(200, admin_payment_overview())
+            try:
+                self._json_response(200, admin_payment_overview())
+            except ValueError as error:
+                self._json_response(503, {"error": str(error)})
+            return
+
+        if request_path == "/api/admin/haulage":
+            if not require_permission(self, "view_finance"):
+                self._json_response(403, {"error": "You do not have permission to view haulage payments."})
+                return
+            try:
+                bookings = [haulage_payment_record(row) for row in load_haulage_bookings()]
+                self._json_response(200, {"bookings": sorted(bookings, key=lambda row: row["createdAt"], reverse=True),
+                                          "canManage": bool(require_permission(self, "manage_finance"))})
+            except ValueError as error:
+                self._json_response(503, {"error": str(error)})
             return
 
         if self.path.startswith("/api/admin/finance/payments/export"):

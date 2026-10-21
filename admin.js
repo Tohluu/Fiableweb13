@@ -1331,6 +1331,7 @@ if (logoutBtn) {
       )));
       select.value = paymentOverview.monthly[selected] ? selected : paymentOverview.currentMonth;
       renderAdminPaymentOverview();
+      await loadAdminHaulagePayments();
     } catch (failure) {
       error.textContent = `${failure.message} Use Refresh totals to try again.`;
       error.hidden = false;
@@ -1350,28 +1351,143 @@ if (logoutBtn) {
     const values = {
       paymentSubscriptionRevenue: row.subscriptionRevenue, paymentWebsiteRevenue: row.websiteRevenue,
       paymentTotalRevenue: row.totalRevenue, paymentRiderCosts: row.riderCosts,
-      paymentAfterRiderCosts: row.afterRiderCosts, paymentUnpaidWebsite: row.unpaidWebsiteAmount,
+      paymentAfterRiderCosts: row.afterRecordedCosts, paymentUnpaidWebsite: row.unpaidWebsiteAmount,
       paymentYearSubscriptions: paymentOverview.yearly.subscriptionRevenue,
       paymentYearWebsite: paymentOverview.yearly.websiteRevenue,
+      paymentHaulageRevenue: row.haulageRevenue, paymentYearHaulage: paymentOverview.yearly.haulageRevenue,
+      paymentHaulageVanPayments: row.haulageVanPayments, paymentHaulageOtherExpenses: row.haulageOtherExpenses,
+      paymentHaulageNetReceived: row.haulageNetReceived, paymentYearHaulageExpenses: paymentOverview.yearly.haulageExpenses,
+      paymentYearHaulageNet: paymentOverview.yearly.haulageNetReceived,
+      paymentAllUnpaidHaulage: paymentOverview.outstandingHaulage.amount,
       paymentYearTotal: paymentOverview.yearly.totalRevenue,
       paymentAllUnpaidWebsite: paymentOverview.outstandingWebsite.amount,
     };
     Object.entries(values).forEach(([id, amount]) => { document.getElementById(id).textContent = money(amount); });
     document.getElementById("paymentOverviewStatus").textContent = `Showing ${label(month)} · Amounts in naira`;
     document.getElementById("paymentWebsiteReceiptCount").textContent = `${row.paidWebsiteCount} confirmed express ${row.paidWebsiteCount === 1 ? "receipt" : "receipts"}`;
+    document.getElementById("paymentHaulageReceiptCount").textContent = `${row.haulageReceiptCount} confirmed haulage ${row.haulageReceiptCount === 1 ? "receipt" : "receipts"}`;
     document.getElementById("paymentUnpaidWebsiteCount").textContent = `${row.unpaidWebsiteCount} bookings created in this month; excluded from revenue`;
     document.getElementById("paymentAllUnpaidWebsiteCount").textContent = `(${paymentOverview.outstandingWebsite.count} bookings across all months)`;
     document.getElementById("paymentOverviewYearLabel").textContent = `${paymentOverview.currentMonth.slice(0, 4)} year to date`;
     document.getElementById("paymentOverviewMonths").innerHTML = Object.entries(paymentOverview.monthly).map(([key, value]) => `
       <tr class="${key === month ? "payment-selected-month" : ""}">
         <td>${escapeSubscriptionValue(label(key))}</td><td>${money(value.subscriptionRevenue)}</td>
-        <td>${money(value.websiteRevenue)}</td><td><strong>${money(value.totalRevenue)}</strong></td>
-        <td>${money(value.riderCosts)}</td><td>${money(value.afterRiderCosts)}</td>
+        <td>${money(value.websiteRevenue)}</td><td>${money(value.haulageRevenue)}</td><td><strong>${money(value.totalRevenue)}</strong></td>
+        <td>${money(value.riderCosts)}</td><td>${money(value.haulageVanPayments)}</td><td>${money(value.haulageOtherExpenses)}</td><td>${money(value.afterRecordedCosts)}</td>
       </tr>`).join("");
   }
 
   document.getElementById("paymentOverviewMonth")?.addEventListener("change", renderAdminPaymentOverview);
   document.getElementById("refreshPaymentOverview")?.addEventListener("click", loadAdminPaymentOverview);
+
+  let haulageBookings = [], haulageLoading = false;
+  const haulageMoney = value => `₦${Number(value || 0).toLocaleString("en-NG")}`;
+  const haulageExpenseLabels = {van_payment:"Van payment", fuel:"Fuel", loading:"Loading / unloading", tolls:"Tolls / parking", other:"Other expense"};
+  const haulageToday = () => new Date().toLocaleDateString("en-CA", {timeZone:"Africa/Lagos"});
+  const haulageDateLabel = value => value ? new Date(`${value.slice(0,10)}T12:00:00+01:00`).toLocaleDateString("en-GB", {
+    day:"2-digit", month:"short", year:"numeric", timeZone:"Africa/Lagos"
+  }) : "Not scheduled";
+  function haulageMessage(message, error=false) {
+    const node = document.getElementById("haulageMessage");
+    node.textContent = message; node.dataset.error = String(error);
+  }
+  function updateHaulageBalance() {
+    const booking = haulageBookings.find(row => row.id === document.getElementById("haulageReceiptBooking").value);
+    document.getElementById("haulageSelectedBalance").textContent = booking ? `Outstanding: ${haulageMoney(booking.outstanding)}` : "Choose the booking you received payment for.";
+    document.getElementById("haulageReceiptAmount").max = booking?.outstanding || 1000000000;
+  }
+  function updateHaulageExpenseSummary() {
+    const booking = haulageBookings.find(row => row.id === document.getElementById("haulageExpenseBooking").value);
+    document.getElementById("haulageExpenseSummary").textContent = booking
+      ? `Paid expenses: ${haulageMoney(booking.totalExpenses)} · Net received: ${haulageMoney(booking.netReceived)}`
+      : "Choose the haulage job this payment belongs to. Enter amounts already paid.";
+  }
+  function renderHaulagePayments() {
+    const search = document.getElementById("haulageSearch").value.trim().toLowerCase();
+    const status = document.getElementById("haulageStatus").value;
+    const labels = {unpaid:"Unpaid", part_paid:"Part paid", paid:"Paid"};
+    const methods = {bank_transfer:"Bank transfer", cash:"Cash", pos:"POS"};
+    const bookings = haulageBookings.filter(row => (status === "all" || row.paymentStatus === status)
+      && `${row.reference} ${row.customerName} ${row.phone} ${row.pickup} ${row.dropoff}`.toLowerCase().includes(search));
+    document.getElementById("haulagePaymentsBody").innerHTML = bookings.length ? bookings.map(row => `
+      <tr><td><strong>${escapeSubscriptionValue(row.reference)}</strong><small>${escapeSubscriptionValue(row.customerName)} · ${escapeSubscriptionValue(row.phone)}</small><small>Quote: ${haulageDateLabel(row.quoteDate)}</small></td>
+      <td>${escapeSubscriptionValue(row.pickup)} → ${escapeSubscriptionValue(row.dropoff)}<small>${escapeSubscriptionValue(row.description)}</small><small>Scheduled: ${haulageDateLabel(row.scheduledDate)}</small>${row.notes ? `<small>${escapeSubscriptionValue(row.notes)}</small>` : ""}</td>
+      <td>${haulageMoney(row.quoteAmount)}</td><td>${haulageMoney(row.amountPaid)}</td><td><strong>${haulageMoney(row.outstanding)}</strong></td>
+      <td><strong>${haulageMoney(row.totalExpenses)}</strong><small>Van: ${haulageMoney(row.vanPayments)}</small><small>Other: ${haulageMoney(row.otherExpenses)}</small></td><td><strong>${haulageMoney(row.netReceived)}</strong><small>Receipts − paid expenses</small></td>
+      <td>${labels[row.paymentStatus]}<details><summary>${row.receipts.length} receipt${row.receipts.length === 1 ? "" : "s"}</summary>${row.receipts.length ? row.receipts.map(receipt => `
+        <div class="haulage-receipt"><strong>${haulageMoney(receipt.amount)}</strong><small>Received: ${haulageDateLabel(receipt.paidAt)} (Lagos)</small><small>${methods[receipt.method] || "Payment"} · ${escapeSubscriptionValue(receipt.reference || "No reference")}</small><small>Recorded by ${escapeSubscriptionValue(receipt.recordedBy || "Admin")}</small></div>`).join("") : '<p class="muted">No payments received yet.</p>'}</details>
+        <details><summary>${row.expenses.length} expense${row.expenses.length === 1 ? "" : "s"}</summary>${row.expenses.length ? row.expenses.map(expense => `
+        <div class="haulage-receipt"><strong>${haulageExpenseLabels[expense.category]} · ${haulageMoney(expense.amount)}</strong><small>Paid: ${haulageDateLabel(expense.paidAt)} (Lagos)</small><small>Paid to ${escapeSubscriptionValue(expense.paidTo)}</small><small>${escapeSubscriptionValue(expense.description)}</small><small>${methods[expense.method] || "Payment"} · ${escapeSubscriptionValue(expense.reference || "No reference")}</small><small>Recorded by ${escapeSubscriptionValue(expense.recordedBy || "Admin")}</small></div>`).join("") : '<p class="muted">No expenses recorded yet.</p>'}</details></td></tr>`).join("")
+      : '<tr><td colspan="8" class="empty-state">No matching haulage bookings. Add an agreed quote to start tracking payments.</td></tr>';
+  }
+  async function loadAdminHaulagePayments(selectedId) {
+    if (haulageLoading || !adminCanView("view_finance")) return;
+    haulageLoading = true;
+    try {
+      const data = await api("/api/admin/haulage", {cache:"no-store"});
+      haulageBookings = data.bookings;
+      document.getElementById("haulageManage").hidden = !data.canManage;
+      const select = document.getElementById("haulageReceiptBooking");
+      const selected = selectedId || select.value;
+      select.replaceChildren(new Option("Choose a booking", ""), ...haulageBookings.filter(row => row.outstanding > 0).map(row =>
+        new Option(`${row.reference} · ${row.customerName} · ${haulageMoney(row.outstanding)}`, row.id)));
+      select.value = haulageBookings.some(row => row.id === selected && row.outstanding > 0) ? selected : "";
+      const expenseSelect = document.getElementById("haulageExpenseBooking");
+      const expenseSelected = selectedId || expenseSelect.value;
+      expenseSelect.replaceChildren(new Option("Choose a booking", ""), ...haulageBookings.map(row =>
+        new Option(`${row.reference} · ${row.customerName}`, row.id)));
+      expenseSelect.value = haulageBookings.some(row => row.id === expenseSelected) ? expenseSelected : "";
+      updateHaulageBalance(); updateHaulageExpenseSummary(); renderHaulagePayments();
+    } catch (error) {
+      haulageMessage(`${error.message} Use Refresh totals to try again.`, true);
+      document.getElementById("haulageManage").hidden = true;
+    } finally { haulageLoading = false; }
+  }
+  document.getElementById("haulageSearch")?.addEventListener("input", renderHaulagePayments);
+  document.getElementById("haulageStatus")?.addEventListener("change", renderHaulagePayments);
+  document.getElementById("haulageReceiptBooking")?.addEventListener("change", updateHaulageBalance);
+  document.getElementById("haulageExpenseBooking")?.addEventListener("change", updateHaulageExpenseSummary);
+  for (const id of ["haulageQuoteDate", "haulagePaidDate", "haulageExpenseDate"]) {
+    const field = document.getElementById(id);
+    if (field) { field.value = haulageToday(); field.max = haulageToday(); }
+  }
+  for (const [formId, endpoint] of [["haulageBookingForm", "/api/admin/haulage"], ["haulageReceiptForm", "/api/admin/haulage/receipt"], ["haulageExpenseForm", "/api/admin/haulage/expense"]]) {
+    const form = document.getElementById(formId);
+    if (!form) continue;
+    let requestId = crypto.randomUUID(), saving = false;
+    form.addEventListener("input", () => { if (!saving) requestId = crypto.randomUUID(); });
+    form.addEventListener("submit", async event => {
+      event.preventDefault();
+      if (saving || !adminCanView("manage_finance")) return;
+      const value = id => document.getElementById(id).value.trim();
+      const body = formId === "haulageBookingForm" ? {
+        customerName:value("haulageCustomer"), phone:value("haulagePhone"), pickup:value("haulagePickup"), dropoff:value("haulageDropoff"),
+        quoteAmount:Number(value("haulageQuote")), quoteDate:value("haulageQuoteDate"), scheduledDate:value("haulageScheduledDate"),
+        description:value("haulageDescription"), notes:value("haulageNotes"), requestId
+      } : formId === "haulageExpenseForm" ? {
+        bookingId:value("haulageExpenseBooking"), amount:Number(value("haulageExpenseAmount")), paidDate:value("haulageExpenseDate"),
+        method:value("haulageExpenseMethod"), reference:value("haulageExpenseReference"), category:value("haulageExpenseCategory"),
+        paidTo:value("haulageExpensePaidTo"), description:value("haulageExpenseDescription"), requestId
+      } : {
+        bookingId:value("haulageReceiptBooking"), amount:Number(value("haulageReceiptAmount")), paidDate:value("haulagePaidDate"),
+        method:value("haulageReceiptMethod"), reference:value("haulageReceiptReference"), requestId
+      };
+      saving = true;
+      const controls = [...form.querySelectorAll("input,select,textarea,button")];
+      controls.forEach(control => { control.disabled = true; });
+      try {
+        const data = await api(endpoint, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)});
+        form.reset(); requestId = crypto.randomUUID();
+        const dateField = {haulageBookingForm:"haulageQuoteDate", haulageReceiptForm:"haulagePaidDate", haulageExpenseForm:"haulageExpenseDate"}[formId];
+        document.getElementById(dateField).value = haulageToday();
+        await loadAdminHaulagePayments(data.booking.id);
+        if (formId === "haulageBookingForm") document.getElementById("haulageReceiptDetails").open = true;
+        await loadAdminPaymentOverview();
+        haulageMessage(data.message);
+      } catch (error) { haulageMessage(error.message, true); }
+      finally { saving = false; controls.forEach(control => { control.disabled = false; }); }
+    });
+  }
 
   async function loadAdminSubscriptionHistory() {
     const tableBody = document.getElementById("adminSubscriptionHistoryBody");
@@ -1856,6 +1972,15 @@ if (logoutBtn) {
       outstanding: "Outstanding",
       not_payable: "Not payable"
     })[status] || "Not payable";
+    const deliveryDateLabel = delivery => {
+      if (String(delivery.status || "").toLowerCase() !== "delivered") return "Not delivered";
+      if (!delivery.deliveredAt) return "Not recorded";
+      const date = new Date(delivery.deliveredAt);
+      return Number.isNaN(date.getTime()) ? "Not recorded" : date.toLocaleString("en-GB", {
+        day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit",
+        timeZone: "Africa/Lagos"
+      });
+    };
 
     riderDetailsBody.innerHTML = `
       <div class="rider-payment-summary-grid">
@@ -1866,8 +1991,8 @@ if (logoutBtn) {
       </div>
       ${outstandingDeliveries.length ? `<div class="rider-payment-outstanding"><strong>${outstandingDeliveries.length} ${outstandingDeliveries.length === 1 ? "delivery" : "deliveries"} need payment</strong><span>₦${outstandingDeliveries.reduce((total, delivery) => total + Number(delivery.outstandingAmount || 0), 0).toLocaleString("en-NG")} outstanding</span></div>` : ""}
       <h3>Delivery payments</h3>
-      ${payment.breakdown?.length ? `<div class="table-wrap"><table class="admin-table"><thead><tr><th>Order</th><th>Route</th><th>Units</th><th>Status</th><th>Rider 80%</th><th>Payment</th></tr></thead><tbody>${payment.breakdown.map(delivery => `
-        <tr class="${delivery.paymentStatus === "outstanding" || delivery.paymentStatus === "part_paid" ? "rider-payment-row-outstanding" : ""}"><td>${escapeSubscriptionValue(delivery.orderRef)}</td><td>${escapeSubscriptionValue(delivery.route)}</td><td>${delivery.units}</td><td>${escapeSubscriptionValue(delivery.status || "—")}</td><td>${delivery.payable ? `₦${Number(delivery.riderPayment).toLocaleString("en-NG")}` : "Not payable"}</td><td><span class="rider-payment-status ${escapeSubscriptionValue(delivery.paymentStatus)}">${paymentStatusLabel(delivery.paymentStatus)}${delivery.paymentStatus === "outstanding" || delivery.paymentStatus === "part_paid" ? ` · ₦${Number(delivery.outstandingAmount || 0).toLocaleString("en-NG")}` : ""}</span></td></tr>
+      ${payment.breakdown?.length ? `<div class="table-wrap"><table class="admin-table"><thead><tr><th>Order</th><th>Delivered on (Lagos)</th><th>Route</th><th>Units</th><th>Status</th><th>Rider 80%</th><th>Payment</th></tr></thead><tbody>${payment.breakdown.map(delivery => `
+        <tr class="${delivery.paymentStatus === "outstanding" || delivery.paymentStatus === "part_paid" ? "rider-payment-row-outstanding" : ""}"><td>${escapeSubscriptionValue(delivery.orderRef)}</td><td>${escapeSubscriptionValue(deliveryDateLabel(delivery))}</td><td>${escapeSubscriptionValue(delivery.route)}</td><td>${delivery.units}</td><td>${escapeSubscriptionValue(delivery.status || "—")}</td><td>${delivery.payable ? `₦${Number(delivery.riderPayment).toLocaleString("en-NG")}` : "Not payable"}</td><td><span class="rider-payment-status ${escapeSubscriptionValue(delivery.paymentStatus)}">${paymentStatusLabel(delivery.paymentStatus)}${delivery.paymentStatus === "outstanding" || delivery.paymentStatus === "part_paid" ? ` · ₦${Number(delivery.outstandingAmount || 0).toLocaleString("en-NG")}` : ""}</span></td></tr>
       `).join("")}</tbody></table></div>` : '<p class="muted">No deliveries found for this rider.</p>'}
       <div class="rider-payment-actions" style="margin-block-start: 20px;">
         <button type="button" id="markRiderPaymentPaidBtn" class="btn primary">Mark payment as paid</button>

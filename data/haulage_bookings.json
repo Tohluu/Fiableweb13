@@ -1,0 +1,71 @@
+[
+  {
+    "customerName": "Motolani",
+    "phone": "08134977877",
+    "pickup": "3A Elegushi road Ikate",
+    "dropoff": "41 Solomon Okonkwo Street Unity Estate",
+    "description": "Client relocated abroad and needs to move everything in her apartment to another location",
+    "notes": "Bed frame\nMattress\n2 AC\nWardrope \nFridge\nMicrowave\n3 sitter chair and 4 sitter chair\nTV\nShelve\nWashing machine",
+    "quoteAmount": 250000,
+    "quoteDate": "2026-10-06",
+    "scheduledDate": "2026-10-17",
+    "id": "93fa58dc8cb7cc54dcb05a44",
+    "reference": "AW-HAUL-B267DAA6F1",
+    "requestId": "20f64b85-9bf8-4dda-b352-31106444fe99",
+    "createdAt": "2026-10-20T18:55:51.609493+00:00",
+    "recordedBy": "toluwaloseoyinloye@gmail.com",
+    "receipts": [
+      {
+        "amount": 250000,
+        "method": "bank_transfer",
+        "reference": "",
+        "paidAt": "2026-10-14T12:00:00+01:00",
+        "id": "c6ddb1ef6c320caf9418c28d",
+        "requestId": "b70eab63-b9ec-4feb-ac6f-113e929cf259",
+        "recordedAt": "2026-10-20T18:56:16.906686+00:00",
+        "recordedBy": "toluwaloseoyinloye@gmail.com"
+      }
+    ],
+    "expenses": [
+      {
+        "amount": 120000,
+        "method": "bank_transfer",
+        "reference": "",
+        "paidAt": "2026-10-17T12:00:00+01:00",
+        "category": "van_payment",
+        "description": "Van hire",
+        "paidTo": "Driver",
+        "id": "e4aef78a613783b459ebff1d",
+        "requestId": "3b6773b7-162d-42d8-b795-89866d22aa29",
+        "recordedAt": "2026-10-20T19:13:58.994500+00:00",
+        "recordedBy": "toluwaloseoyinloye@gmail.com"
+      },
+      {
+        "amount": 40000,
+        "method": "bank_transfer",
+        "reference": "",
+        "paidAt": "2026-10-17T12:00:00+01:00",
+        "category": "other",
+        "description": "AC and Furniture",
+        "paidTo": "AC and Furniture",
+        "id": "cfe798886639cc39cae92346",
+        "requestId": "1ac7782f-53e8-4b9d-b90f-875d0de7d33d",
+        "recordedAt": "2026-10-20T19:15:01.224574+00:00",
+        "recordedBy": "toluwaloseoyinloye@gmail.com"
+      },
+      {
+        "amount": 20000,
+        "method": "bank_transfer",
+        "reference": "",
+        "paidAt": "2026-10-17T12:00:00+01:00",
+        "category": "fuel",
+        "description": "Petrol for my car to and fro",
+        "paidTo": "Muscle car I drove",
+        "id": "680ebe61d3c7d967c9678a91",
+        "requestId": "27ec3857-a7a5-4798-9734-56919c103fbe",
+        "recordedAt": "2026-10-20T19:16:25.725040+00:00",
+        "recordedBy": "toluwaloseoyinloye@gmail.com"
+      }
+    ]
+  }
+]

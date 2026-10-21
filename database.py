@@ -15,7 +15,7 @@ COLLECTIONS = (
     "accounts", "admin_credentials", "deliveries", "riders", "subscriptions",
     "rider_notifications", "rider_payments", "submissions", "audit_log",
     "unit_adjustments", "support_tickets", "notification_log", "payments",
-    "reset_tokens", "batch_routing",
+    "reset_tokens", "batch_routing", "haulage_bookings",
 )
 WRITE_LOCK = 734924067116  # Shared across every Fiable process using this database.
 

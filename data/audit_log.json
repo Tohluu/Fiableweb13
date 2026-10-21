@@ -23857,5 +23857,148 @@
       "pickupRules": {}
     },
     "note": null
+  },
+  {
+    "id": "yG0ZkCnz6GCWW29N",
+    "at": "2026-10-20T17:58:13.201073+00:00",
+    "actorEmail": "toluwaloseoyinloye@gmail.com",
+    "actorRole": "owner",
+    "action": "admin_login",
+    "targetType": "admin",
+    "targetId": 2,
+    "previousValue": null,
+    "newValue": null,
+    "note": null
+  },
+  {
+    "id": "_f2IwwzgeCPx482e",
+    "at": "2026-10-20T17:59:25.044372+00:00",
+    "actorEmail": "toluwaloseoyinloye@gmail.com",
+    "actorRole": "owner",
+    "action": "rider_payment_recorded",
+    "targetType": "rider",
+    "targetId": 8,
+    "previousValue": null,
+    "newValue": {
+      "amount": 9600,
+      "month": "2026-10"
+    },
+    "note": null
+  },
+  {
+    "id": "2x8AC_9UonUE_u63",
+    "at": "2026-10-20T18:50:13.292716+00:00",
+    "actorEmail": "toluwaloseoyinloye@gmail.com",
+    "actorRole": "owner",
+    "action": "admin_login",
+    "targetType": "admin",
+    "targetId": 2,
+    "previousValue": null,
+    "newValue": null,
+    "note": null
+  },
+  {
+    "id": "xUn6o2-HSRNLh-yn",
+    "at": "2026-10-20T18:55:51.642888+00:00",
+    "actorEmail": "toluwaloseoyinloye@gmail.com",
+    "actorRole": "owner",
+    "action": "haulage_booking_recorded",
+    "targetType": "haulage",
+    "targetId": "93fa58dc8cb7cc54dcb05a44",
+    "previousValue": null,
+    "newValue": {
+      "quoteAmount": 250000,
+      "reference": "AW-HAUL-B267DAA6F1"
+    },
+    "note": null
+  },
+  {
+    "id": "iLgdcfaFzkmf2yGI",
+    "at": "2026-10-20T18:56:16.984948+00:00",
+    "actorEmail": "toluwaloseoyinloye@gmail.com",
+    "actorRole": "owner",
+    "action": "haulage_payment_received",
+    "targetType": "haulage",
+    "targetId": "93fa58dc8cb7cc54dcb05a44",
+    "previousValue": null,
+    "newValue": {
+      "amount": 250000,
+      "method": "bank_transfer",
+      "reference": "",
+      "paidAt": "2026-10-14T12:00:00+01:00"
+    },
+    "note": null
+  },
+  {
+    "id": "Mdk11Yj7YdMsl0CI",
+    "at": "2026-10-20T19:13:05.089728+00:00",
+    "actorEmail": "toluwaloseoyinloye@gmail.com",
+    "actorRole": "owner",
+    "action": "admin_login",
+    "targetType": "admin",
+    "targetId": 2,
+    "previousValue": null,
+    "newValue": null,
+    "note": null
+  },
+  {
+    "id": "iwEPa1tQuWsuuHU_",
+    "at": "2026-10-20T19:13:59.064857+00:00",
+    "actorEmail": "toluwaloseoyinloye@gmail.com",
+    "actorRole": "owner",
+    "action": "haulage_expense_recorded",
+    "targetType": "haulage",
+    "targetId": "93fa58dc8cb7cc54dcb05a44",
+    "previousValue": null,
+    "newValue": {
+      "amount": 120000,
+      "method": "bank_transfer",
+      "reference": "",
+      "paidAt": "2026-10-17T12:00:00+01:00",
+      "category": "van_payment",
+      "description": "Van hire",
+      "paidTo": "Driver"
+    },
+    "note": null
+  },
+  {
+    "id": "KGevZtL0-X9Ay9Fs",
+    "at": "2026-10-20T19:15:01.260482+00:00",
+    "actorEmail": "toluwaloseoyinloye@gmail.com",
+    "actorRole": "owner",
+    "action": "haulage_expense_recorded",
+    "targetType": "haulage",
+    "targetId": "93fa58dc8cb7cc54dcb05a44",
+    "previousValue": null,
+    "newValue": {
+      "amount": 40000,
+      "method": "bank_transfer",
+      "reference": "",
+      "paidAt": "2026-10-17T12:00:00+01:00",
+      "category": "other",
+      "description": "AC and Furniture",
+      "paidTo": "AC and Furniture"
+    },
+    "note": null
+  },
+  {
+    "id": "HX42trxA5YnwgC3p",
+    "at": "2026-10-20T19:16:25.760765+00:00",
+    "actorEmail": "toluwaloseoyinloye@gmail.com",
+    "actorRole": "owner",
+    "action": "haulage_expense_recorded",
+    "targetType": "haulage",
+    "targetId": "93fa58dc8cb7cc54dcb05a44",
+    "previousValue": null,
+    "newValue": {
+      "amount": 20000,
+      "method": "bank_transfer",
+      "reference": "",
+      "paidAt": "2026-10-17T12:00:00+01:00",
+      "category": "fuel",
+      "description": "Petrol for my car to and fro",
+      "paidTo": "Muscle car I drove"
+    },
+    "note": null
   }
 ]

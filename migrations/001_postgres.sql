@@ -16,7 +16,7 @@ BEGIN
         'accounts', 'admin_credentials', 'deliveries', 'riders', 'subscriptions',
         'rider_notifications', 'rider_payments', 'submissions', 'audit_log',
         'unit_adjustments', 'support_tickets', 'notification_log', 'payments',
-        'reset_tokens', 'batch_routing'
+        'reset_tokens', 'batch_routing', 'haulage_bookings'
     ] LOOP
         EXECUTE format('CREATE TABLE IF NOT EXISTS fiable.%I (
             record_key text PRIMARY KEY,
