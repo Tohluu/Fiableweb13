@@ -1,0 +1,74 @@
+Created using the built-in image generation tool.
+Pricing checked against local services.html, server.py and get-started.html on 2026-10-23. Contact checked against contact.html.
+Reference image: images/apexwings-logo.png.
+
+Use case: ads-marketing / structured rate card.
+Create a polished, accurate, finished ApexWings Logistics RATE CARD as a flat portrait graphic, approximately 2:3, high resolution, easy to read on WhatsApp. Use the supplied official logo as brand reference, preserving the blue A/wing mark, ApexWings wordmark and SPEED | RELIABILITY | TRUST tagline faithfully.
+Design should complement earlier ApexWings flyers: white background, navy #0c2d51, vibrant blue #1769e0, pale blue panels, tasteful cyan accents, bold contemporary sans-serif. Clear grid alignment, ample safe margins, exceptionally clean numbers and naira symbols. This is a practical pricing reference: prices and tables dominate, no large hero photo or marketing paragraphs. Small tasteful parcel, motorcycle and cargo van illustrations/icons may identify service sections, but keep them secondary.
+Layout:
+1. Compact official logo header with large title RATE CARD and Lagos subtitle.
+2. Monthly subscription section with three adjacent pricing cards, all fully visible.
+3. Simple explanatory unit note.
+4. Express / single delivery section with an actual two-column table containing seven rows: Route units | Estimated charge. Match numbers accurately.
+5. Clearly prominent BULK HAULAGE section with small blue/white cargo van and cartons icon, quote details.
+6. Compact Batch Saver note and subscription terms.
+7. Strong navy WhatsApp contact footer.
+
+Render the following exact text, no extra copy or invented prices:
+Title: "RATE CARD"
+Subtitle: "Delivery services across Lagos"
+
+Section heading: "MONTHLY SUBSCRIPTION PLANS"
+Three pricing cards:
+"BASIC"
+"₦67,500 / month"
+"45 delivery units"
+"₦1,500 per unit"
+
+"GROWTH"
+"₦105,000 / month"
+"75 delivery units"
+"₦1,400 per unit"
+
+"BUSINESS"
+"₦143,000 / month"
+"110 delivery units"
+"₦1,300 per unit"
+
+Explanatory note:
+"Units are delivery credits. Each route uses 1–7 units; the number of deliveries depends on your routes."
+Small subscription pricing note:
+"Subscription express priority: +₦2,000 per delivery."
+
+Section heading: "EXPRESS / SINGLE DELIVERY"
+Rate highlight: "₦2,000 per route unit • No subscription required"
+Table column headers: "Route units" and "Estimated charge"
+Rows, each in its own line with its corresponding charge:
+"1" | "₦2,000"
+"2" | "₦4,000"
+"3" | "₦6,000"
+"4" | "₦8,000"
+"5" | "₦10,000"
+"6" | "₦12,000"
+"7" | "₦14,000"
+Table footnote: "Confirm your pickup, destination and availability with our team."
+
+Prominent section heading: "BULK HAULAGE"
+"Custom quote by load and route"
+"Cartons • Furniture • Equipment"
+"Send goods, quantity, estimated size, pickup and destination."
+"Price and vehicle availability confirmed before booking."
+
+Small savings note:
+"BATCH SAVER"
+"Eligible subscriber delivery groups can save units. Review your quote before booking."
+
+Small but legible terms:
+"Monthly plans are paid upfront. Unused units may roll over for up to two weeks."
+
+Footer:
+"Get your route quote on WhatsApp"
+"+234 701 541 4492"
+"Monday–Saturday • 8:00 AM–5:00 PM"
+
+Constraints: literal price accuracy is essential. Do not call units deliveries. Do not invent destination-specific prices, discounts, dates, tax charges, website, email, QR code or delivery guarantees. Make it clear the ₦2,000-per-unit table applies to EXPRESS / SINGLE DELIVERY only, not subscription plans. Bulk haulage is quoted separately. Priority surcharge is subscription-specific and must not be added to the single delivery table. Avoid tiny dense text, overlapping sections or clipped prices. All content must fit and be readable. Final image should be an elegant and useful customer-facing rate card.

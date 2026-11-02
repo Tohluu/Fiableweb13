@@ -1,0 +1,38 @@
+Created using the built-in image generation tool.
+Design guide: C:\Users\HP FOLIO\Pictures\sample2.jpeg
+Brand reference: images/Logo2.png
+
+Use case: ads-marketing.
+Asset type: finished high-resolution landscape educational marketing flyer for Fiable Logistics, approximately 16:9, 2048x1152 or larger with generous legibility. Flat graphic, not a photographed poster.
+Primary request: "How Fiable Works". Explain the subscription model: choose a plan, receive delivery units, request and track deliveries. Goal: explain the offer simply to a first-time customer. Include images illustrating each subscription step.
+
+Input image 1: sample2.jpeg, PRIMARY LAYOUT AND STYLE GUIDE. Follow its white space, professional presentation aesthetic, large upper-left heading, numbered process stages, aligned smartphone illustrations and left-to-right progression arrows. Adapt into four equally important stages with FOUR phones, one per stage. Omit the reference's dark sidebar, page number and unrelated navigation. Do not reproduce its Paack/Nespresso logos, delivery time slots, map, tracking promises or wording.
+Input image 2: images/Logo2.png, official FIABLE LOGISTICS logo reference. Preserve its winged parcel emblem and Fiable Logistics lettering faithfully. This flyer is branded FIABLE, not ApexWings. Place the full official logo cleanly in the upper-right white area at a comfortably visible size. Do not add ApexWings, Paack, Nespresso or other brands.
+
+Art direction: clean bright white background; navy and royal blue typography with cyan highlights reflecting the official Fiable logo. Spacious, welcoming, precise. Bold large headline, a brief subtitle, then four evenly spaced columns. Each column contains a bold numbered step heading above a large realistic but simplified smartphone illustration, with a short explanatory caption below. Thin blue progression chevrons between the phones. All four phone frames equal height. Screens are polished ILLUSTRATIVE interfaces with a few large legible elements, not dense screenshots, and no tiny invented paragraphs, fake browser URLs, full keyboards or map tiles. Navy/blue smartphone frames, white screens and restrained cyan selections. Each phone has a relevant clear blue icon: plans/calendar, credit wallet, parcel/pickup form, completed delivery timeline.
+
+Phone 1: plan selection interface showing three simple plan rows: "Basic" with "45 units"; "Growth" with "75 units", selected in blue; "Business" with "110 units". The selected Growth plan makes the numerical example coherent.
+Phone 2: wallet/balance interface with a large "75", "units available" and "Growth plan", plus a simple delivery-credit/wallet illustration.
+Phone 3: compact request interface with fields labelled "Pickup" and "Destination", a simple parcel icon, a clear route estimate "3 units", and a button reading "Confirm request". Do not fill in real addresses.
+Phone 4: delivery status interface with an easily read three-stage timeline "Requested", "In transit", "Delivered", the last state selected with a check mark. Below show "72 units remaining". Do not imply live GPS tracking or guaranteed delivery times.
+Include a small readable "Illustrative screens" label near the process area so viewers understand these are explanatory visuals.
+
+EXACT TEXT outside phones:
+"How Fiable Works"
+"Your monthly delivery plan, explained."
+"01 Choose a plan"
+"Select a monthly plan and pay upfront."
+"02 Receive units"
+"Your plan adds delivery credits to your account."
+"03 Request a delivery"
+"Add pickup and destination. Review units and confirm."
+"04 Track deliveries"
+"Follow order updates and your remaining units."
+"Illustrative screens"
+"Example: Growth gives 75 units. A 3-unit delivery leaves 72."
+"Units are delivery credits, not a fixed number of deliveries. Each route uses 1–7 units."
+"Choose your plan and get started."
+[Official Fiable Logistics logo as supplied]
+
+Composition detail: below the four phone columns and captions, place the illustrative numerical example in a calm pale blue full-width strip with a modest wallet/parcel icon. Put the units clarification directly beneath it in clear readable navy type. Small final call to action at the bottom. Ensure no overlap, no text clipped, no excessively small text and no unnecessary clutter. Prioritise the four steps over decorative effects.
+Constraints: use Fiable spelling accurately. Keep the 75 minus 3 equals 72 example exact. Do not confuse units with deliveries. No pricing, no website, QR code, phone number or email, no monthly rollover claim, no expiry claims, no unlimited deliveries, no nationwide coverage, no invented speed guarantee or GPS map. The four-stage journey and unit-credit explanation must be understandable at a glance.

@@ -1,0 +1,28 @@
+Created using the built-in image generation tool.
+
+Use case: ads-marketing.
+Asset type: finished portrait social-media flyer for ApexWings, approximately 2:3, high resolution, flat artwork suitable for WhatsApp and Instagram sharing.
+Primary request: "Running a Business Is Hard Enough". Show the everyday frustrations of running a small business: rider cancellations, unexpected delivery charges, delayed deliveries and customer complaints. Goal: immediate recognition, empathy and shares.
+Input image 1: official ApexWings logo reference. Preserve its blue wing/A symbol, ApexWings wordmark and SPEED | RELIABILITY | TRUST tagline faithfully. Do not redesign it.
+Input image 2: previous ApexWings flyer, brand reference only. Carry through its premium navy, electric blue, cyan and white palette and crisp bold typography. Do NOT reproduce its sales-oriented layout, service claims, plans, prices, phone number or vehicle scene.
+
+Composition: compact official logo on a clean white upper area, followed by a very large highly readable multi-line headline. Central editorial photographic scene of a relatable Nigerian female small-business owner at her packing table, surrounded by a few sealed parcels, checking her phone with a weary, exasperated but natural expression. One hand rests at her temple. She is working hard, not posing for a glamour shot. Realistic warm skin, believable hands and phone. Tasteful blue/navy graphic framing unifies the photo with the brand.
+Integrate four spacious notification-style panels around or immediately below the central scene, one for each everyday frustration. Each panel has its short exact category label and quote below. They must be clearly readable at phone size. The messages are examples of business frustrations, not literal notifications bearing ApexWings branding. Do not imply that ApexWings is the company causing these problems.
+Finish with a concise engagement prompt and sharing call to action on a navy footer. Keep a clear visual hierarchy, strong contrast, sufficient margins and minimal clutter. No sales pitch. No exaggerated distress. No emojis.
+
+Exact visible text:
+[Official logo including its existing tagline]
+"Running a Business"
+"Is Hard Enough"
+"Rider cancellations"
+"The rider cancelled. Again."
+"Unexpected charges"
+"Another extra charge?"
+"Delayed deliveries"
+"It still hasn't arrived."
+"Customer complaints"
+"Where is my order?"
+"Sound familiar?"
+"Share with a business owner who gets it."
+
+Constraints: render all text accurately, use elegant modern sans-serif typography, no cropping of text or logo, no invented logo, no added phone number, email, URL, QR code, discount, price, guarantee, service promise or other copy. Do not show any rider or vehicle in ApexWings branding associated with the complaints. Empathetic and shareable rather than an aggressive sales ad.

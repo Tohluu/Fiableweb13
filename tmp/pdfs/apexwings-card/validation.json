@@ -1,0 +1,20 @@
+{
+  "card_size_mm": [
+    90,
+    50
+  ],
+  "bleed_mm": 3,
+  "professional_pdf_pages": 2,
+  "a4_pdf_pages": 2,
+  "cards_per_a4": 8,
+  "phone": "+234 701 541 4492",
+  "qr_target": "https://wa.me/2347015414492",
+  "qr_modules_including_quiet_zone": 37,
+  "logo_dpi_at_print_size": 390,
+  "font_embedding": "Segoe UI regular and bold, embedded TrueType subsets",
+  "outputs": [
+    "C:\\Users\\HP FOLIO\\Documents\\Fiable\\output\\pdf\\apexwings-business-card-print.pdf",
+    "C:\\Users\\HP FOLIO\\Documents\\Fiable\\output\\pdf\\apexwings-business-cards-A4.pdf",
+    "C:\\Users\\HP FOLIO\\Documents\\Fiable\\output\\pdf\\apexwings-business-card-preview.png"
+  ]
+}

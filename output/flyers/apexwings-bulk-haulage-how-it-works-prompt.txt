@@ -1,0 +1,36 @@
+Created using the built-in image generation tool.
+
+Use case: ads-marketing.
+Asset type: finished high-resolution landscape social-media explainer flyer for ApexWings Logistics, approximately 16:9, matching the series style of the supplied subscription explainer. Flat designed graphic, not a photographed poster.
+Primary request: create another "How ApexWings Works" flyer, this time entirely about BULK HAULAGE. Explain how to enquire and book a larger load. Make the process understandable at a glance.
+
+Input image 1: official ApexWings logo. Faithfully retain the supplied blue wing/A mark, ApexWings lettering and SPEED | RELIABILITY | TRUST tagline. No redesigned mark.
+Input image 2: existing "How ApexWings Works" subscription flyer, STYLE AND COMPOSITION REFERENCE ONLY. Use its clean white background, navy/royal-blue/cyan palette, large title, four numbered stages with progression arrows, neat alignment and generous whitespace. This is a new bulk-haulage flyer: remove ALL subscription plans, delivery units, balances, subscription phone screens and numerical examples.
+
+Design: large "How ApexWings Works" heading at upper-left, compact complete official logo upper-right, strong cyan "BULK HAULAGE" subheading. Under that, a brief product-category line. Main middle area comprises FOUR evenly spaced numbered stages, left to right, each with a large high-quality modern editorial logistics illustration and a very readable short explanatory caption. Use beautiful coherent semi-realistic blue-and-white illustrations with kraft cartons and human warmth; no childish clipart and no dense mockup screens. Fine blue chevrons connect the four stages.
+Stage 1 illustration: cartons plus a wrapped furniture item and a small measuring tape, communicating details of the goods. No exotic/industrial hazards.
+Stage 2 illustration: two clearly marked pickup/destination location pins, connected by a simple schematic route line, with a calendar symbol. This is a schematic graphic, NOT a real map.
+Stage 3 illustration: a clean large quote sheet/clipboard with a check mark and a blue cargo vehicle symbol. No invented price, fake readable fine print or guarantee.
+Stage 4 illustration: a modern unbranded blue-and-white medium cargo truck at a tidy pickup point with sealed cartons and a professional Nigerian logistics worker. Keep scale believable and avoid oversized fleets, container ships or airplanes.
+All four illustrations equal visual weight and aligned. Stage captions on white must be large enough for phone reading. Lower pale-blue strip has a helpful note on handling/access. Footer navy band features a strong WhatsApp quote-enquiry CTA and a large accurate phone number, plus Lagos location and one concise confirmation note. Do not overcrowd or crop the footer.
+
+EXACT VISIBLE TEXT:
+"How ApexWings Works"
+"BULK HAULAGE"
+"Stock • Cartons • Furniture • Equipment"
+"01 Share your load"
+"Goods, quantity, weight or dimensions."
+"02 Send your route"
+"Pickup, destination and preferred date."
+"03 Receive your quote"
+"We confirm price and vehicle availability."
+"04 Confirm your booking"
+"Agree the details and pickup timing."
+"Let us know about fragile items, stairs or loading help needed."
+"Request a bulk haulage quote on WhatsApp"
+"+234 701 541 4492"
+"Lagos, Nigeria"
+"Quote, vehicle availability and pickup timing confirmed before booking."
+[Official ApexWings logo with its existing tagline]
+
+Constraints: exact spelling ApexWings and complete correct phone digits. The offer is quote-based bulk haulage, no subscriptions or units. No prices, no free quote claim, no fixed maximum load, no owned fleet claim, no vehicle availability guarantee, no nationwide coverage, no same-day promise, no GPS/live tracking promises, no website, QR code, email or other brands. Preserve a premium brand-consistent clean layout with no extra copy, no tiny text, no overlapping labels and no cropped elements.

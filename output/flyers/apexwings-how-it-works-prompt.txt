@@ -1,0 +1,32 @@
+Created using the built-in image generation tool; branding edit of fiable-how-it-works.png.
+
+Use case: text-localization.
+Asset type: existing landscape subscription-explainer flyer, precise brand correction.
+Input image 1: EDIT TARGET, the existing "How Fiable Works" flyer. Preserve its landscape dimensions, four-phone layout, white background, typography style, blue/cyan/navy palette, arrows, illustrations, spacing and all subscription information.
+Input image 2: official ApexWings logo, replacement brand reference. Preserve its supplied blue wing/A mark, ApexWings wordmark and SPEED | RELIABILITY | TRUST tagline faithfully.
+
+Requested changes ONLY:
+1. Replace the large top heading "How Fiable Works" with "How ApexWings Works". Spell ApexWings exactly. Keep it large and bold, using blue for ApexWings and navy for How and Works. Rebalance or modestly resize the title if necessary so the longer name fits cleanly without colliding with the logo.
+2. Replace the Fiable Logistics logo in the upper-right with the supplied official ApexWings logo, including its tagline when legible.
+3. Replace ALL FOUR Fiable Logistics logos inside the four phone screens with small faithful ApexWings logos/wordmarks. Ensure no Fiable lettering or old winged-box brand emblem remains anywhere.
+
+Keep all other text and numerical information exactly unchanged:
+"Your monthly delivery plan, explained."
+"01 Choose a plan"
+"02 Receive units"
+"03 Request a delivery"
+"04 Track deliveries"
+Basic 45 units; Growth 75 units selected; Business 110 units.
+75 units available; Growth plan.
+Pickup; Destination; 3 units for this delivery; Confirm request.
+Requested; In transit; Delivered; 72 units remaining.
+"Select a monthly plan and pay upfront."
+"Your plan adds delivery credits to your account."
+"Add pickup and destination. Review units and confirm."
+"Follow order updates and your remaining units."
+"Illustrative screens"
+"Example: Growth gives 75 units. A 3-unit delivery leaves 72."
+"Units are delivery credits, not a fixed number of deliveries. Each route uses 1–7 units."
+"Choose your plan and get started."
+
+Constraints: this is a careful branding edit, not a redesign. Preserve the exact 75 minus 3 equals 72 educational example and credit explanation. No additional copy, no prices, contacts, URL, QR code or invented claims. No Fiable, Paack or Nespresso brand references. Every word complete and uncropped.

@@ -1,0 +1,36 @@
+Created using the built-in image generation tool; edit of apexwings-vendor-flyer.png.
+
+Edit the supplied ApexWings vendor flyer into an improved finished version. Main correction: BULK HAULAGE must be a prominent featured service with its own spacious section, a large bold heading and a clear quote call to action. The current tiny additional-services line is inadequate.
+
+Preserve the official ApexWings logo, brand palette, professional blue/white/navy style, the vendor/rider image, headline, four benefit messages, all three exact monthly plans and the entire WhatsApp contact information. Reflow the layout professionally to make room: shorten the height of the upper photo/headline area and tighten the benefits section moderately. Keep portrait proportions approximately 2:3, crisp high resolution, generous margins, excellent phone legibility. Do not just squeeze more tiny text into the existing bottom line.
+
+Add a full-width pale blue feature panel BETWEEN the plan prices/units explanation and the dark WhatsApp CTA footer. This substantial feature panel should have a tasteful realistic photo or high-quality illustration of an unbranded blue and white cargo van with sealed cartons on one side. On the other side, render the following exact text:
+"BULK HAULAGE"
+"Moving stock or a larger load?"
+"Cartons • Furniture • Equipment"
+"Share your goods, quantity and route."
+"Request a quote on WhatsApp"
+Small readable qualification: "Price and vehicle availability confirmed by our team."
+The heading BULK HAULAGE must be large, bold, and visually comparable in importance to the monthly plan heading. Do not add a haulage price or imply haulage is included in the subscription.
+Remove the old 'Also available: Single delivery • Bulk haulage quotes' line. Instead place a small neat 'Single deliveries also available' line near the four benefits.
+
+Preserve these exact existing details accurately:
+"You take the order. We take it there."
+"Reliable deliveries. Smarter business growth."
+"FOR LAGOS VENDORS & ONLINE SELLERS"
+"Predictable monthly delivery budget"
+"Coordinated pickups & order tracking"
+"Batch Saver for eligible delivery groups"
+"Vendor support & promotional visibility"
+"Choose your monthly plan"
+"BASIC" / "₦67,500" / "45 units / month"
+"GROWTH" / "₦105,000" / "75 units / month"
+"BUSINESS" / "₦143,000" / "110 units / month"
+"Units are delivery credits. Each route uses 1–7 units; delivery count varies by route."
+"Become an ApexWings vendor"
+"Chat with us on WhatsApp"
+"+234 701 541 4492"
+"Monday–Saturday • 8:00 AM–5:00 PM"
+"Lagos, Nigeria"
+
+The final flyer must feel balanced and finished, with bulk haulage clearly visible at a glance as a major service. All copy complete and readable. No website URL, QR code, email, invented offer or guarantee.

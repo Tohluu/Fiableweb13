@@ -1,0 +1,18 @@
+Created using the built-in image generation tool with images/apexwings-logo.png as the brand reference.
+
+Use case: ads-marketing.
+Create a NEW finished portrait launch teaser flyer for ApexWings Logistics, suitable for saving and sharing on WhatsApp and social media. Approximately 2:3 portrait, high resolution. This is a flat professionally designed graphic, not a mockup of a poster.
+Input image: official ApexWings logo reference. Faithfully preserve the supplied blue A/wing symbol, ApexWings wordmark, and its SPEED | RELIABILITY | TRUST tagline. Do not invent or redesign the logo.
+
+Primary purpose: announce LAUNCHING SOON. Keep this flyer beautifully minimal with very little copy. The words LAUNCHING SOON are the dominant centerpiece, oversized, confident and exceptionally readable.
+
+Art direction: premium, modern, anticipatory logistics brand. Navy #0c2d51, rich electric blue #1769e0, cyan highlights, crisp white. Sophisticated bold sans-serif typography, ample negative space, meticulous alignment and generous safe margins. Upper clean white area carries the official logo at a confident but modest size. Transition through an elegant sweeping blue wing-inspired curve into a rich navy/blue central and lower field. The massive main announcement sits on the navy field, white with tasteful blue/cyan accent on one word. Fine understated route arcs or a dotted delivery route may form restrained background texture, never a fake geographical map.
+At the lower edge, include a compact beautifully integrated photorealistic logistics vignette: an unbranded modern blue-and-white cargo van, a blue dispatch motorcycle with a parcel box, and two or three sealed kraft cartons. Vehicles small enough to support the headline, no people, no visual clutter. Subtle studio lighting and plausible realistic scale. The image must convey both parcel dispatch and bulk haulage.
+Exact visible text, and no other copy:
+[official logo as supplied, including its existing tagline]
+"LOGISTICS"
+"LAUNCHING"
+"SOON"
+"Lagos, Nigeria"
+Place LOGISTICS as a small widely letterspaced descriptor under the logo. Place Lagos, Nigeria as a small tasteful footer.
+Constraints: no prices, no subscription plans, no benefits list, no phone number, no email, no website, no QR code, no launch date, no extra slogan, no 'now open', no fictitious launch schedule. No food, airplanes, shipping containers or boats. This should feel like an elegant brand reveal and launch announcement. Ensure the main message is much more prominent than the vehicle vignette. All text clean, accurate and uncropped.

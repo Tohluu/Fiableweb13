@@ -1,0 +1,32 @@
+Created using the built-in image generation tool.
+Design guide: C:\Users\HP FOLIO\Pictures\sample.jpeg
+
+Use case: ads-marketing.
+Asset type: finished square social-media flyer, high resolution approximately 2048x2048, flat designed artwork, not a printed-poster mockup.
+Primary request: "What Can Apexwings Help You Move?" Present business deliveries, recurring dispatch needs and bulk haulage enquiries. Goal: service discovery.
+
+Input image 1: supplied sample.jpeg. This is the PRIMARY DESIGN GUIDE for composition: clean square logistics flyer, simple solid/very subtle gradient background, left-aligned readable copy, large white outline logistics illustrations down the right, strong headings, compact contact area and logo near the bottom. Follow the simplicity and text/icon balance. Do not copy its Vortex name, contact details, green palette, pallet capacity, vehicle claims, equipment claims or wording.
+Input image 2: official ApexWings logo. Preserve the supplied blue wing/A mark, ApexWings wordmark and SPEED | RELIABILITY | TRUST tagline accurately. No redesigned logo.
+
+Art direction: adapt the sample into premium ApexWings navy and rich blue with white copy and restrained cyan accents. No photography, no people, no 3D objects, no busy collage. Main upper 80 percent is deep navy with a subtle blue gradient, simple crisp white outline graphics. Lower white footer band contains contact information on the left and the official blue ApexWings logo with its small tagline on the right. Maintain safe margins, plenty of breathing room and phone readability. Do not make the logo or contact details tiny.
+Headline dominates the upper-left and extends across enough width to remain legible: break at natural phrases. Below, three aligned spacious service rows, text on the left roughly 65 percent width and relevant large white outline illustrations on the right roughly 30 percent. Row 1: sealed parcel illustration. Row 2: delivery motorcycle with small calendar motif. Row 3: a medium cargo truck. These are clean polished line illustrations similar in simplicity to the sample; no implied owned vehicle fleet or maximum capacity. Each category heading bold and its brief explanation in regular sans-serif. Use thin understated separators only if helpful.
+Finish the main dark field with a strong short enquiry call to action and a readable haulage qualification. The white footer has a WhatsApp icon, phone number, Lagos location and official logo. Do not add URL or email.
+
+Exact visible copy:
+"What Can ApexWings"
+"Help You Move?"
+"BUSINESS DELIVERIES"
+"Customer orders, parcels and business supplies."
+"RECURRING DISPATCH"
+"Regular pickups and monthly delivery plans."
+"BULK HAULAGE ENQUIRIES"
+"Moving stock, furniture or equipment?"
+"Tell us what you need to move."
+"Share your goods, quantity and route."
+"Haulage price and vehicle availability confirmed by our team."
+"Chat with us on WhatsApp"
+"+234 701 541 4492"
+"Lagos, Nigeria"
+[Official logo including its existing SPEED | RELIABILITY | TRUST tagline]
+
+Constraints: exact spelling ApexWings, all phone digits correct, all text readable, complete and uncropped. No other visible text. No prices, free-quote claim, GPS tracking claim, same-day promise, nationwide promise, tonnage, pallet capacity, availability guarantee, website, QR code or email. The services should be instantly distinguishable. Keep the reference's calm uncluttered informational character while clearly belonging to ApexWings.

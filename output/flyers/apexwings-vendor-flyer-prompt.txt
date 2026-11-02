@@ -1,0 +1,37 @@
+Created using the built-in image generation tool.
+Source details: local index.html, services.html, contact.html and images/apexwings-logo.png.
+
+Use case: ads-marketing.
+Create a polished, finished portrait marketing flyer for ApexWings Logistics, for a Lagos vendor to receive and read on WhatsApp. High resolution, approximately 2:3 portrait. This is a complete flat graphic design, not a photo of a printed flyer.
+Input image: the attached image is the existing official ApexWings logo reference. Faithfully preserve the blue A/wing mark, ApexWings wordmark and small SPEED | RELIABILITY | TRUST tagline. Place this existing brand identity cleanly on white at the top, modest size, no invented replacement logo.
+Design: sophisticated contemporary logistics brand, bold editorial sans-serif typography, generous spacing, crisp navy #0c2d51 and vibrant blue #1769e0, white and very pale blue. Strong legibility on a phone, clear hierarchy, precision alignment. No decorative clutter. Use a tasteful photographic hero on the right of the upper portion showing a professional Black Nigerian delivery rider in a plain blue uniform and helmet accepting a sealed kraft parcel from a smiling Black Nigerian female online vendor; small modern Lagos shop setting, natural light. Photo should be naturally integrated with an elegant blue curved/diagonal border. Keep the headline on the left with ample solid-color negative space. Image must convey parcel logistics, no food or aircraft.
+Organize into top logo band, arresting headline/photo hero, short benefits, three very legible price columns, slim additional-services line, and large navy bottom CTA.
+Render ONLY the following marketing copy verbatim, with accurate spelling and naira symbols; do not add text:
+Header eyebrow: "FOR LAGOS VENDORS & ONLINE SELLERS"
+Main headline, large: "You take the order.\nWe take it there."
+Supporting line: "Reliable deliveries. Smarter business growth."
+Benefits heading: "More time for your business."
+Four concise benefits in a clean two-column layout, small elegant relevant icons:
+"Predictable monthly delivery budget"
+"Coordinated pickups & order tracking"
+"Batch Saver for eligible delivery groups"
+"Vendor support & promotional visibility"
+Plans heading: "Choose your monthly plan"
+Three adjacent clear pricing blocks:
+"BASIC"
+"₦67,500"
+"45 units / month"
+"GROWTH"
+"₦105,000"
+"75 units / month"
+"BUSINESS"
+"₦143,000"
+"110 units / month"
+Important note under prices, readable not tiny: "Units are delivery credits. Each route uses 1–7 units; delivery count varies by route."
+Additional service line: "Also available: Single delivery • Bulk haulage quotes"
+Bottom CTA: "Become an ApexWings vendor"
+Contact label: "Chat with us on WhatsApp"
+Contact phone, very prominent: "+234 701 541 4492"
+Hours: "Monday–Saturday • 8:00 AM–5:00 PM"
+Footer small: "Lagos, Nigeria"
+Constraints: all text must fit within generous safe margins, complete contact number, no cropped content. No QR code, no website URL, no email, no fake testimonial, no guarantees of timing, no made-up discount percentages. Treat pricing units correctly as credits, never delivery counts. Keep most of the lower half white for clean pricing readability. Premium cohesive finished flyer ready to save and share.

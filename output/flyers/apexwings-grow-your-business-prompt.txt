@@ -1,0 +1,30 @@
+Created using the built-in image generation tool.
+Photographic input: C:\Users\HP FOLIO\Pictures\sample3.jpeg
+
+Use case: ads-marketing.
+Asset type: finished portrait marketing flyer for ApexWings Logistics, approximately 4:5 aspect ratio, high resolution, designed for social media and WhatsApp sharing. Flat artwork, not a mockup.
+Primary request: "Your Time Is Better Spent Growing Your Business". Emphasise predictable delivery planning, reduced coordination stress and better visibility. Communicate the benefits through a calm, aspirational small-business-owner scene and clear concise benefit copy.
+
+Input image 1: sample3.jpeg, PRIMARY PHOTOGRAPHIC INPUT. Use this actual supplied image as the central hero photograph: the smiling Black female business owner in a black headwrap and apron, packing her products beside her laptop with stocked shelves behind her. Preserve her identity, facial features, natural expression, skin tone, hands, clothing and shop details. Crop and scale the supplied photograph professionally into the flyer; do not substitute a different woman or create a different setting. Keep her face and hands unobstructed by text. This is a lifestyle image integrated into a new advertising layout, not a request to alter the person. Retain believable product packaging and laptop, avoid gratuitous parcel/rider additions.
+Input image 2: official ApexWings logo. Preserve its supplied blue wing/A symbol, ApexWings wordmark and SPEED | RELIABILITY | TRUST tagline faithfully.
+
+Art direction: premium, warm, confident, modern and business-focused. Use ApexWings navy, rich electric blue, cyan and white as the graphic palette, with the hero photo's natural warm colours preserved. Clean generous white top area, strong bold sans-serif headline with "Growing Your Business" emphasised in blue. Compact official logo above the headline. Large welcoming hero photo forms the visual heart of the flyer, showing enough of her workspace to convey an active successful small business. A simple blue brand curve at the lower photograph edge can connect to the benefit area.
+Beneath the hero, four compact beautifully aligned benefit blocks in a spacious 2x2 grid, each with one modest relevant blue icon, bold heading and one short explanatory line. The four categories are monthly budget/planning (calendar/wallet), coordinated dispatch (parcel/rider), order visibility (order list/eye), vendor growth support (megaphone/support). Keep the design calm, no oversized floating notifications, no heavy repeated card borders, no visual clutter. Use navy copy on white or very pale blue. Body type must remain readable when shared on a phone. Lower navy footer has WhatsApp contact with large accurate phone digits and Lagos location.
+
+Exact visible text only:
+[Official ApexWings logo including its existing tagline]
+"Your Time Is Better Spent"
+"Growing Your Business"
+"Predictable planning"
+"Plan your delivery budget with monthly units."
+"Less coordination stress"
+"We coordinate pickups and riders."
+"Clear order visibility"
+"Check delivery updates, history and remaining units."
+"Support for growth"
+"Vendor support and promotional visibility."
+"Chat with us on WhatsApp"
+"+234 701 541 4492"
+"Lagos, Nigeria"
+
+Constraints: correct spelling ApexWings, all phone digits accurate, all text complete and uncropped, adequate margins and excellent phone readability. Preserve supplied woman's identity and photograph. Do not add Fiable branding, other logos, fake testimonials, quantified time savings, revenue promises, guaranteed on-time claims, guaranteed sales growth, nationwide claims, prices, offers, website URL, email, QR code or extra copy. Do not imply unlimited deliveries or fixed units per delivery. This should feel like a finished premium campaign piece communicating more room to focus on the business through structured delivery support.

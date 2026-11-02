@@ -1,0 +1,32 @@
+Created using the built-in image generation tool.
+
+Use case: ads-marketing.
+Asset type: finished portrait social-media brand introduction flyer for ApexWings Logistics, 2:3 aspect ratio, high-resolution flat graphic for WhatsApp and Instagram sharing.
+Primary request: "Meet Apexwings Logistics". Introduce the business, its customers and its promise to make logistics easier. Goal: brand positioning. Convey capable, approachable, organised delivery support for Lagos businesses.
+Input image 1: official logo reference, preserve the supplied blue wing/A symbol, ApexWings wordmark and SPEED | RELIABILITY | TRUST tagline accurately. Do not redesign.
+Input image 2: previous campaign flyer as branding reference only. Match its navy, electric blue, cyan and white palette, bold legible typography and curved brand motifs. Create a distinctly NEW welcoming brand-introduction composition. Do not reproduce frustration cards, complaints, distressed pose or previous headline.
+
+Art direction: premium clean editorial advertising. Generous negative space, confident typographic hierarchy and excellent phone readability. Upper white section carries the official logo at modest scale. A striking large title below introduces the brand with "Meet" as the smaller lead-in, "ApexWings" as the dominant word and "Logistics" clearly visible. Keep the logo and title beautifully balanced, without unnecessary repeated decorative marks.
+Central hero: natural photorealistic Nigerian small-business owner at the entrance of a neat Lagos retail/online-selling workspace, smiling as she hands a sealed kraft parcel to a professional Nigerian male delivery rider wearing a blue jacket and a correctly worn blue motorcycle helmet. Show believable parcel handling, realistic hands and faces, warm human rapport, not an artificial handshake pose. A dispatch motorcycle with a parcel box can appear subtly in the background outside. No third-party brands or invented text on clothing, buildings or vehicles.
+Include the short introduction near the image on a clean high-contrast area, not over busy facial detail.
+Below or integrated into the image transition, a simple three-item service strip with restrained relevant icons and readable labels. The three services must have equal prominence.
+A generous navy lower panel presents the promise statement as an important second focal point, followed by a compact contact line with WhatsApp icon, the exact phone number and location. Overall more spacious and less text-heavy than a rate-card flyer. Every line must be readable and uncropped.
+
+Exact visible text, and no other copy:
+[Official logo including existing SPEED | RELIABILITY | TRUST tagline]
+"Meet"
+"ApexWings"
+"Logistics"
+"Delivery support for Lagos businesses,"
+"vendors and online sellers."
+"Single deliveries"
+"Monthly plans"
+"Bulk haulage"
+"Our promise"
+"To make logistics easier,"
+"so you can focus on your business."
+"Chat with us on WhatsApp"
+"+234 701 541 4492"
+"Lagos, Nigeria"
+
+Constraints: exact spelling ApexWings, accurate complete phone number, no pricing, no discounts, no invented statistics, no same-day or on-time guarantees, no nationwide claims, no URL, no QR code, no email, no launch date, no extra marketing copy. Avoid tiny type, excessive icons, clutter and fake map graphics. The design should instantly communicate WHO WE ARE, WHO WE SERVE and OUR PROMISE. Professional and welcoming.
