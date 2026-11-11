@@ -10,6 +10,19 @@ for compatibility.
 Run the local app with `python server.py`, then open `http://localhost:8080`.
 Restart the server after changing Python code.
 
+## Installable Apexwings app
+
+The website includes a web app manifest, branded home screen icons and an install
+banner on all main pages. Deploy the updated files to the existing HTTPS host.
+Chrome/Edge can offer a native install prompt when eligible; iPhone users receive
+Safari Add to Home Screen instructions. Browsers control native prompt availability.
+The banner can be dismissed for three days and is hidden in standalone app mode.
+The app opens the homepage and keeps the existing booking, tracking and portal flows.
+It requires internet access; the service worker displays an offline retry page and
+does not cache customer pages or API data. This is a web app installation, not an
+App Store or Play Store listing. Local testing works at http://localhost:8080.
+Run `node --test tests/app_install_checks.cjs` to check install banner behavior.
+
 ## Admin team access and email setup
 
 **Admin → Team** supports role changes, access revocation/restoration, deletion,

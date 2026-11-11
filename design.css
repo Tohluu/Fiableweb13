@@ -76,6 +76,14 @@ footer { background:#f5f5f1; color:var(--ink); padding:58px 0 22px; border-block
 .plan.popular,.plan.popular.selected,.plan.selected { transform:none; box-shadow:none; }
 .plan.popular { border-color:var(--blue); border-block-start:4px solid var(--blue); padding-block-start:27px; }
 .plan.selected { outline:2px solid var(--blue); outline-offset:3px; border-width:1px; }
+#plans .plan { transition:transform .2s ease,box-shadow .2s ease,border-color .2s ease; }
+#plans .plan:focus-within { border-color:var(--blue); box-shadow:0 12px 30px rgba(23,105,224,.14); }
+@media (hover:hover) and (pointer:fine) {
+ #plans .plan:hover { transform:translateY(-6px); border-color:var(--blue); box-shadow:0 16px 36px rgba(23,105,224,.16); }
+}
+@media (prefers-reduced-motion:reduce) {
+ #plans .plan:hover { transform:none; }
+}
 .badge { border-radius:2px; font-size:9px; }
 .plan .price { font-family:inherit; font-size:34px; letter-spacing:-.04em; }
 .plan .btn { margin-block-start:auto; }

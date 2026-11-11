@@ -1,0 +1,17 @@
+.app-install { background: #edf4ff; color: #142d50; border-bottom: 1px solid #cbdcf5; padding: 12px 20px; font-family: inherit; }
+.app-install[hidden] { display: none; }
+.app-install-inner { max-width: 1200px; margin: auto; display: flex; align-items: center; gap: 12px; }
+.app-install img { width: 44px; height: 44px; border-radius: 10px; flex-shrink: 0; }
+.app-install-copy { flex: 1; min-width: 0; }
+.app-install-copy strong { display: block; font-size: 15px; }
+.app-install-copy p { margin: 3px 0 0; font-size: 13px; line-height: 1.5; }
+.app-install button { cursor: pointer; font: inherit; border: 0; border-radius: 8px; padding: 10px 16px; background: #1769e0; color: white; font-weight: 600; }
+.app-install button:focus-visible { outline: 3px solid #142d50; outline-offset: 3px; }
+.app-install .app-install-close { background: transparent; color: #142d50; font-size: 22px; padding: 8px; }
+@media (max-width: 480px) {
+    .app-install { padding: 10px 12px; }
+    .app-install-inner { gap: 8px; flex-wrap: wrap; }
+    .app-install-copy { flex-basis: calc(100% - 90px); }
+    .app-install-action { margin-left: 52px; }
+    .app-install-close { margin-left: auto; }
+}
