@@ -34,6 +34,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     invalidateTest();
     $('routingSave').disabled = !canManage || busy;
     message('Unsaved changes. Test your pricing and groups, then save when ready.');
+    renderLocationDirectory();
   }
   const areaOptions = selected => config.areas.map(area =>
     `<option value="${escape(area.id)}" ${area.id === selected ? 'selected' : ''}>${escape(area.label)}</option>`
@@ -47,7 +48,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   function refreshLocationChoices() {
     locations = config.locations.map(location => location.id).sort((a, b) => locationLabel(a).localeCompare(locationLabel(b)));
     const area = $('routingLocationArea').value;
-    $('routingLocationArea').innerHTML = '<option value="">Select a delivery area</option>' + areaOptions(area);
+    $('routingLocationArea').innerHTML = '<option value="">Same name as location (automatic)</option>' + areaOptions(area);
     const zone = $('routingLocationZone').value;
     $('routingLocationZone').innerHTML = '<option value="">Select a pricing zone</option>' + zoneOptions(zone);
     const pickup = $('routingTestPickup').value || 'egbeda';
@@ -58,6 +59,27 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
+  function renderLocationDirectory() {
+    const zoneFilter = $('routingDirectoryZone');
+    const selectedZone = zoneFilter.value;
+    zoneFilter.innerHTML = '<option value="">All pricing zones</option>' + zoneOptions(selectedZone);
+    const query = $('routingDirectorySearch').value.trim().toLocaleLowerCase();
+    const areaByLocation = new Map(config.areas.flatMap(area => area.locations.map(id => [id, area.label])));
+    const rows = config.locations.map(location => ({
+      ...location, zoneLabel: config.pricingZones[location.zone], areaLabel: areaByLocation.get(location.id) || ''
+    })).filter(location => (!selectedZone || location.zone === selectedZone)
+      && [location.label, location.zoneLabel, location.areaLabel].some(label => label.toLocaleLowerCase().includes(query)))
+      .sort((a, b) => a.label.localeCompare(b.label));
+    $('routingDirectoryRows').innerHTML = rows.map(location => `<tr>
+      <th scope="row">${escape(location.label)}</th>
+      <td><span class="routing-zone-label">${escape(location.zoneLabel)}</span></td>
+      <td>${escape(location.areaLabel)}</td>
+    </tr>`).join('') || '<tr><td colspan="3" class="routing-directory-empty">No locations match your search or zone filter.</td></tr>';
+    $('routingDirectoryCount').textContent = `${rows.length} of ${config.locations.length} locations shown. ${dirty ? 'Showing unsaved changes. Save routing rules to keep them.' : 'Showing saved assignments.'}`;
+  }
+  $('routingDirectorySearch').addEventListener('input', renderLocationDirectory);
+  $('routingDirectoryZone').addEventListener('change', renderLocationDirectory);
+
   function renderPricing() {
     pricingZones = config.pricingZones;
     $('routingPricingZones').innerHTML = Object.entries(pricingZones).map(([id, label]) =>
@@ -67,6 +89,18 @@ document.addEventListener('DOMContentLoaded', async () => {
       `<label><span data-zone-route-label="${index}">${escape(pricingZones[route.from])} ↔ ${escape(pricingZones[route.to])}</span>
         <input data-zone-units="${index}" aria-label="Units: ${escape(pricingZones[route.from])} to ${escape(pricingZones[route.to])}" type="number" min="1" max="7" step="1" value="${route.units}" required ${canManage ? '' : 'disabled'}></label>`
     ).join('');
+    renderOneUnitReview();
+  }
+
+  function renderOneUnitReview() {
+    const rows = config.zoneUnits.filter(route => route.units === 1).map(route => {
+      const zones = [...new Set([route.from, route.to])];
+      const members = zones.map(zone => config.locations.filter(location => location.zone === zone));
+      if (members.some(locations => !locations.length) || (zones.length === 1 && members[0].length < 2)) return '';
+      return `<div class="routing-rate-review"><strong>${zones.map(zone => escape(config.pricingZones[zone])).join(' ↔ ')}: 1 unit</strong>
+        ${members.map(locations => `<span>${locations.map(location => escape(location.label)).join(', ')}</span>`).join('')}</div>`;
+    }).filter(Boolean);
+    $('routingOneUnitReview').innerHTML = rows.join('') || '<p class="muted">No routes between different locations currently share a 1-unit rate.</p>';
   }
 
   function renderGroups() {
@@ -110,6 +144,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     $('routingAddArea').hidden = !canManage;
     $('routingAddLocationFields').hidden = !canManage;
     $('routingSeparate').hidden = !canManage;
+    renderOneUnitReview();
+    renderLocationDirectory();
   }
 
   async function load() {
@@ -167,6 +203,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (index === undefined || !canManage) return;
     config.zoneUnits[Number(index)].units = event.target.value === '' ? null : Number(event.target.value);
     changed();
+    renderOneUnitReview();
   });
   $('routingAreas').addEventListener('change', event => {
     if (event.target.dataset.areaName) renderAreas();
@@ -196,7 +233,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const pricedLocation = event.target.dataset.locationZone;
     if (pricedLocation) {
       config.locations.find(location => location.id === pricedLocation).zone = event.target.value;
-      changed(); return;
+      changed(); renderOneUnitReview(); return;
     }
     const location = event.target.dataset.location;
     if (!location) return;
@@ -207,7 +244,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('routingLocations').addEventListener('input', event => {
     const id = event.target.dataset.locationName;
     if (!id || !canManage) return;
-    config.locations.find(location => location.id === id).label = event.target.value;
+    const location = config.locations.find(location => location.id === id);
+    const area = config.areas.find(area => area.locations.length === 1 && area.locations[0] === id && area.label === location.label);
+    if (area) area.label = event.target.value;
+    location.label = event.target.value;
     changed();
   });
   $('routingAddLocation').addEventListener('click', () => {
@@ -215,15 +255,39 @@ document.addEventListener('DOMContentLoaded', async () => {
     const feedback = $('routingLocationMessage');
     const label = $('routingLocationName').value.trim();
     const zone = $('routingLocationZone').value;
-    const area = config.areas.find(area => area.id === $('routingLocationArea').value);
+    const selectedArea = $('routingLocationArea').value;
+    let area = config.areas.find(area => area.id === selectedArea);
     const nameKey = name => name.replace(/[^\p{L}\p{N}]+/gu, ' ').trim().toLocaleLowerCase();
     const id = label.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 80) || `location-${Date.now()}`;
     let error = '';
     if (!label || !nameKey(label)) error = 'Enter a neighbourhood or town name.';
     else if (config.locations.some(location => location.id === id || nameKey(location.label) === nameKey(label))) error = 'That location already exists. Use its existing entry or enter a distinct location name.';
     else if (!zone) error = 'Choose a pricing zone for the new location.';
-    else if (!area) error = 'Choose a delivery area for the new location.';
+    else if (selectedArea && !area) error = 'Choose a delivery area for the new location.';
     if (error) { feedback.textContent = error; feedback.dataset.error = 'true'; return; }
+    if (!area) {
+      const areaLabel = ['ikeja', 'opebi', 'oregun', 'maryland'].includes(nameKey(label)) ? 'Ikeja' : label;
+      area = config.areas.find(area => area.label.toLocaleLowerCase() === areaLabel.toLocaleLowerCase());
+      if (!area) {
+        const base = `location-${id}`.slice(0, 54);
+        let areaId = base, suffix = 2;
+        while (config.areas.some(area => area.id === areaId)) areaId = `${base}-${suffix++}`;
+        area = { id: areaId, label: areaLabel, locations: [] };
+        config.areas.push(area);
+        Object.values(config.pickupRules).forEach(groups => {
+          const groupIds = new Set(groups.map(group => group.id));
+          const groupLabels = new Set(groups.map(group => group.label.toLocaleLowerCase()));
+          let groupId = areaId, groupLabel = areaLabel, index = 2;
+          while (groupIds.has(groupId)) groupId = `${base}-${index++}`;
+          index = 2;
+          while (groupLabels.has(groupLabel.toLocaleLowerCase())) {
+            const ending = ` (${index++})`;
+            groupLabel = areaLabel.slice(0, 100 - ending.length) + ending;
+          }
+          groups.push({ id: groupId, label: groupLabel, areas: [areaId] });
+        });
+      }
+    }
     config.locations.push({ id, label, zone });
     area.locations.push(id);
     changed(); renderAreas();

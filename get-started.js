@@ -2,6 +2,16 @@ const vendorForm = document.getElementById('vendorForm');
 const serviceType = document.getElementById('serviceType');
 const serviceSubmit = document.getElementById('serviceSubmit');
 const selectedPlan = document.getElementById('selectedPlan');
+const businessType = document.getElementById('get-started-field-5');
+const otherBusinessType = document.getElementById('otherBusinessType');
+const updateBusinessType = () => {
+    const active = !businessType.disabled && businessType.value === 'Other';
+    document.getElementById('otherBusinessTypeFields').hidden = !active;
+    otherBusinessType.disabled = !active;
+    otherBusinessType.required = active;
+    otherBusinessType.setCustomValidity('');
+};
+businessType.addEventListener('change', updateBusinessType);
 const serviceFields = {
     subscription: document.getElementById('subscriptionFields'),
     bulk: document.getElementById('bulkFields')
@@ -35,6 +45,7 @@ const updateServiceFields = () => {
     const isBulk = serviceType.value === 'bulk';
     Object.entries(serviceFields).forEach(([service, fields]) => toggleFields(fields, service === serviceType.value));
     toggleFields(document.getElementById('accountFields'), !isBulk);
+    updateBusinessType();
     // A plan chosen on the pricing page must never be applied to another service.
     if (serviceType.value !== 'subscription') selectedPlan.value = '';
     document.getElementById('subscriptionRules').hidden = isBulk;
@@ -89,10 +100,12 @@ vendorForm.addEventListener('submit', event => {
     }
     submitRequest(vendorForm, '/api/vendor', {
         name, businessName, phone, email,
+        businessAddress: value('businessAddress'),
         password: value('vendorPassword'),
         plan: serviceType.value === 'subscription' ? selectedPlan.value : '',
         service: serviceType.value,
         businessType: value('get-started-field-5'),
+        otherBusinessType: businessType.value === 'Other' ? value('otherBusinessType') : '',
         monthlyVolume: serviceType.value === 'subscription' ? value('monthlyVolume') : ''
     }, 'Account created. You can now sign in.', () => {
         window.location.href = `portal.html?email=${encodeURIComponent(email)}`;

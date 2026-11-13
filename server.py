@@ -276,13 +276,18 @@ DEFAULT_DELIVERY_AREAS = {
 }
 MAX_BATCH_DELIVERIES = 100
 MAX_DELIVERY_LOCATIONS = 500
+DELIVERY_AREA_NAMING_VERSION = 1
+IKEJA_AREA_LOCATIONS = {"ikeja", "opebi", "oregun", "maryland"}
 PRICING_ZONE_LABELS = {
-    "mainland-west": "Mainland West (Amuwo-Odofin / Ojo / Apapa)",
+    "mainland-west": "Mainland West (Ojo)",
     "mainland-north": "Mainland North (Egbeda / Shasha / Idimu / Ikotun)",
     "mainland-north-west": "Mainland North-West (Ayobo / Ipaja / Abule Egba / Agbado)",
     "mainland-north-east": "Mainland North-East (Agege / Ifako-Ijaiye)",
-    "mainland-central": "Mainland Central (Yaba / Mushin)",
-    "mainland-east": "Mainland East (Ikeja / Kosofe / Oshodi)",
+    "mainland-central": "Mainland Central (Yaba / Ebute Metta / Oyingbo)",
+    "mainland-east": "Mainland East (Ikeja / Kosofe / Magodo)",
+    "mainland-south": "Mainland South (Surulere / Mushin / Oshodi)",
+    "mainland-south-west": "Mainland South-West (Apapa / Amuwo-Odofin / Festac)",
+    "mainland-south-east": "Mainland South-East (Gbagada / Shomolu / Bariga / Ilupeju)",
     "island-central": "Central Island (VI / Ikoyi / Lekki Phase 1)",
     "lekki-corridor-1": "Lekki Corridor 1 (Ikate / Chevron / Ikota)",
     "lekki-corridor-2": "Lekki Corridor 2 (VGC / Ajah / Sangotedo)",
@@ -311,6 +316,29 @@ MAINLAND_ZONE_MOVES = {
 }
 LOCATION_ZONES.update({location: target for location, (_, target) in MAINLAND_ZONE_MOVES.items()})
 NEW_MAINLAND_ZONES = {"mainland-north-west", "mainland-north-east"}
+SOUTH_MAINLAND_ZONE_SOURCES = {
+    "mainland-south": ("mainland-central", "mainland-east"),
+    "mainland-south-west": ("mainland-west",),
+    "mainland-south-east": ("mainland-central", "mainland-east"),
+}
+SOUTH_MAINLAND_ZONE_MOVES = {
+    "surulere": (("mainland-east", "mainland-central"), "mainland-south"),
+    "mushin": (("mainland-central",), "mainland-south"),
+    "oshodi-isolo": (("mainland-east",), "mainland-south"),
+    "apapa": (("mainland-west",), "mainland-south-west"),
+    "amuwo-odofin": (("mainland-west",), "mainland-south-west"),
+    "ajegunle": (("mainland-west",), "mainland-south-west"),
+    "ajeromi-ifelodun": (("mainland-west",), "mainland-south-west"),
+    "festac-town": (("mainland-west",), "mainland-south-west"),
+    "satellite-town": (("mainland-west",), "mainland-south-west"),
+    "mile-2": (("mainland-west",), "mainland-south-west"),
+    "gbagada": (("mainland-east",), "mainland-south-east"),
+    "shomolu": (("mainland-east", "mainland-central"), "mainland-south-east"),
+    "bariga": (("mainland-central",), "mainland-south-east"),
+    "ilupeju": (("mainland-east",), "mainland-south-east"),
+}
+LOCATION_ZONES.update({location: target for location, (_, target) in SOUTH_MAINLAND_ZONE_MOVES.items()
+                       if location in LOCATION_ZONES})
 
 # Seeded additions remain custom locations: administrators can edit their
 # names, pricing zones and delivery areas without changing application code.
@@ -346,6 +374,10 @@ LAGOS_LOCATION_ADDITIONS = [
     ("badore", "Badore", "lekki-corridor-2"),
     ("ado", "Ado", "lekki-corridor-2"),
     ("langbasa", "Langbasa", "lekki-corridor-2"),
+]
+LAGOS_LOCATION_ADDITIONS = [
+    (key, label, SOUTH_MAINLAND_ZONE_MOVES[key][1] if key in SOUTH_MAINLAND_ZONE_MOVES else zone)
+    for key, label, zone in LAGOS_LOCATION_ADDITIONS
 ]
 LEKKI_CORRIDOR_2_LOCATIONS.update(
     key for key, _, zone in LAGOS_LOCATION_ADDITIONS if zone == "lekki-corridor-2"
@@ -396,7 +428,9 @@ def expand_lagos_location_catalog(config):
 
 
 def mainland_zone_sources(zone):
-    # Each added zone includes places formerly assigned to North and West.
+    if zone in SOUTH_MAINLAND_ZONE_SOURCES:
+        return SOUTH_MAINLAND_ZONE_SOURCES[zone]
+    # Each northern zone includes places formerly assigned to North and West.
     return ("mainland-north", "mainland-west") if zone in NEW_MAINLAND_ZONES else (zone,)
 
 
@@ -412,7 +446,8 @@ def default_zone_units(zones=None):
                                      for zone in (source, target))
                     candidates.append(ZONE_UNIT_MATRIX.get(pair, EXTENDED_UNITS if "extended" in pair else 3))
             units = max(candidates)
-            if origin in NEW_MAINLAND_ZONES or destination in NEW_MAINLAND_ZONES:
+            if any(zone in NEW_MAINLAND_ZONES or zone in SOUTH_MAINLAND_ZONE_SOURCES
+                   for zone in (origin, destination)):
                 units = max(2, units)
             routes.append({"from": origin, "to": destination, "units": units})
     return routes
@@ -422,7 +457,7 @@ def validate_zone_pricing(config, zone_labels=None):
     zone_labels = PRICING_ZONE_LABELS if zone_labels is None else zone_labels
     labels = config.get("pricingZones", zone_labels)
     if not isinstance(labels, dict) or set(labels) != set(zone_labels):
-        raise ValueError("Keep all pricing zones, including both mainland northern zones and Lekki corridors.")
+        raise ValueError("Keep all pricing zones, including the mainland northern and southern zones and both Lekki corridors.")
     normalized, seen = {}, set()
     for key in zone_labels:
         label = labels[key]
@@ -455,7 +490,9 @@ def validate_zone_pricing(config, zone_labels=None):
 
 
 def upgrade_mainland_pricing(config):
-    previous_zones = {key: label for key, label in PRICING_ZONE_LABELS.items() if key not in NEW_MAINLAND_ZONES}
+    northern_zones = {key: label for key, label in PRICING_ZONE_LABELS.items()
+                      if key not in SOUTH_MAINLAND_ZONE_SOURCES}
+    previous_zones = {key: label for key, label in northern_zones.items() if key not in NEW_MAINLAND_ZONES}
     labels = config.get("pricingZones")
     old_settings = isinstance(labels, dict) and set(labels) == set(previous_zones)
     if "pricingZones" in config and not old_settings:
@@ -473,9 +510,9 @@ def upgrade_mainland_pricing(config):
         upgraded["pricingZones"] = {
             key: PRICING_ZONE_LABELS[key] if key in NEW_MAINLAND_ZONES or old_labels.get(key) == renamed_defaults.get(key)
             else old_labels[key]
-            for key in PRICING_ZONE_LABELS
+            for key in northern_zones
         }
-        routes = default_zone_units()
+        routes = default_zone_units(northern_zones)
         for route in routes:
             origin, destination = route["from"], route["to"]
             pair = frozenset((origin, destination))
@@ -495,6 +532,54 @@ def upgrade_mainland_pricing(config):
             if isinstance(location, dict) and isinstance(location.get("id"), str):
                 move = MAINLAND_ZONE_MOVES.get(location["id"])
                 if move and location.get("zone") == move[0]:
+                    location = {**location, "zone": move[1]}
+            upgraded["locations"].append(location)
+    return upgraded
+
+
+def upgrade_southern_mainland_pricing(config):
+    """Split broad mainland zones once, preserving saved rates and custom assignments."""
+    previous_zones = {key: label for key, label in PRICING_ZONE_LABELS.items()
+                      if key not in SOUTH_MAINLAND_ZONE_SOURCES}
+    labels = config.get("pricingZones")
+    if "pricingZones" in config and not (isinstance(labels, dict) and set(labels) == set(previous_zones)):
+        return config
+    upgraded = dict(config)
+    if "pricingZones" in config:
+        old_labels, old_routes = validate_zone_pricing(config, previous_zones)
+        values = {frozenset((route["from"], route["to"])): route["units"] for route in old_routes}
+        renamed_defaults = {
+            "mainland-west": ("Mainland West (Amuwo-Odofin / Ojo / Apapa)",),
+            "mainland-central": ("Mainland Central (Yaba / Mushin)", "Mainland Central (Yaba / Mushin / Surulere)"),
+            "mainland-east": ("Mainland East (Ikeja / Kosofe / Oshodi)",),
+        }
+        upgraded["pricingZones"] = {**old_labels, **{
+            key: PRICING_ZONE_LABELS[key] for key in SOUTH_MAINLAND_ZONE_SOURCES
+        }}
+        for key, old_names in renamed_defaults.items():
+            if old_labels[key] in old_names:
+                upgraded["pricingZones"][key] = PRICING_ZONE_LABELS[key]
+        routes = default_zone_units()
+        for route in routes:
+            origin, destination = route["from"], route["to"]
+            pair = frozenset((origin, destination))
+            if pair in values:
+                route["units"] = values[pair]
+            else:
+                # Northern zones already exist in this matrix; inherit their
+                # actual saved rate instead of expanding them into old parents.
+                sources = SOUTH_MAINLAND_ZONE_SOURCES.get(origin, (origin,))
+                targets = SOUTH_MAINLAND_ZONE_SOURCES.get(destination, (destination,))
+                route["units"] = max(2, *(values[frozenset((source, target))]
+                                         for source in sources for target in targets))
+        upgraded["zoneUnits"] = routes
+    catalog = config.get("locations")
+    if isinstance(catalog, list):
+        upgraded["locations"] = []
+        for location in catalog:
+            if isinstance(location, dict) and isinstance(location.get("id"), str):
+                move = SOUTH_MAINLAND_ZONE_MOVES.get(location["id"])
+                if move and location.get("zone") in move[0]:
                     location = {**location, "zone": move[1]}
             upgraded["locations"].append(location)
     return upgraded
@@ -538,26 +623,96 @@ def validate_delivery_locations(locations):
     return normalized
 
 
+def name_delivery_areas_after_locations(config):
+    """Apply the location-named area layout once, independently of pricing."""
+    if config.get("areaNamingVersion", 0) >= DELIVERY_AREA_NAMING_VERSION:
+        return config
+    result = deepcopy(config)
+    old_area = {location: area["id"] for area in result["areas"] for location in area["locations"]}
+    targets = {}
+    for location in result["locations"]:
+        is_ikeja = (location["id"] in IKEJA_AREA_LOCATIONS
+                    or location["label"].strip().casefold() in IKEJA_AREA_LOCATIONS)
+        key = "ikeja" if is_ikeja else location["id"]
+        targets.setdefault(key, {"label": "Ikeja" if is_ikeja else location["label"], "locations": []})["locations"].append(location["id"])
+
+    def unused(base, used, limit=60):
+        base = base[:limit]
+        value, suffix = base, 2
+        while value.casefold() in used:
+            ending = f"-{suffix}"
+            value = f"{base[:limit - len(ending)]}{ending}"
+            suffix += 1
+        used.add(value.casefold())
+        return value
+
+    # Keep the old area ID for its namesake, or its first catalog location.
+    # This retains familiar pickup IDs while splitting each shared area.
+    areas, source_by_area, used_ids = [], {}, set()
+    assigned = set()
+    source_by_target = {key: old_area["ikeja" if key == "ikeja" else target["locations"][0]]
+                        for key, target in targets.items()}
+    for original in result["areas"]:
+        keys = [key for key, target in targets.items()
+                if source_by_target[key] == original["id"]]
+        keys.sort(key=lambda key: key != original["id"])
+        for index, key in enumerate(keys):
+            target = targets[key]
+            area_id = unused(original["id"] if index == 0 else f"location-{key}", used_ids)
+            areas.append({"id": area_id, "label": target["label"], "locations": sorted(target["locations"])})
+            source_by_area[area_id] = original["id"]
+            assigned.add(key)
+    assert assigned == set(targets)
+
+    # Preserve explicit combinations of multiple old areas. A formerly shared
+    # area splits into independent destination groups. Merged Ikeja locations
+    # use the existing Ikeja pickup policy.
+    rules = {}
+    for pickup in areas:
+        previous = result["pickupRules"].get(source_by_area[pickup["id"]])
+        if previous is None:
+            continue
+        groups, group_ids, group_names = [], set(), set()
+        for group in previous:
+            members = [area for area in areas if source_by_area[area["id"]] in group["areas"]]
+            partitions = [members] if len(group["areas"]) > 1 else [[area] for area in members]
+            for partition in partitions:
+                if not partition:
+                    continue
+                combined = len(group["areas"]) > 1
+                groups.append({
+                    "id": unused(group["id"] if combined else partition[0]["id"], group_ids),
+                    "label": unused(group["label"] if combined else partition[0]["label"], group_names, 100),
+                    "areas": [area["id"] for area in partition],
+                })
+        rules[pickup["id"]] = groups
+    result.update(areas=areas, pickupRules=rules, areaNamingVersion=DELIVERY_AREA_NAMING_VERSION)
+    return result
+
+
 def default_batch_routing():
     # Starting areas for dispatcher review; no cross-area combinations until
     # an administrator explicitly configures them for a pickup area.
-    return expand_lagos_location_catalog({
+    return name_delivery_areas_after_locations(expand_lagos_location_catalog({
         "pricingZones": dict(PRICING_ZONE_LABELS),
         "zoneUnits": default_zone_units(),
         "locations": default_delivery_locations(),
         "areas": [{"id": key, "label": label, "locations": sorted(locations)}
                   for key, (label, locations) in DEFAULT_DELIVERY_AREAS.items()],
         "pickupRules": {},
-    })
+    }))
 
 
 def validate_batch_routing(config):
     if not isinstance(config, dict):
         raise ValueError("Delivery routing must be an object.")
-    config = upgrade_mainland_pricing(config)
+    config = upgrade_southern_mainland_pricing(upgrade_mainland_pricing(config))
     catalog_version = config.get("locationCatalogVersion", 0)
     if type(catalog_version) is not int or not 0 <= catalog_version <= LAGOS_LOCATION_CATALOG_VERSION:
         raise ValueError("Unsupported delivery location catalog version.")
+    area_naming_version = config.get("areaNamingVersion", 0)
+    if type(area_naming_version) is not int or not 0 <= area_naming_version <= DELIVERY_AREA_NAMING_VERSION:
+        raise ValueError("Unsupported delivery area naming version.")
     pricing_zones, zone_units = validate_zone_pricing(config)
     # Older saved routing files contain only areas, pickup rules and locations.
     fallback_catalog = default_batch_routing()["locations"] if catalog_version else default_delivery_locations()
@@ -614,7 +769,7 @@ def validate_batch_routing(config):
         if seen != area_ids:
             raise ValueError("Each destination area must appear in exactly one group per pickup area.")
         normalized_rules[pickup] = output
-    return {"locationCatalogVersion": catalog_version,
+    return {"locationCatalogVersion": catalog_version, "areaNamingVersion": area_naming_version,
             "pricingZones": pricing_zones, "zoneUnits": zone_units,
             "locations": catalog, "areas": normalized, "pickupRules": normalized_rules}
 
@@ -626,7 +781,8 @@ def load_batch_routing():
         config = default_batch_routing()
     except (OSError, json.JSONDecodeError) as error:
         raise ValueError("Delivery routing could not be loaded. Contact an administrator.") from error
-    return validate_batch_routing(expand_lagos_location_catalog(validate_batch_routing(config)))
+    return validate_batch_routing(name_delivery_areas_after_locations(
+        expand_lagos_location_catalog(validate_batch_routing(config))))
 
 
 def batch_routing_version(config):
@@ -1121,7 +1277,25 @@ def log_startup_state():
     print("[startup] Proof storage available")
 
 
-def create_account(email, name, password, plan=None):
+def registration_business_type(payload):
+    business_type = clean(payload.get("businessType"), 120)
+    if business_type.lower() in ("other", "others"):
+        business_type = clean(payload.get("otherBusinessType"), 120)
+        if not business_type or business_type.lower() in ("other", "others"):
+            raise ValueError("Please specify your business type.")
+    return business_type
+
+
+def registration_business_address(payload):
+    address = str(payload.get("businessAddress") or "").strip()
+    if not address:
+        raise ValueError("Please enter your business address.")
+    if len(address) > 500:
+        raise ValueError("Business address must be 500 characters or fewer.")
+    return address
+
+
+def create_account(email, name, password, plan=None, phone="", business_type="", business_name="", business_address=""):
     normalized_email = email.lower()
     if any(account["email"] == normalized_email for account in load_accounts()):
         raise ValueError(
@@ -1135,6 +1309,10 @@ def create_account(email, name, password, plan=None):
         "subscriberId": generate_subscriber_id(accounts),
         "email": normalized_email,
         "name": name,
+        "phone": clean(phone, 40),
+        "businessType": clean(business_type, 120),
+        "businessName": clean(business_name, 160),
+        "businessAddress": clean(business_address, 500),
         "salt": salt,
         "passwordHash": password_hash(password, salt),
         "plan": plan,
@@ -2462,7 +2640,50 @@ def clear_vendor_session(handler):
         VENDOR_SESSIONS.pop(token, None)
 
 
-def summary_for_account(account):
+def vendor_profile_details_for_accounts(accounts):
+    """Include registration details, with fallback for older account records."""
+    phones = {}
+    business_types = {}
+    business_names = {}
+    business_addresses = {}
+    for submission in load_json_list(DATA_FILE):
+        if submission.get("type") != "vendor":
+            continue
+        details = submission.get("data") or {}
+        email = str(details.get("email", "")).strip().lower()
+        phone = clean(details.get("phone"), 40)
+        if phone:
+            phones[email] = phone
+        business_type = clean(details.get("businessType"), 120)
+        if business_type:
+            business_types[email] = business_type
+        business_name = clean(details.get("businessName"), 160)
+        if business_name:
+            business_names[email] = business_name
+        business_address = clean(details.get("businessAddress"), 500)
+        if business_address:
+            business_addresses[email] = business_address
+    return [dict(phone=(
+        clean(account.get("phone"), 40)
+        or phones.get(account["email"].strip().lower(), "")
+    ), businessType=(
+        clean(account.get("businessType"), 120)
+        or business_types.get(account["email"].strip().lower(), "")
+    ), businessName=(
+        clean(account.get("businessName"), 160)
+        or business_names.get(account["email"].strip().lower(), "")
+    ), businessAddress=(
+        clean(account.get("businessAddress"), 500)
+        or business_addresses.get(account["email"].strip().lower(), "")
+    )) for account in accounts]
+
+
+def admin_vendor_summaries(accounts):
+    profiles = vendor_profile_details_for_accounts(accounts)
+    return [summary_for_account(account, profile) for account, profile in zip(accounts, profiles)]
+
+
+def summary_for_account(account, profile=None):
     plan = account.get("plan") if account.get("plan") in PLANS else None
     units_allocated = PLANS[plan]["units"] if plan else 0
     units_allocated += int(account.get("manualUnitAdjustment", 0) or 0)
@@ -2506,6 +2727,7 @@ def summary_for_account(account):
         (completed / total_deliveries * 100), 1
     ) if total_deliveries else 0.0
     return {
+        **(profile if profile is not None else vendor_profile_details_for_accounts([account])[0]),
         "subscriberId": account.get("subscriberId"),
         "email": account["email"],
         "name": account["name"],
@@ -2528,10 +2750,7 @@ def admin_summary():
     accounts = load_accounts()
     deliveries = load_deliveries()
 
-    vendor_summaries = [
-        summary_for_account(account)
-        for account in accounts
-    ]
+    vendor_summaries = admin_vendor_summaries(accounts)
 
     total_vendors = len(vendor_summaries)
 
@@ -5245,7 +5464,12 @@ class FiableHandler(SimpleHTTPRequestHandler):
                     if len(password) < 8:
                         raise ValueError("Your password must be at least 8 characters")
                     selected_plan = clean(payload.get("plan"), 40) or None
-                    create_account(email, name, password, selected_plan)
+                    payload["businessType"] = registration_business_type(payload)
+                    payload["businessAddress"] = registration_business_address(payload)
+                    create_account(email, name, password, selected_plan,
+                                   phone=payload.get("phone"), business_type=payload.get("businessType"),
+                                   business_name=payload.get("businessName"),
+                                   business_address=payload["businessAddress"])
                 saved = save_submission("vendor" if path.endswith("vendor") else "contact", {
                     key: clean(value) for key, value in payload.items() if key != "password"
                 })
@@ -6803,6 +7027,37 @@ class FiableHandler(SimpleHTTPRequestHandler):
                 self.wfile.write(body)
                 return
 
+            if path == "/api/account/profile":
+                email = get_logged_in_vendor_email(self)
+                if not email:
+                    self._json_response(401, {"error": "Please sign in to edit your profile."})
+                    return
+                updates = {}
+                for key, label, limit in (("name", "Name", 120), ("phone", "Phone number", 40),
+                                          ("businessName", "Business name", 160)):
+                    value = str(payload.get(key) or "").strip()
+                    if not value or len(value) > limit:
+                        raise ValueError(f"{label} is required and must be {limit} characters or fewer.")
+                    updates[key] = value
+                if not re.fullmatch(r"\+?[0-9 ()\-]{7,40}", updates["phone"]) or not 7 <= len(re.sub(r"\D", "", updates["phone"])) <= 15:
+                    raise ValueError("Please enter a valid phone number.")
+                if len(str(payload.get("businessType") or "").strip()) > 120 or len(str(payload.get("otherBusinessType") or "").strip()) > 120:
+                    raise ValueError("Business type must be 120 characters or fewer.")
+                updates["businessType"] = registration_business_type(payload)
+                if not updates["businessType"]:
+                    raise ValueError("Please enter your business type.")
+                updates["businessAddress"] = registration_business_address(payload)
+                with locked_file(ACCOUNTS_FILE):
+                    accounts = load_accounts()
+                    account = next((item for item in accounts if item.get("email", "").lower() == email.lower()), None)
+                    if account is None:
+                        self._json_response(404, {"error": "Account not found."})
+                        return
+                    account.update(updates)
+                    atomic_write_json(ACCOUNTS_FILE, accounts)
+                self._json_response(200, summary_for_account(account))
+                return
+
             if path == "/api/change-password":
                 email = get_logged_in_vendor_email(self)
                 if not email:
@@ -7868,10 +8123,7 @@ class FiableHandler(SimpleHTTPRequestHandler):
 
             accounts = load_accounts()
 
-            vendors = [
-                summary_for_account(account)
-                for account in accounts
-            ]
+            vendors = admin_vendor_summaries(accounts)
 
             self._json_response(
                 200,

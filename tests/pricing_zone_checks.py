@@ -22,7 +22,7 @@ def set_units(config, origin, destination, units):
 def validation_checks():
     config = server.default_batch_routing()
     assert server.validate_batch_routing(config) == config
-    assert len(config["pricingZones"]) == 10 and len(config["zoneUnits"]) == 55
+    assert len(config["pricingZones"]) == 13 and len(config["zoneUnits"]) == 91
     zones = {location["id"]: location["zone"] for location in config["locations"]}
     assert zones["chevron"] == zones["ikate-elegushi"] == "lekki-corridor-1"
     assert zones["ajah"] == zones["vgc"] == zones["sangotedo"] == "lekki-corridor-2"
@@ -37,6 +37,8 @@ def validation_checks():
             location["zone"] = "lekki"
         if location["id"] in server.MAINLAND_ZONE_MOVES:
             location["zone"] = server.MAINLAND_ZONE_MOVES[location["id"]][0]
+        if location["id"] in server.SOUTH_MAINLAND_ZONE_MOVES:
+            location["zone"] = server.SOUTH_MAINLAND_ZONE_MOVES[location["id"]][0][0]
     server.atomic_write_json(server.BATCH_ROUTING_FILE, legacy)
     before = server.BATCH_ROUTING_FILE.read_bytes()
     assert server.load_batch_routing() == config
@@ -45,22 +47,29 @@ def validation_checks():
         for destination in server.LOCATION_ZONES:
             original_zones = [server.MAINLAND_ZONE_MOVES[location][0] if location in server.MAINLAND_ZONE_MOVES else zones[location]
                               for location in (origin, destination)]
+            original_zones = [server.SOUTH_MAINLAND_ZONE_MOVES[location][0][0]
+                              if location in server.SOUTH_MAINLAND_ZONE_MOVES else zone
+                              for location, zone in zip((origin, destination), original_zones)]
             pair = frozenset("lekki" if zone.startswith("lekki-corridor-") else zone for zone in original_zones)
             expected = server.ZONE_UNIT_MATRIX.get(pair, 7 if "extended" in pair else 3)
             actual = server.estimate_delivery(origin, destination, "Basic", routing=config)["units"]
             assert actual >= expected, (origin, destination, expected, actual)
-            if origin not in server.MAINLAND_ZONE_MOVES and destination not in server.MAINLAND_ZONE_MOVES:
+            moved = set(server.MAINLAND_ZONE_MOVES) | set(server.SOUTH_MAINLAND_ZONE_MOVES)
+            if origin not in moved and destination not in moved:
                 assert actual == expected
     for origin, destination in [('egbeda', 'ipaja'), ('ipaja', 'egbeda'), ('egbeda', 'ifako-ijaiye'),
                                 ('ayobo', 'abule-egba'), ('agege', 'ifako-ijaiye'), ('ipaja', 'ipaja')]:
         assert server.estimate_delivery(origin, destination, "Basic", routing=config)["units"] == 3
     previous = copy.deepcopy(config)
-    previous["pricingZones"] = {key: label for key, label in previous["pricingZones"].items() if key not in server.NEW_MAINLAND_ZONES}
+    added = server.NEW_MAINLAND_ZONES | set(server.SOUTH_MAINLAND_ZONE_SOURCES)
+    previous["pricingZones"] = {key: label for key, label in previous["pricingZones"].items() if key not in added}
     previous["zoneUnits"] = [route for route in previous["zoneUnits"]
-                             if route["from"] not in server.NEW_MAINLAND_ZONES and route["to"] not in server.NEW_MAINLAND_ZONES]
+                             if route["from"] not in added and route["to"] not in added]
     for location in previous["locations"]:
         if location["id"] in server.MAINLAND_ZONE_MOVES:
             location["zone"] = server.MAINLAND_ZONE_MOVES[location["id"]][0]
+        if location["id"] in server.SOUTH_MAINLAND_ZONE_MOVES:
+            location["zone"] = server.SOUTH_MAINLAND_ZONE_MOVES[location["id"]][0][0]
     previous["pricingZones"]["mainland-north"] = 'Custom northern zone'
     set_units(previous, "mainland-west", "mainland-central", 5)
     next(location for location in previous["locations"] if location["id"] == "agege")["zone"] = "mainland-east"

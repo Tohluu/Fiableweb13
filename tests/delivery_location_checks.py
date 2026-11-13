@@ -44,7 +44,9 @@ def validation_checks():
             pass
         else:
             raise AssertionError("Invalid location configuration accepted")
-    assert server.estimate_batch_deliveries(requests(["ogudu", "kosofe", "ikeja"]), "Basic", routing=custom)["groups"][0]["deliveryCount"] == 3
+    groups = server.estimate_batch_deliveries(requests(["ogudu", "kosofe", "ikeja"]), "Basic", routing=custom)["groups"]
+    assert len(groups) == 2
+    assert next(group for group in groups if group["axis"] == "ikeja")["deliveryCount"] == 2
     print("PASS: legacy configuration migration, custom-location validation, coverage and grouping.", flush=True)
 
 

@@ -21,7 +21,8 @@ def migration_checks():
     legacy = copy.deepcopy(fresh)
     del legacy["locationCatalogVersion"]
     legacy["locations"] = [item for item in legacy["locations"] if item["id"] not in additions]
-    legacy["areas"] = [area for area in legacy["areas"] if not set(area["locations"]) & additions]
+    legacy["areas"] = [{**area, "locations": [key for key in area["locations"] if key not in additions]}
+                       for area in legacy["areas"] if set(area["locations"]) - additions]
     # Simulate existing admin additions and changed rates, names and assignments.
     legacy["locations"] += [
         {"id": "maryland-gra", "label": "Maryland", "zone": "extended"},

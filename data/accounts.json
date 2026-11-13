@@ -11,7 +11,11 @@
     "passwordResetAt": "2026-08-24T15:50:50.860216+00:00",
     "subscriberId": "FL-SUB-0001",
     "passwordChangedAt": "2026-08-14T14:37:05.353656+00:00",
-    "manualUnitAdjustment": 8
+    "manualUnitAdjustment": 8,
+    "phone": "08103694860",
+    "businessName": "tytt",
+    "businessType": "Beauty",
+    "businessAddress": "41, Solomon Okonkwo Street Unity Estate Egbeda"
   },
   {
     "email": "aurellehaven@gmail.com",
@@ -22,7 +26,11 @@
     "subscriberId": "FL-SUB-0002",
     "plan": "Basic",
     "paymentStatus": "paid",
-    "paidAt": "2026-08-18T06:57:56.277367+00:00"
+    "paidAt": "2026-08-18T06:57:56.277367+00:00",
+    "phone": "07015414492",
+    "businessName": "Aurelle Haven",
+    "businessType": "Fashion",
+    "businessAddress": "41 Solomon Okonkwo Street Unity Estate"
   },
   {
     "email": "teelearning@gmail.com",

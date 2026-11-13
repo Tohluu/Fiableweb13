@@ -11,4 +11,15 @@ h1,h2,h3 { letter-spacing:-.025em; }
 input,select,textarea { border-radius:3px; }
 .sidebar-link { border-radius:3px; }
 a:focus-visible,button:focus-visible { outline:3px solid var(--blue); outline-offset:3px; }
+#vendorProfileForm .profile-detail-row label { margin:0; color:var(--muted); font-size:inherit; font-weight:inherit; flex:0 0 35%; }
+#vendorProfileForm .form-actions { display:flex; flex-wrap:wrap; gap:10px; }
+#vendorProfileForm .form-actions[hidden] { display:none; }
+#vendorProfileFields { border:0; padding:0; margin:0; min-width:0; }
+#vendorProfileForm.profile-readonly .profile-editor { display:none; }
+#vendorProfileForm:not(.profile-readonly) .profile-value { display:none; }
+#vendorProfileForm .profile-detail-row > .profile-editor { width:60%; min-width:0; }
+#detailBusinessAddress { white-space:pre-wrap; }
+#editProfileOtherFields label { margin:12px 0 7px; }
+#vendorProfileForm.profile-readonly #profileSaveStatus:empty { display:none; }
+#view-account .detail-row strong { min-width:0; overflow-wrap:anywhere; text-align:right; }
 @media(prefers-reduced-motion:reduce) { html { scroll-behavior:auto; } *,*::before,*::after { transition:none!important; animation:none!important; } }

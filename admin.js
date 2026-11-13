@@ -954,6 +954,9 @@ if (logoutBtn) {
             <!-- Vendor -->
             <td>
               <strong>${vendor.name}</strong>
+              <div class="muted">Business name: ${escapeSubscriptionValue(vendor.businessName || "Not provided")}</div>
+              <div class="muted">${vendorPhoneContact(vendor.phone)}</div>
+              <div class="muted">Business type: ${escapeSubscriptionValue(vendor.businessType || "Not provided")}</div>
             </td>
 
 
@@ -1309,6 +1312,16 @@ if (logoutBtn) {
       "\"": "&quot;",
       "'": "&#039;"
     }[character]));
+  }
+
+  function vendorPhoneContact(value) {
+    const phone = String(value ?? "").trim();
+    if (!phone) return "Phone not provided";
+    const dial = phone.replace(/[^\d+]/g, "");
+    const label = escapeSubscriptionValue(phone);
+    return /^\+?\d{7,15}$/.test(dial)
+      ? `<a href="tel:${dial}">${label}</a>`
+      : label;
   }
 
   let paymentOverview = null;
@@ -4676,6 +4689,26 @@ if (logoutBtn) {
         <div class="vendor-detail-item">
           <span>Email</span>
           <strong>${vendor.email || "—"}</strong>
+        </div>
+
+        <div class="vendor-detail-item">
+          <span>Phone number</span>
+          <strong>${vendorPhoneContact(vendor.phone)}</strong>
+        </div>
+
+        <div class="vendor-detail-item">
+          <span>Business type</span>
+          <strong>${escapeSubscriptionValue(vendor.businessType || "Not provided")}</strong>
+        </div>
+
+        <div class="vendor-detail-item">
+          <span>Business name</span>
+          <strong>${escapeSubscriptionValue(vendor.businessName || "Not provided")}</strong>
+        </div>
+
+        <div class="vendor-detail-item">
+          <span>Business address</span>
+          <strong style="white-space:pre-wrap;overflow-wrap:anywhere">${escapeSubscriptionValue(vendor.businessAddress || "Not provided")}</strong>
         </div>
 
         <div class="vendor-detail-item">

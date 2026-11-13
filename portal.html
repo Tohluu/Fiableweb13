@@ -6,7 +6,7 @@
   <meta name="description" content="Apexwings Logistics vendor portal">
   <title>Apexwings Vendor Portal</title>
   <link rel="stylesheet" href="portal.css?v=5">
-  <link rel="stylesheet" href="portal-design.css?v=1">
+  <link rel="stylesheet" href="portal-design.css?v=5">
 <link rel="stylesheet" href="brand.css?v=1">
 <link rel="icon" type="image/png" href="images/apexwings-symbol.png">
 <link rel="manifest" href="/manifest.webmanifest">
@@ -592,12 +592,55 @@
             </article>
             <article class="panel details-card">
               <h3>Account details</h3>
-              <div class="detail-row"><span>Name</span><strong id="detailName">—</strong></div>
-              <div class="detail-row"><span>Email</span><strong id="detailEmail">—</strong></div>
+              <div class="detail-row"><span>Email</span><strong id="detailEmail">&mdash;</strong></div>
+              <form id="vendorProfileForm" class="profile-readonly">
+                <fieldset id="vendorProfileFields" disabled>
+                <div class="detail-row profile-detail-row">
+                  <label for="editProfileName">Name</label>
+                  <strong class="profile-value" id="detailName">Not provided</strong>
+                  <input id="editProfileName" class="profile-editor" required maxlength="120" autocomplete="name">
+                </div>
+                <div class="detail-row profile-detail-row">
+                  <label for="editProfilePhone">Phone number</label>
+                  <strong class="profile-value" id="detailPhone">Not provided</strong>
+                  <input id="editProfilePhone" class="profile-editor" type="tel" required maxlength="40" autocomplete="tel">
+                </div>
+                <div class="detail-row profile-detail-row">
+                  <label for="editProfileBusinessName">Business name</label>
+                  <strong class="profile-value" id="detailBusinessName">Not provided</strong>
+                  <input id="editProfileBusinessName" class="profile-editor" required maxlength="160" autocomplete="organization">
+                </div>
+                <div class="detail-row profile-detail-row">
+                  <label for="editProfileBusinessType">Business type</label>
+                  <strong class="profile-value" id="detailBusinessType">Not provided</strong>
+                  <select id="editProfileBusinessType" class="profile-editor" required>
+                  <option value="">Select business type</option>
+                  <option>Fashion</option><option>Food</option><option>E-commerce</option>
+                  <option>Beauty</option><option>Electronics</option><option>Retail</option>
+                  <option>Home Business</option><option>Other</option>
+                </select>
+                </div>
+                <div id="editProfileOtherFields" class="profile-editor" hidden>
+                  <label for="editProfileOtherType">Please specify your business type</label>
+                  <input id="editProfileOtherType" maxlength="120" disabled>
+                </div>
+                <div class="detail-row profile-detail-row">
+                  <label for="editProfileAddress">Business address</label>
+                  <strong class="profile-value" id="detailBusinessAddress">Not provided</strong>
+                  <textarea id="editProfileAddress" class="profile-editor" required maxlength="500" rows="3" autocomplete="street-address"></textarea>
+                </div>
+                </fieldset>
+                <p id="profileSaveStatus" role="status" aria-live="polite"></p>
+                <div class="form-actions" id="profileEditActions" hidden>
+                  <button class="btn primary" type="submit" id="saveProfileBtn">Save changes</button>
+                  <button class="btn outline" type="button" id="cancelProfileBtn">Cancel</button>
+                </div>
+              </form>
               <div class="detail-row"><span>Subscriber ID</span><strong id="detailSubscriberId">—</strong></div>
               <div class="detail-row"><span>Plan</span><strong id="detailPlan">—</strong></div>
               <div class="detail-row"><span>Units allocated</span><strong id="detailUnits">0</strong></div>
               <div class="detail-row"><span>Renewal date</span><strong id="detailRenewal">—</strong></div>
+              <button class="btn outline" type="button" id="editProfileBtn" aria-controls="vendorProfileFields" aria-expanded="false">Edit profile</button>
             </article>
           </div>
         </section>
@@ -615,6 +658,7 @@
                 <!-- Profile & Account -->
                 <article class="panel details-card">
                 <h3>Profile & Account</h3>
+                <button class="btn outline" type="button" id="settingsEditProfileBtn">Edit profile</button>
 
                 <div class="detail-row">
                     <span>Name</span>
@@ -754,6 +798,9 @@
     const LOCATIONS = [];
     const PLAN_PRICES = { Basic: 67500, Growth: 105000, Business: 143000 };
     const state = { account: null, deliveries: [] };
+    let profileDirty = false;
+    let profileEmail = "";
+    let profileEditing = false;
     let pendingBatchEntry = new URLSearchParams(window.location.search).get("view") === "batch";
     if (pendingBatchEntry) document.getElementById("portalLoginDescription").textContent = "Log in to book a batch from one pickup to multiple destinations.";
 
@@ -1253,8 +1300,8 @@
       $("profileName").textContent = a.name;
       $("profileEmail").textContent = a.email;
       $("profileState").textContent = stateText;
-      $("detailName").textContent = a.name;
       $("detailEmail").textContent = a.email;
+      populateProfileFields();
       $("detailSubscriberId").textContent = a.subscriberId || "—";
       $("detailPlan").textContent = a.plan || "No plan";
       $("detailUnits").textContent = a.unitsAllocated;
@@ -1273,6 +1320,107 @@
       renderStatusList();
       loadNotificationSettings();
     }
+
+    function toggleProfileOtherType() {
+      const active = $("editProfileBusinessType").value === "Other";
+      $("editProfileOtherFields").hidden = !active;
+      $("editProfileOtherType").disabled = !active;
+      $("editProfileOtherType").required = active;
+      $("editProfileOtherType").setCustomValidity("");
+    }
+
+    function populateProfileFields() {
+      const account = state.account;
+      if (account) {
+        for (const [id, key] of [["detailName", "name"], ["detailPhone", "phone"],
+          ["detailBusinessName", "businessName"], ["detailBusinessType", "businessType"],
+          ["detailBusinessAddress", "businessAddress"]]) {
+          $(id).textContent = account[key] || "Not provided";
+        }
+      }
+      if (!account || (profileDirty && profileEmail === account.email)) return;
+      if (profileEmail !== account.email) setProfileEditing(false);
+      profileDirty = false;
+      profileEmail = account.email;
+      $("vendorProfileForm").reset();
+      $("vendorProfileForm").querySelectorAll("input,textarea,select").forEach(input => input.setCustomValidity(""));
+      $("editProfileName").value = account.name || "";
+      $("editProfilePhone").value = account.phone || "";
+      $("editProfileBusinessName").value = account.businessName || "";
+      $("editProfileAddress").value = account.businessAddress || "";
+      const type = account.businessType || "";
+      const known = Array.from($("editProfileBusinessType").options).some(option => option.value === type);
+      $("editProfileBusinessType").value = known ? type : "Other";
+      $("editProfileOtherType").value = known ? "" : type;
+      toggleProfileOtherType();
+      $("profileSaveStatus").textContent = "";
+    }
+    function setProfileEditing(editing) {
+      profileEditing = editing;
+      $("vendorProfileFields").disabled = !editing;
+      $("vendorProfileForm").classList.toggle("profile-readonly", !editing);
+      $("profileEditActions").hidden = !editing;
+      $("editProfileBtn").hidden = editing;
+      $("editProfileBtn").setAttribute("aria-expanded", String(editing));
+    }
+    function startProfileEditing() {
+      if (!state.account) return;
+      setProfileEditing(true);
+      $("editProfileName").focus();
+    }
+    $("editProfileBtn").addEventListener("click", startProfileEditing);
+    $("settingsEditProfileBtn").addEventListener("click", () => {
+      switchView("account");
+      startProfileEditing();
+    });
+    $("cancelProfileBtn").addEventListener("click", () => {
+      profileDirty = false;
+      populateProfileFields();
+      setProfileEditing(false);
+      $("editProfileBtn").focus();
+    });
+    $("editProfileBusinessType").addEventListener("change", toggleProfileOtherType);
+    const markProfileDirty = event => {
+      if (!profileEditing) return;
+      profileDirty = true;
+      event.target.setCustomValidity?.("");
+      $("profileSaveStatus").textContent = "Unsaved changes";
+    };
+    $("vendorProfileForm").addEventListener("input", markProfileDirty);
+    $("vendorProfileForm").addEventListener("change", markProfileDirty);
+    $("vendorProfileForm").addEventListener("submit", async event => {
+      event.preventDefault();
+      if (!profileEditing) return;
+      const form = event.currentTarget;
+      form.querySelectorAll("input:required:not(:disabled),textarea:required").forEach(input => {
+        input.setCustomValidity(input.value.trim() ? "" : "Please enter this detail.");
+      });
+      if (!form.reportValidity()) return;
+      const button = $("saveProfileBtn");
+      button.disabled = true;
+      form.inert = true;
+      $("profileSaveStatus").textContent = "Saving changes…";
+      const value = id => $(id).value.trim();
+      try {
+        state.account = await api("/api/account/profile", {
+          method: "POST",
+          body: JSON.stringify({ name: value("editProfileName"), phone: value("editProfilePhone"),
+            businessName: value("editProfileBusinessName"), businessType: value("editProfileBusinessType"),
+            otherBusinessType: value("editProfileOtherType"), businessAddress: value("editProfileAddress") })
+        });
+        profileDirty = false;
+        updateAccountUI();
+        setProfileEditing(false);
+        $("profileSaveStatus").textContent = "Profile updated successfully.";
+        toast("Profile updated successfully.");
+      } catch (error) {
+        $("profileSaveStatus").textContent = error.message;
+      } finally {
+        button.disabled = false;
+        form.inert = false;
+        if (!profileEditing) $("editProfileBtn").focus();
+      }
+    });
 
     function loadNotificationSettings() {
       const settings = JSON.parse(

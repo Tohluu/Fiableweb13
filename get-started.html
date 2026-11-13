@@ -171,6 +171,8 @@
 </div>
 </div>
 <div id="accountFields" class="service-fields">
+<label for="businessAddress">Business address</label>
+<textarea id="businessAddress" required autocomplete="street-address" maxlength="500" rows="3" placeholder="Building number, street, area and city"></textarea>
 <label for="vendorPassword">Create a password</label>
 <div class="password-field">
 <input id="vendorPassword" required type="password" minlength="8" maxlength="128" autocomplete="new-password" placeholder="At least 8 characters">
@@ -189,6 +191,10 @@
 <option>Home Business</option>
 <option>Other</option>
 </select>
+<div id="otherBusinessTypeFields" hidden>
+<label for="otherBusinessType">Please specify your business type</label>
+<input id="otherBusinessType" type="text" maxlength="120" placeholder="Enter your business type" disabled>
+</div>
 </div>
 <div id="subscriptionFields">
 <label for="monthlyVolume">Estimated monthly deliveries</label>
@@ -276,6 +282,6 @@
 <script src="csrf.js"></script>
 <script src="site.js?v=3"></script>
 <script src="express-booking.js?v=3"></script>
-<script src="get-started.js?v=3"></script>
+<script src="get-started.js?v=5"></script>
 </body>
 </html>

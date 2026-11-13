@@ -184,6 +184,25 @@ Validate a JSON backup without writing data with
 
 Open **Admin → Settings → Pricing zones, delivery areas & batch groups**.
 
+The **Location and zone directory** lists every location beside its pricing zone
+and delivery area. Search by location, zone or area, or filter by pricing zone.
+New locations and assignment/name edits update the directory immediately; the
+status identifies unsaved changes. Use **Save routing rules** to keep changes.
+The directory uses the shared routing list, so saved additions appear on reload.
+
+Delivery areas now use each location's name. Opebi, Oregun and Maryland share
+**Ikeja** with Ikeja itself. Existing broad areas are split once when settings
+load, including custom locations. Pricing zones, route units and booked orders
+are preserved. Explicit combinations of multiple areas are carried forward;
+destinations that only shared a broad delivery area become separate batch groups.
+The merged Ikeja area uses the existing Ikeja pickup rules. Later saved admin
+edits are retained. Restart the server after updating Python code.
+
+When adding a location, **Same name as location (automatic)** creates its matching
+delivery area by default. You can still choose an existing area explicitly.
+`python -B tests/delivery_area_naming_checks.py` checks the one-time rollout,
+Ikeja exceptions, pricing, custom locations, pickup rules and saved edits.
+
 In **Pricing zone names and route units**, rename any pricing zone and set
 1–7 units for every pair of zones. Prices are symmetric: a route has the same
 units in either direction. A zone paired with itself controls within-zone
@@ -215,11 +234,37 @@ original rates, Egbeda–Ipaja, Egbeda–Ifako-Ijaiye and within the new norther
 zones start at 3 units. Review and edit these starting charges before launch.
 Saved orders, delivery areas and batch discount groups are unchanged.
 
+**Mainland South** covers Surulere, Mushin and Oshodi-Isolo.
+**Mainland South-West** covers Apapa, Amuwo-Odofin, Ajegunle,
+Ajeromi-Ifelodun, Festac Town, Satellite Town and Mile 2.
+**Mainland South-East** covers Gbagada, Shomolu, Bariga and Ilupeju.
+Magodo stays in Mainland East; Ojo stays in Mainland West.
+These are editable dispatch pricing groups, rather than measured distances.
+
+Existing eight- and ten-zone settings receive the three southern zones on read.
+Locations move only from the listed groups' old default zones; assignments to
+other zones are retained. Existing rates and custom labels are preserved.
+New southern rows inherit the highest saved rate between their parent zones,
+with a starting minimum of 2 units, including within-zone journeys. With the
+original rates, Gbagada–Magodo, Surulere–Yaba and Apapa–Ojo each start at 2 units.
+Later admin changes to these assignments or rates are retained. Existing orders
+keep their booked prices. Restart the server after updating the code.
+
+Expand **Review locations sharing a 1-unit rate** inside the pricing section
+to see the locations covered by each remaining 1-unit route. This list updates
+as you edit route units or location assignments. Use it to decide whether to
+raise a rate or move a location before saving.
+
+`python -B tests/southern_pricing_checks.py` checks the rollout, all old route
+prices, custom settings, symmetric quotes, express/single/batch booking,
+permissions and saved order prices. `node --test tests/routing_pricing_ui_checks.cjs`
+checks the zone choices, 1-unit review, live edits and read-only access.
+
 1. Review the proposed delivery areas. Each supported location belongs to one
    area. You can rename areas, add an area and move locations into it, or remove
    an area after moving its locations elsewhere.
    To add a missing neighbourhood or town, use **Add a location** in this section:
-   enter its name, choose its pricing zone and delivery area, then select
+   enter its name, choose its pricing zone and optionally an existing delivery area, then select
    **Add location to draft**. The pricing zone determines normal route units;
    the area determines batch grouping. Custom location names and all location
    pricing zones can be edited in the location list.
@@ -239,14 +284,14 @@ The Lagos catalog includes 30 additional neighbourhoods across the mainland,
 island and both Lekki corridors. Existing settings receive these once, without
 overwriting saved prices, location assignments or batch groups. Matching IDs or
 names already added by an administrator are retained. New locations initially
-have separate delivery areas; combine areas only after reviewing dispatch routes.
+have matching delivery areas, with Opebi, Oregun and Maryland under Ikeja.
 All 30 names, pricing zones and area assignments are editable in the location
 list above. Berger is clarified to Ojodu Berger, keeping its existing ID and zone.
 The catalog version is saved with routing settings so later admin edits persist.
 
 For example, test three Lekki Phase 1, three Chevron and three Sangotedo
-deliveries from Egbeda. They initially form three groups. For the Alimosho pickup
-area, assign Lekki Phase 1 / Ikate and Chevron / Ikota the same test group name.
+deliveries from Egbeda. They initially form three groups. For the Egbeda pickup
+area, assign Lekki Phase 1 and Chevron the same test group name.
 The dry run then shows two groups from Egbeda, while a pickup in Ikeja still
 produces three. This demonstrates the rule mechanism, not a validated dispatch
 recommendation.
