@@ -26368,5 +26368,17 @@
     "previousValue": null,
     "newValue": null,
     "note": null
+  },
+  {
+    "id": "FQQNC6IZIpbfI2bV",
+    "at": "2026-11-16T21:17:55.840550+00:00",
+    "actorEmail": "toluwaloseoyinloye@gmail.com",
+    "actorRole": "owner",
+    "action": "admin_login",
+    "targetType": "admin",
+    "targetId": 2,
+    "previousValue": null,
+    "newValue": null,
+    "note": null
   }
 ]

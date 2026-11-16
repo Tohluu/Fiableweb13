@@ -76,7 +76,7 @@ footer { background:#f5f5f1; color:var(--ink); padding:58px 0 22px; border-block
 .plan.popular,.plan.popular.selected,.plan.selected { transform:none; box-shadow:none; }
 .plan.popular { border-color:var(--blue); border-block-start:4px solid var(--blue); padding-block-start:27px; }
 .plan.selected { outline:2px solid var(--blue); outline-offset:3px; border-width:1px; }
-#plans .plan { transition:transform .2s ease,box-shadow .2s ease,border-color .2s ease; }
+#plans .plan { border-radius:16px; transition:transform .2s ease,box-shadow .2s ease,border-color .2s ease; }
 #plans .plan:focus-within { border-color:var(--blue); box-shadow:0 12px 30px rgba(23,105,224,.14); }
 @media (hover:hover) and (pointer:fine) {
  #plans .plan:hover { transform:translateY(-6px); border-color:var(--blue); box-shadow:0 16px 36px rgba(23,105,224,.16); }
@@ -88,6 +88,50 @@ footer { background:#f5f5f1; color:var(--ink); padding:58px 0 22px; border-block
 .plan .price { font-family:inherit; font-size:34px; letter-spacing:-.04em; }
 .plan .btn { margin-block-start:auto; }
 .plan-example { border-radius:2px; font-size:12px; }
+.registration-plan-summary { padding:14px 16px; margin:0 0 20px; border:1px solid #c0d9f5; border-radius:8px; background:#edf5ff; color:#0c2d51; font-size:13px; line-height:1.6; overflow-wrap:anywhere; }
+/* Growth plan: Apexwings blue with the shared navy brand palette. */
+#plans .plan-growth {
+ --growth-accent:var(--blue);
+ --growth-highlight:#c8e4ff;
+ color:#fff;
+ border:1px solid #2c6dab;
+ background:radial-gradient(ellipse at top left, #0c2d51 0%, #0a1c32 44%, #06111f 80%);
+ box-shadow:0 8px 26px rgba(12,45,81,.14),inset 0 1px 0 rgba(255,255,255,.08);
+ isolation:isolate;
+}
+#plans .plan-growth-header {
+ display:flex;
+ align-items:center;
+ justify-content:space-between;
+ flex-wrap:wrap;
+ gap:12px;
+ padding:20px 18px;
+ margin:-22px -18px 6px;
+ border-radius:11px;
+ background:linear-gradient(115deg,var(--blue),var(--blue-dark));
+ box-shadow:inset 0 1px 0 rgba(255,255,255,.12);
+}
+#plans .plan-growth-header h3 { margin:0; color:#fff; font-size:22px; }
+#plans .plan-growth .badge { position:static; background:var(--growth-highlight); color:#0c2d51; border-radius:20px; padding:4px 9px; font-size:9px; line-height:1.5; }
+#plans .plan-growth .price { color:#fff; }
+#plans .plan-growth .units { color:var(--growth-highlight); }
+#plans .plan-growth p,#plans .plan-growth li { color:#deebf8; }
+#plans .plan-growth .plan-example { background:rgba(8,102,217,.14); border:1px solid rgba(137,191,252,.2); border-radius:8px; }
+#plans .plan-growth .plan-example strong { color:#fff; }
+#plans .plan-growth ul,#plans .plan-growth li { border-color:rgba(182,215,249,.16); }
+#plans .plan-growth li:before { color:var(--growth-highlight); }
+#plans .plan-growth .plan-btn { color:#fff; background:#102b49; border:1px solid #427aaf; border-radius:9px; box-shadow:inset 0 1px 0 rgba(255,255,255,.06); transition:background .2s ease,border-color .2s ease,box-shadow .2s ease; }
+#plans .plan-growth .plan-btn:hover,#plans .plan-growth .plan-btn:focus-visible { background:var(--growth-accent); border-color:#83bcff; box-shadow:0 6px 24px rgba(8,102,217,.3); }
+#plans .plan-growth .plan-btn:focus-visible { outline:3px solid var(--growth-highlight); outline-offset:4px; }
+#plans .plan-growth:focus-within { border-color:#83bcff; box-shadow:0 18px 42px rgba(8,102,217,.26),0 0 0 1px rgba(95,166,245,.3); }
+#plans .plan-growth.selected { outline-color:var(--growth-highlight); border-color:#83bcff; }
+@media (hover:hover) and (pointer:fine) {
+ #plans .plan-growth:hover { transform:translateY(-8px); border-color:#83bcff; box-shadow:0 24px 48px rgba(8,74,151,.28),0 0 28px rgba(8,102,217,.2); }
+ #plans .plan-growth:hover .plan-btn { background:var(--growth-accent); border-color:#83bcff; }
+}
+@media (prefers-reduced-motion:reduce) {
+ #plans .plan-growth:hover { transform:none; }
+}
 .economics { flex-wrap:wrap; font-size:13px; }
 .economics a { color:var(--blue); font-weight:600; }
 .unit,.form-box,.result,.compare,.benefit,.rule,.service-visual { border-radius:4px; box-shadow:none; }

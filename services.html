@@ -7,7 +7,7 @@
 <meta name="theme-color" content="#1769e0">
 <title>Services | Apexwings Logistics</title>
 <link rel="stylesheet" href="fiable.css?v=5">
-<link rel="stylesheet" href="design.css?v=6">
+<link rel="stylesheet" href="design.css?v=10">
 <link rel="stylesheet" href="brand.css?v=1">
 <link rel="icon" type="image/png" href="images/apexwings-symbol.png">
 <link rel="manifest" href="/manifest.webmanifest">
@@ -68,11 +68,13 @@
 <li>Business visibility</li>
 <li>Performance tracking</li>
 </ul>
-<button class="btn btn-outline plan-btn" data-plan="Basic">Choose Basic</button>
+<a class="btn btn-outline plan-btn" data-plan="Basic" href="get-started.html?service=subscription&amp;plan=Basic#get-started">Choose Basic</a>
 </div>
-<div class="plan">
-<span class="badge">GROWTH PLAN</span>
+<div class="plan plan-growth">
+<div class="plan-growth-header">
 <h3>Growth</h3>
+<span class="badge">GROWTH PLAN</span>
+</div>
 <div class="price">₦105,000</div>
 <div class="units">75 delivery units / month</div>
 <p class="plan-example"><strong>Example:</strong> 25 deliveries at 3 units each. Routes use 1-7 units per delivery.</p>
@@ -86,7 +88,7 @@
 <li>Performance tracking</li>
 <li>Better unit economics</li>
 </ul>
-<button class="btn btn-primary plan-btn" data-plan="Growth">Choose Growth</button>
+<a class="btn btn-primary plan-btn" data-plan="Growth" href="get-started.html?service=subscription&amp;plan=Growth#get-started">Choose Growth</a>
 </div>
 <div class="plan">
 <h3>Business</h3>
@@ -104,7 +106,7 @@
 <li>Higher monthly capacity</li>
 <li>Better unit economics</li>
 </ul>
-<button class="btn btn-outline plan-btn" data-plan="Business">Choose Business</button>
+<a class="btn btn-outline plan-btn" data-plan="Business" href="get-started.html?service=subscription&amp;plan=Business#get-started">Choose Business</a>
 </div>
 </div>
 <div class="economics">
@@ -291,7 +293,7 @@
 </div>
 <div class="footer-col">
 <strong>For business</strong>
-<a href="services.html#vendors">Become a Vendor</a>
+<a href="get-started.html?service=subscription#get-started">Become a Vendor</a>
 <a href="services.html#calculator">Delivery Calculator</a>
 <a href="track.html">Track Delivery</a>
 <a href="get-started.html">Get Started</a>
@@ -318,10 +320,10 @@
 <script src="site.js"></script>
 <script src="services-calculator.js"></script>
 <script>
-        const planData = { Basic:{price:67500,units:45}, Growth:{price:105000,units:75}, Business:{price:143000,units:110} };
-        const selectPlan = card => { const button = card.querySelector('.plan-btn'); document.querySelectorAll('.plan').forEach(otherCard => { const selected = otherCard === card; otherCard.classList.toggle('selected', selected); otherCard.querySelector('.plan-btn').textContent = selected ? 'Proceed to registration' : `Choose ${otherCard.querySelector('h3').textContent}`; }); };
-        document.querySelectorAll('.plan').forEach(card => card.addEventListener('click', event => { if (event.target.closest('.plan-btn')) return; selectPlan(card); }));
-        document.querySelectorAll('.plan-btn').forEach(button => button.addEventListener('click', event => { event.preventDefault(); const card = event.currentTarget.closest('.plan'); selectPlan(card); toast(`${button.dataset.plan} selected. Redirecting to registration…`); setTimeout(() => { window.location.href = `get-started.html?plan=${encodeURIComponent(button.dataset.plan)}`; }, 450); }));
+        document.querySelectorAll('#plans .plan').forEach(card => card.addEventListener('click', event => {
+            if (event.target.closest('a, button')) return;
+            window.location.href = card.querySelector('.plan-btn').href;
+        }));
     </script>
 </body>
 </html>

@@ -18,13 +18,25 @@ const serviceFields = {
 };
 const params = new URLSearchParams(window.location.search);
 const requestedService = params.get('service');
-const planParam = params.get('plan');
+const registrationPlans = {
+    Basic: { price: 67500, units: 45 },
+    Growth: { price: 105000, units: 75 },
+    Business: { price: 143000, units: 110 }
+};
+const planParam = Object.keys(registrationPlans).find(plan => plan.toLowerCase() === (params.get('plan') || '').trim().toLowerCase()) || '';
 if (Object.hasOwn(serviceFields, requestedService)) {
     serviceType.value = requestedService;
 } else if (planParam) {
     serviceType.value = 'subscription';
 }
 selectedPlan.value = serviceType.value === 'subscription' ? planParam || '' : '';
+const updateSelectedPlan = () => {
+    const plan = Object.hasOwn(registrationPlans, selectedPlan.value) ? registrationPlans[selectedPlan.value] : null;
+    document.getElementById('registrationPlanSummary').textContent = plan
+        ? `${selectedPlan.value} plan: ₦${plan.price.toLocaleString('en-NG')} / month · ${plan.units} delivery units. Routes use 1–7 units per delivery.`
+        : 'Choose a plan to see your monthly price and delivery units.';
+};
+selectedPlan.addEventListener('change', updateSelectedPlan);
 
 const bulkDate = document.getElementById('bulkDate');
 const updateMinimumDate = () => {
@@ -45,17 +57,19 @@ const updateServiceFields = () => {
     const isBulk = serviceType.value === 'bulk';
     Object.entries(serviceFields).forEach(([service, fields]) => toggleFields(fields, service === serviceType.value));
     toggleFields(document.getElementById('accountFields'), !isBulk);
+    toggleFields(document.getElementById('registrationPlanFields'), serviceType.value === 'subscription');
     updateBusinessType();
     // A plan chosen on the pricing page must never be applied to another service.
     if (serviceType.value !== 'subscription') selectedPlan.value = '';
+    updateSelectedPlan();
     document.getElementById('subscriptionRules').hidden = isBulk;
     document.getElementById('bulkGuidance').hidden = !isBulk;
     document.getElementById('serviceEyebrow').textContent = isBulk ? 'Bulk haulage' : 'Become a vendor';
-    document.getElementById('serviceHeading').textContent = isBulk ? 'Tell us what needs to move.' : 'Ready to make delivery easier?';
+    document.getElementById('serviceHeading').textContent = isBulk ? 'Tell us what needs to move.' : 'Become a vendor';
     document.getElementById('serviceDescription').textContent = isBulk
         ? 'Share your load, route and preferred date to request a haulage quote. No account is required.'
         : "Join Apexwings' growing network of Lagos businesses and get access to structured, subscription-based delivery support.";
-    document.getElementById('serviceFormHeading').textContent = isBulk ? 'Request a bulk haulage quote' : 'Register for Apexwings services';
+    document.getElementById('serviceFormHeading').textContent = isBulk ? 'Request a bulk haulage quote' : 'Create your vendor account';
     document.getElementById('serviceFormDescription').textContent = isBulk
         ? 'Complete the details below, then send the prepared message to our team on WhatsApp.'
         : 'Choose your service and create your vendor account. You can sign in after registration.';

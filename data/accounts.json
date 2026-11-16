@@ -142,5 +142,19 @@
     "paymentStatus": "paid",
     "createdAt": "2026-08-15T16:25:00.140758+00:00",
     "paidAt": "2026-08-15T16:32:17.363693+00:00"
+  },
+  {
+    "subscriberId": "FL-SUB-0013",
+    "email": "adebayosalami@gmail.com",
+    "name": "Adebayo Salami",
+    "phone": "08103347899",
+    "businessType": "Electronics",
+    "businessName": "Adegold",
+    "businessAddress": "1 Ebun street Abule Ijesha",
+    "salt": "0b97aa492a02273e2efe58ca4db96006",
+    "passwordHash": "b10d42d34b86b96e98d83281b1b4131cfd120a3418715f8bd914253bd1eb6694",
+    "plan": "Basic",
+    "paymentStatus": "pending",
+    "createdAt": "2026-11-16T20:55:09.700940+00:00"
   }
 ]

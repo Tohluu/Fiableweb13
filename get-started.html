@@ -7,7 +7,7 @@
 <meta name="theme-color" content="#1769e0">
 <title>Get Started | Apexwings Logistics</title>
 <link rel="stylesheet" href="fiable.css?v=5">
-<link rel="stylesheet" href="design.css?v=1">
+<link rel="stylesheet" href="design.css?v=10">
 <link rel="stylesheet" href="express-booking.css?v=2">
 <link rel="stylesheet" href="brand.css?v=1">
 <link rel="icon" type="image/png" href="images/apexwings-symbol.png">
@@ -107,11 +107,11 @@
 </div>
 </section>
 
-<section id="get-started" class="section">
+<section id="get-started" class="section" aria-labelledby="serviceHeading">
 <div class="container two-col">
 <div>
 <div class="eyebrow" id="serviceEyebrow">Become a vendor</div>
-<h2 id="serviceHeading">Ready to make delivery easier?</h2>
+<h2 id="serviceHeading">Become a vendor</h2>
 <p class="hero-copy" id="serviceDescription" style="font-size:15px">Join Apexwings' growing network of Lagos businesses and get access to structured, subscription-based delivery support.</p>
 <div class="rule-list service-fields" id="subscriptionRules">
 <div class="rule">
@@ -143,7 +143,7 @@
 </div>
 </div>
 <div class="form-box">
-<h3 id="serviceFormHeading">Register for Apexwings services</h3>
+<h3 id="serviceFormHeading">Create your vendor account</h3>
 <p id="serviceFormDescription" style="color:var(--muted);font-size:13px">Choose the service that fits your operation.</p>
 <form id="vendorForm">
 <label for="serviceType">What do you need?</label>
@@ -152,6 +152,16 @@
 <option value="subscription">Monthly subscription deliveries</option>
 <option value="bulk">Bulk haulage</option>
 </select>
+<div id="registrationPlanFields" class="service-fields" hidden>
+<label for="selectedPlan">Selected subscription plan</label>
+<select id="selectedPlan" name="plan" required disabled aria-describedby="registrationPlanSummary">
+<option value="">Choose a subscription plan</option>
+<option value="Basic">Basic</option>
+<option value="Growth">Growth</option>
+<option value="Business">Business</option>
+</select>
+<p id="registrationPlanSummary" class="registration-plan-summary" role="status" aria-live="polite">Choose a plan to see your monthly price and delivery units.</p>
+</div>
 <div class="form-grid">
 <div>
 <label for="get-started-field-1">Full name</label>
@@ -178,7 +188,6 @@
 <input id="vendorPassword" required type="password" minlength="8" maxlength="128" autocomplete="new-password" placeholder="At least 8 characters">
 <button class="password-toggle" type="button" aria-label="Show password" aria-pressed="false">&#128065;</button>
 </div>
-<input id="selectedPlan" type="hidden" value="">
 <label for="get-started-field-5">Business type</label>
 <select required id="get-started-field-5">
 <option value="">Select business type</option>
@@ -282,6 +291,6 @@
 <script src="csrf.js"></script>
 <script src="site.js?v=3"></script>
 <script src="express-booking.js?v=3"></script>
-<script src="get-started.js?v=5"></script>
+<script src="get-started.js?v=6"></script>
 </body>
 </html>

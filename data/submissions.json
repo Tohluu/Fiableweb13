@@ -1237,5 +1237,22 @@
       "reason": "Delivery Question",
       "message": "Hiod"
     }
+  },
+  {
+    "id": 138,
+    "type": "vendor",
+    "createdAt": "2026-11-16T20:55:09.802946+00:00",
+    "data": {
+      "name": "Adebayo Salami",
+      "businessName": "Adegold",
+      "phone": "08103347899",
+      "email": "adebayosalami@gmail.com",
+      "businessAddress": "1 Ebun street Abule Ijesha",
+      "plan": "Basic",
+      "service": "subscription",
+      "businessType": "Electronics",
+      "otherBusinessType": "",
+      "monthlyVolume": "31\u201350"
+    }
   }
 ]
