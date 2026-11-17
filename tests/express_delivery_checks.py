@@ -74,6 +74,11 @@ def checks(port):
         assert public["timeline"][-1]["status"] == expected
         assert all(set(event) == {"status", "at"} for event in public["timeline"])
         assert "deliveryOtp" not in public and "details" not in public and "riderPhone" not in public
+        assert set(public) == {"trackingCode", "orderRef", "status", "createdAt", "updatedAt", "timeline", "riderContact"}
+        expected_contact = None if expected == "Order Received" else {
+            "name": "Express Test Rider", "phone": "08000000002",
+        }
+        assert public["riderContact"] == expected_contact, public
         return public
 
     check_tracking("Order Received")

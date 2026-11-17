@@ -50,7 +50,10 @@ def migration_checks():
     for origin in zones:
         for destination in zones:
             units = server.estimate_delivery(origin, destination, 'Basic', routing=upgraded)['units']
-            assert units >= old_rates[frozenset((zones[origin], zones[destination]))], (origin, destination)
+            expected = 1 if origin == destination else max(2, old_rates[frozenset((zones[origin], zones[destination]))])
+            assert units >= expected, (origin, destination)
+            if origin == destination:
+                assert units == 1
     for origin, destination in [('gbagada', 'magodo'), ('surulere', 'yaba'), ('apapa', 'ojo'),
                                 ('oshodi-isolo', 'ikeja'), ('bariga', 'magodo'), ('festac-town', 'ojo')]:
         assert server.estimate_delivery(origin, destination, 'Basic', routing=upgraded)['units'] == 2
@@ -66,7 +69,7 @@ def migration_checks():
     assert server.estimate_delivery('gbagada', 'magodo', 'Basic', routing=migrated)['units'] == 4
     assert server.estimate_delivery('agege', 'gbagada', 'Basic', routing=migrated)['units'] == 6
     modern = copy.deepcopy(upgraded)
-    set_units(modern, 'mainland-south-east', 'mainland-east', 1)
+    set_units(modern, 'mainland-south-east', 'mainland-east', 2)
     next(item for item in modern['locations'] if item['id'] == 'gbagada')['zone'] = 'mainland-east'
     assert server.validate_batch_routing(modern) == modern, 'Later admin changes must survive reads'
     broken = copy.deepcopy(previous); broken['zoneUnits'].pop()

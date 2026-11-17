@@ -52,6 +52,7 @@ def validation_checks():
                               for location, zone in zip((origin, destination), original_zones)]
             pair = frozenset("lekki" if zone.startswith("lekki-corridor-") else zone for zone in original_zones)
             expected = server.ZONE_UNIT_MATRIX.get(pair, 7 if "extended" in pair else 3)
+            expected = 1 if origin == destination else max(2, expected)
             actual = server.estimate_delivery(origin, destination, "Basic", routing=config)["units"]
             assert actual >= expected, (origin, destination, expected, actual)
             moved = set(server.MAINLAND_ZONE_MOVES) | set(server.SOUTH_MAINLAND_ZONE_MOVES)
@@ -59,7 +60,7 @@ def validation_checks():
                 assert actual == expected
     for origin, destination in [('egbeda', 'ipaja'), ('ipaja', 'egbeda'), ('egbeda', 'ifako-ijaiye'),
                                 ('ayobo', 'abule-egba'), ('agege', 'ifako-ijaiye'), ('ipaja', 'ipaja')]:
-        assert server.estimate_delivery(origin, destination, "Basic", routing=config)["units"] == 3
+        assert server.estimate_delivery(origin, destination, "Basic", routing=config)["units"] == (1 if origin == destination else 3)
     previous = copy.deepcopy(config)
     added = server.NEW_MAINLAND_ZONES | set(server.SOUTH_MAINLAND_ZONE_SOURCES)
     previous["pricingZones"] = {key: label for key, label in previous["pricingZones"].items() if key not in added}
@@ -82,10 +83,10 @@ def validation_checks():
     assert all(route in upgraded["zoneUnits"] for route in previous["zoneUnits"])
     modern = copy.deepcopy(config)
     next(location for location in modern["locations"] if location["id"] == "ipaja")["zone"] = "mainland-north"
-    set_units(modern, "mainland-north-west", "mainland-north-west", 1)
+    set_units(modern, "mainland-north-west", "mainland-north-west", 2)
     assert server.validate_batch_routing(modern) == modern, "Modern settings must preserve intentional assignments and unit edits"
     invalid = []
-    for units in [0, 8, 1.5, True, "3", None]:
+    for units in [0, 1, 8, 1.5, True, "3", None]:
         bad = copy.deepcopy(config); bad["zoneUnits"][0]["units"] = units; invalid.append(bad)
     missing = copy.deepcopy(config); missing["zoneUnits"].pop(); invalid.append(missing)
     duplicate = copy.deepcopy(config); duplicate["zoneUnits"][-1] = duplicate["zoneUnits"][0]; invalid.append(duplicate)
@@ -137,7 +138,7 @@ def api_checks(port):
     assert server.load_batch_routing() == saved["config"] == json.loads(server.BATCH_ROUTING_FILE.read_text())
     assert owner.request('/api/admin/batch-routing', {"config": config, "version": initial["version"]})[0] == 409
     for origin, destination, units in [('egbeda', 'chevron', 4), ('chevron', 'egbeda', 4),
-                                       ('egbeda', 'ajah', 7), ('egbeda', 'vgc', 4), ('chevron', 'chevron', 2)]:
+                                       ('egbeda', 'ajah', 7), ('egbeda', 'vgc', 4), ('chevron', 'chevron', 1)]:
         status, quote = guest.request('/api/calculate', {"pickup": origin, "dropoff": destination})
         assert status == 200 and quote["units"] == units and quote["cost"] == units * 2000
     status, subscriber_quote = vendor.request('/api/calculate', {

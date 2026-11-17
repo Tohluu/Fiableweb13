@@ -422,7 +422,7 @@
               </div>
             </div>
 
-            <p class="muted">Per eligible group: 3–5 deliveries qualify for 5%, 6–10 for 10%, and 11+ for 15% off route units. Groups of one or two use normal units. Charges round up to whole units, with at least one unit per delivery, so small groups may have no unit saving. Express surcharges are unchanged.</p>
+            <p class="muted">Per eligible group: 3–5 deliveries qualify for 5%, 6–10 for 10%, and 11+ for 15% off route units. Groups of one or two use normal units. Charges round up to whole units. Matching pickup and delivery locations cost 1 unit; different locations retain at least 2 units per delivery after discounts, so some groups have no unit saving. Express surcharges are unchanged.</p>
             <form id="batchDeliveryForm">
               <div class="form-grid batch-shared-details">
                 <div><label for="batchPickup">Pickup location</label><select id="batchPickup" required></select></div>
@@ -1600,6 +1600,10 @@
 
     function openDeliveryModal(d) {
 
+      const riderPhone = String(d.riderPhone || "").trim();
+      const riderDialNumber = riderPhone.replace(/[\s().-]/g, "");
+      const canCallRider = /^\+?\d{7,15}$/.test(riderDialNumber);
+
       const modal =
         $("deliveryModal");
 
@@ -1941,8 +1945,10 @@
 
                 <strong>
                   ${
-                    d.riderPhone
-                      ? escapeHtml(d.riderPhone)
+                    canCallRider
+                      ? `<a href="tel:${riderDialNumber}">Call rider: ${escapeHtml(riderPhone)}</a>`
+                      : riderPhone
+                      ? escapeHtml(riderPhone)
                       : "—"
                   }
                 </strong>
@@ -2773,7 +2779,7 @@ $("resetBackLoginBtn").addEventListener("click", () => {
           const rate = Math.round(group.discountRate * 100);
           const saving = !rate ? 'Normal units: fewer than 3 deliveries in this group.'
             : group.unitsSaved ? `${rate}% tier: ${group.unitsSaved} unit${group.unitsSaved === 1 ? '' : 's'} saved`
-            : `${rate}% tier: no whole-unit saving after rounding`;
+            : `${rate}% tier: no whole-unit saving after rounding and minimum route charges`;
           const destinations = group.deliveryIndexes.map(index => {
             const delivery = deliveries[index];
             return `${index + 1}. ${LOCATIONS.find(([value]) => value === delivery.dropoff)?.[1] || delivery.dropoff}`;

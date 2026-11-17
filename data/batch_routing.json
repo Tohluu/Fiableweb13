@@ -16,7 +16,7 @@
     {
       "from": "mainland-west",
       "to": "mainland-west",
-      "units": 1
+      "units": 2
     },
     {
       "from": "mainland-west",
@@ -66,7 +66,7 @@
     {
       "from": "mainland-north",
       "to": "mainland-north",
-      "units": 1
+      "units": 2
     },
     {
       "from": "mainland-north",
@@ -111,7 +111,7 @@
     {
       "from": "mainland-north-west",
       "to": "mainland-north-west",
-      "units": 1
+      "units": 2
     },
     {
       "from": "mainland-north-west",
@@ -151,7 +151,7 @@
     {
       "from": "mainland-north-east",
       "to": "mainland-north-east",
-      "units": 1
+      "units": 2
     },
     {
       "from": "mainland-north-east",
@@ -186,7 +186,7 @@
     {
       "from": "mainland-central",
       "to": "mainland-central",
-      "units": 1
+      "units": 2
     },
     {
       "from": "mainland-central",
@@ -216,7 +216,7 @@
     {
       "from": "mainland-east",
       "to": "mainland-east",
-      "units": 1
+      "units": 2
     },
     {
       "from": "mainland-east",
@@ -241,7 +241,7 @@
     {
       "from": "island-central",
       "to": "island-central",
-      "units": 1
+      "units": 2
     },
     {
       "from": "island-central",
@@ -261,7 +261,7 @@
     {
       "from": "lekki-corridor-1",
       "to": "lekki-corridor-1",
-      "units": 1
+      "units": 2
     },
     {
       "from": "lekki-corridor-1",
@@ -276,7 +276,7 @@
     {
       "from": "lekki-corridor-2",
       "to": "lekki-corridor-2",
-      "units": 1
+      "units": 2
     },
     {
       "from": "lekki-corridor-2",
@@ -1260,5 +1260,6 @@
     }
   ],
   "pickupRules": {},
-  "areaNamingVersion": 1
+  "areaNamingVersion": 1,
+  "locationPricingVersion": 1
 }

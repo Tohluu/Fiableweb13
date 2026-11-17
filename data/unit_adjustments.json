@@ -8,5 +8,15 @@
     "previousBalance": 0,
     "newBalance": 8,
     "at": "2026-10-13T11:16:04.756914+00:00"
+  },
+  {
+    "id": "NoBSL9qf2Qfimg",
+    "email": "toluwaloseoyinloye@gmail.com",
+    "unitsDelta": 2,
+    "reason": "Testing",
+    "adminEmail": "toluwaloseoyinloye@gmail.com",
+    "previousBalance": 8,
+    "newBalance": 10,
+    "at": "2026-11-17T19:05:55.261325+00:00"
   }
 ]

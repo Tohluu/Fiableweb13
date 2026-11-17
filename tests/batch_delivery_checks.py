@@ -96,7 +96,8 @@ def pricing_checks():
         assert quote["vendorSaving"] == quote["unitsSaved"] * 1500
         assert [item["dropoff"] for item in quote["deliveries"]] == [item["dropoff"] for item in payload]
         for item in quote["deliveries"]:
-            assert 1 <= item["units"] <= item["originalUnits"]
+            minimum = 1 if item["pickup"] == item["dropoff"] else 2
+            assert minimum <= item["units"] <= item["originalUnits"]
             assert item["cost"] == item["originalCost"] - item["vendorDiscountAmount"]
             assert item["riderPayout"] == round(item["originalCost"] * server.RIDER_PAYOUT_RATE)
     print("PASS: all locations grouped once, independent tiers, extended areas, whole-unit allocation, express pricing, 200 mixed-route cases.", flush=True)

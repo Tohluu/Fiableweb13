@@ -15,6 +15,9 @@
 .track-timeline .track-meta { font-size:13px; color:var(--muted); }
 .track-result { margin-block-start:28px; }
 .track-error { color:#b91c1c; margin-block-start:16px; }
+.track-rider { margin-block-start:20px; padding:16px; border:1px solid var(--line); border-radius:8px; overflow-wrap:anywhere; }
+.track-rider h4 { margin:0 0 8px; }
+.track-rider p { margin:8px 0; }
 </style>
 <link rel="stylesheet" href="design.css?v=1">
 <link rel="stylesheet" href="brand.css?v=1">
@@ -70,6 +73,12 @@
 <div class="form-box">
 <h3 id="trackOrderRef">Order</h3>
 <p><strong id="trackStatus"></strong></p>
+<section id="trackRider" class="track-rider hidden" aria-labelledby="trackRiderHeading">
+<h4 id="trackRiderHeading">Rider contact</h4>
+<p id="trackRiderName"></p>
+<a id="trackRiderPhone" class="hidden"></a>
+<p id="trackRiderMessage"></p>
+</section>
 <ul id="trackTimelineList" class="track-timeline"></ul>
 </div>
 </div>
@@ -127,11 +136,42 @@
         document.getElementById("trackCodeInput").value = prefillCode;
     }
 
+    function renderRiderContact(data) {
+        const section = document.getElementById("trackRider");
+        const name = document.getElementById("trackRiderName");
+        const phone = document.getElementById("trackRiderPhone");
+        const message = document.getElementById("trackRiderMessage");
+        section.classList.add("hidden");
+        name.textContent = "";
+        phone.textContent = "";
+        phone.removeAttribute("href");
+        phone.classList.add("hidden");
+        message.textContent = "";
+        if (!Object.prototype.hasOwnProperty.call(data, "riderContact")) return;
+        const rider = data.riderContact;
+        if (rider) {
+            name.textContent = rider.name || "Assigned rider";
+            const number = String(rider.phone || "").trim();
+            const dialNumber = number.replace(/[\s().-]/g, "");
+            if (/^\+?\d{7,15}$/.test(dialNumber)) {
+                phone.textContent = `Call rider: ${number}`;
+                phone.href = `tel:${dialNumber}`;
+                phone.classList.remove("hidden");
+            } else {
+                message.textContent = "Rider phone number is not available yet.";
+            }
+        } else {
+            message.textContent = "A rider has not been assigned yet. Contact details will appear once assigned.";
+        }
+        section.classList.remove("hidden");
+    }
+
     async function runTrackLookup(code) {
         const errorBox = document.getElementById("trackError");
         const resultBox = document.getElementById("trackResult");
         errorBox.classList.add("hidden");
         resultBox.classList.add("hidden");
+        renderRiderContact({});
         try {
             const response = await fetch(`/api/track?code=${encodeURIComponent(code)}`);
             const data = await response.json();
@@ -140,6 +180,7 @@
             }
             document.getElementById("trackOrderRef").textContent = data.orderRef || "Order";
             document.getElementById("trackStatus").textContent = `Current status: ${data.status}`;
+            renderRiderContact(data);
             document.getElementById("trackTimelineList").innerHTML = (data.timeline || []).map(event => `
                 <li>
                     <span class="track-status">${event.status}</span>

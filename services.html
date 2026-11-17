@@ -7,7 +7,7 @@
 <meta name="theme-color" content="#1769e0">
 <title>Services | Apexwings Logistics</title>
 <link rel="stylesheet" href="fiable.css?v=5">
-<link rel="stylesheet" href="design.css?v=10">
+<link rel="stylesheet" href="design.css?v=12">
 <link rel="stylesheet" href="brand.css?v=1">
 <link rel="icon" type="image/png" href="images/apexwings-symbol.png">
 <link rel="manifest" href="/manifest.webmanifest">
@@ -125,7 +125,7 @@
 </div>
 <div class="unit-list">
 <div class="unit">
-<b>1</b> Short-distance delivery</div>
+<b>1</b> Matching pickup and delivery location</div>
 <div class="unit">
 <b>2</b> Nearby zones</div>
 <div class="unit">
@@ -175,7 +175,7 @@
 </div>
 <div class="calculator-explanation">
 <strong>How the estimate works</strong>
-<span>We compare the pickup and delivery locations, assign their operational zones, then estimate units based on the route. Same-location routes use 1 unit, nearby neighborhoods such as Yaba and Surulere use about 2 units, moderate cross-city routes use 3 units, and Lekki or extended routes use more. The estimate is already priced as express delivery at ₦2,000 per unit.</span>
+<span>Matching pickup and delivery locations, such as Egbeda to Egbeda, use 1 unit. Different locations use 2–7 units based on the configured zone rate, even when they share a delivery area or pricing zone. Compare express delivery at ₦2,000 per unit with the recommended monthly plan below.</span>
 </div>
 <div class="calculator">
 <div class="form-box">
@@ -189,20 +189,43 @@
 </select>
 <button class="btn btn-primary" id="calculate" disabled style="inline-size:100%">Calculate My Delivery</button>
 </div>
-<div class="result">
+<div class="result" aria-live="polite" aria-atomic="true">
 <div class="eyebrow">Estimated delivery units</div>
-<div class="result-number" id="unitResult">2 <small>units</small>
+<div class="result-number" id="unitResult">—
 </div>
 <hr>
 <div class="result-line">
-<span>Estimated cost</span>
-<strong id="costResult">₦4,000</strong>
+<span>Express delivery price</span>
+<strong id="costResult">—</strong>
 </div>
 <div class="result-line">
 <span>Recommended plan</span>
-<strong id="planResult">Basic</strong>
+<strong id="planResult">—</strong>
 </div>
-<small id="calcNote">Express delivery estimate based on selected Lagos locations.</small>
+<div id="calculatorPlanComparison" class="calculator-plan-comparison" hidden>
+<div class="result-line">
+<span id="planDeliveryLabel">Route value on the recommended plan</span>
+<strong id="planDeliveryCost">—</strong>
+</div>
+<div class="result-line calculator-plan-saving">
+<span>Saving per delivery vs express</span>
+<strong id="planDeliverySaving">—</strong>
+</div>
+<div class="result-line">
+<span>Monthly subscription price</span>
+<strong id="planMonthlyPrice">—</strong>
+</div>
+<div class="result-line">
+<span>Included units per month</span>
+<strong id="planMonthlyUnits">—</strong>
+</div>
+<p class="calculator-plan-note">Monthly plans are paid upfront. Each delivery uses units from your included allocation.</p>
+</div>
+<div id="calculatorActions" class="calculator-actions" hidden>
+<a id="calculatorExpressLink" class="btn btn-outline" href="get-started.html#quick-express">Request express delivery ↗</a>
+<a id="calculatorPlanLink" class="btn btn-primary" href="get-started.html?service=subscription#get-started">Choose this plan ↗</a>
+</div>
+<small id="calcNote">Choose your pickup and delivery locations, then calculate to compare prices.</small>
 </div>
 </div>
 </div>
@@ -318,7 +341,7 @@
 <button class="back-to-top" id="backToTop" type="button" aria-label="Back to top">↑</button>
 <script src="csrf.js"></script>
 <script src="site.js"></script>
-<script src="services-calculator.js"></script>
+<script src="services-calculator.js?v=3"></script>
 <script>
         document.querySelectorAll('#plans .plan').forEach(card => card.addEventListener('click', event => {
             if (event.target.closest('a, button')) return;

@@ -1761,11 +1761,11 @@
                 <p class="muted">Mainland South covers Surulere, Mushin and Oshodi; South-West covers Apapa, Amuwo-Odofin, Ajegunle, Festac, Satellite Town and Mile 2; South-East covers Gbagada, Shomolu, Bariga and Ilupeju. Magodo stays in Mainland East. Rename zones here or move locations in the next section.</p>
                 <div id="routingPricingZones" class="routing-location-list"></div>
                 <h3>Units between pricing zones</h3>
-                <p class="muted">Enter 1–7 units for each zone pair. The same rate applies in both directions; a zone paired with itself covers journeys within that zone. New southern zones start from the highest saved charge between their former zones, with a minimum of 2 units, including within-zone journeys. Review these starting rates against your dispatch costs. Saved changes apply to new express, subscriber and batch quotes.</p>
+                <p class="muted">Enter 2–7 units for journeys between different locations. The same rate applies in both directions, including different locations within one zone. When the pickup and delivery use the exact same location, such as Egbeda → Egbeda, the charge is always 1 unit. Sharing a pricing zone or delivery area does not qualify for 1 unit. Batch discounts retain a minimum of 2 units for different-location deliveries. Saved changes apply to new quotes; existing bookings keep their prices.</p>
                 <div id="routingZoneUnits" class="routing-location-list"></div>
                 <details class="routing-section">
-                  <summary>Review locations sharing a 1-unit rate</summary>
-                  <p class="muted">Every pickup and destination in the listed zones shares this rate. Review the locations below, then adjust route units above or move a location to another pricing zone.</p>
+                  <summary>Review matching-location journeys: 1 unit</summary>
+                  <p class="muted">Only matching pickup and delivery location IDs qualify. This list includes every standard and custom location and updates when you add or rename a location.</p>
                   <div id="routingOneUnitReview"></div>
                 </details>
               </details>
@@ -2300,7 +2300,7 @@
   <!-- Admin JavaScript -->
   <script src="csrf.js"></script>
   <script src="admin.js?v=31"></script>
-  <script src="batch-routing.js?v=6"></script>
+  <script src="batch-routing.js?v=7"></script>
 
   <!-- =====================================================
       ADMIN TOAST

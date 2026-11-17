@@ -17,6 +17,10 @@ const catalog = [
 function fixture() {
   const events = {}, nodes = new Map(), requests = [], messages = [];
   let locations = catalog, failed = false, quoteFailed = false;
+  let quote = { units: 3, cost: 6000, recommendedPlan: 'Growth', planComparison: {
+    plan: 'Growth', unitPrice: 1400, deliveryCost: 4200, expressCost: 6000,
+    savingPerDelivery: 1800, monthlyPrice: 105000, monthlyUnits: 75
+  } }, quoteGate = null;
   const element = id => {
     if (!nodes.has(id)) nodes.set(id, {
       value: '', disabled: false, textContent: '', options: [], handlers: {},
@@ -39,11 +43,12 @@ function fixture() {
     fetch: async (url, options) => {
       requests.push({ url, options });
       const isCatalog = url === '/api/locations';
+      if (!isCatalog && quoteGate) await quoteGate;
       return {
         ok: isCatalog ? !failed : !quoteFailed,
         json: async () => isCatalog ? { locations } : quoteFailed
           ? { error: 'Please check the route' }
-          : { units: 3, cost: 4500, recommendedPlan: 'Basic' }
+          : quote
       };
     }
   });
@@ -53,13 +58,15 @@ function fixture() {
   return { events, element, requests, messages, context,
     locations(value) { locations = value; },
     fail(value) { failed = value; },
-    failQuote(value) { quoteFailed = value; }
+    failQuote(value) { quoteFailed = value; },
+    quote(value) { quote = value; },
+    delayQuote(gate) { quoteGate = gate; }
   };
 }
 
 test('saved admin locations populate both dropdowns and calculate with the CSRF token', async () => {
   const html = fs.readFileSync(path.join(root, 'services.html'), 'utf8');
-  assert(html.indexOf('src="csrf.js"') < html.indexOf('src="services-calculator.js"'));
+  assert(html.indexOf('src="csrf.js"') < html.indexOf('src="services-calculator.js'));
   const app = fixture();
   assert.equal(app.element('calculate').disabled, true);
   await tick();
@@ -74,9 +81,89 @@ test('saved admin locations populate both dropdowns and calculate with the CSRF 
   assert.deepEqual(JSON.parse(request.options.body), { pickup: 'egbeda', dropoff: 'ogudu' });
   assert.equal(request.options.headers.get('X-CSRF-Token'), 'test-token');
   assert.equal(app.element('unitResult').innerHTML, '3 <small>units</small>');
-  assert.equal(app.element('costResult').textContent, '\u20a64,500');
-  assert.equal(app.element('planResult').textContent, 'Basic');
+  assert.equal(app.element('costResult').textContent, '\u20a66,000');
+  assert.equal(app.element('planResult').textContent, 'Growth');
+  assert.equal(app.element('calculatorPlanComparison').hidden, false);
+  assert.equal(app.element('planDeliveryCost').textContent, '\u20a64,200');
+  assert.equal(app.element('planDeliverySaving').textContent, '\u20a61,800');
+  assert.equal(app.element('planMonthlyPrice').textContent, '\u20a6105,000');
+  assert.equal(app.element('planMonthlyUnits').textContent, '75 units');
+  assert.match(app.element('planDeliveryLabel').textContent, /With Growth: 3 units × ₦1,400/);
+  assert.equal(app.element('calculatorPlanLink').href, 'get-started.html?service=subscription&plan=Growth#get-started');
+  assert.equal(app.element('calculatorActions').hidden, false);
+  assert.equal(app.element('calculatorPlanLink').hidden, false);
+  const express = new URL(app.element('calculatorExpressLink').href, 'https://example.test/');
+  assert.equal(express.pathname, '/get-started.html');
+  assert.equal(express.hash, '#quick-express');
+  assert.equal(express.searchParams.get('service'), 'express');
+  assert.equal(express.searchParams.get('pickup'), 'egbeda');
+  assert.equal(express.searchParams.get('dropoff'), 'ogudu');
   assert.equal(app.element('calculate').disabled, false);
+});
+
+test('all recommended plans show server-provided monthly prices, route values and savings', async () => {
+  const app = fixture();
+  await tick();
+  assert.equal(app.element('calculatorPlanComparison').hidden, true);
+  assert.equal(app.element('calculatorActions').hidden, true);
+  for (const [plan, units, unitPrice, monthlyPrice, monthlyUnits] of [
+    ['Basic', 1, 1500, 67500, 45], ['Growth', 4, 1400, 105000, 75], ['Business', 7, 1300, 143000, 110]
+  ]) {
+    app.quote({ units, cost: units * 2000, recommendedPlan: plan, planComparison: {
+      plan, unitPrice, monthlyPrice, monthlyUnits, deliveryCost: units * unitPrice,
+      expressCost: units * 2000, savingPerDelivery: units * (2000 - unitPrice)
+    } });
+    await app.element('calculate').handlers.click();
+    assert.equal(app.element('planResult').textContent, plan);
+    assert.equal(app.element('planDeliveryCost').textContent, `₦${(units * unitPrice).toLocaleString('en-NG')}`);
+    assert.equal(app.element('planDeliverySaving').textContent, `₦${(units * (2000 - unitPrice)).toLocaleString('en-NG')}`);
+    assert.equal(app.element('planMonthlyPrice').textContent, `₦${monthlyPrice.toLocaleString('en-NG')}`);
+    assert.equal(app.element('calculatorPlanLink').textContent, `Choose ${plan} ↗`);
+    const url = new URL(app.element('calculatorPlanLink').href, 'https://example.test/');
+    assert.equal(url.searchParams.get('plan'), plan);
+    assert.equal(url.hash, '#get-started');
+  }
+});
+
+test('route changes and delayed responses cannot leave a comparison for an old route', async () => {
+  const app = fixture();
+  await tick();
+  await app.element('calculate').handlers.click();
+  app.element('dropoff').value = 'ogudu';
+  app.element('dropoff').handlers.change();
+  assert.equal(app.element('calculatorPlanComparison').hidden, true);
+  assert.equal(app.element('calculatorActions').hidden, true);
+  assert.equal(app.element('costResult').textContent, '—');
+  let release;
+  app.delayQuote(new Promise(resolve => { release = resolve; }));
+  const pending = app.element('calculate').handlers.click();
+  app.element('pickup').value = 'ogudu';
+  app.element('pickup').handlers.change();
+  release();
+  await pending;
+  assert.equal(app.element('calculatorPlanComparison').hidden, true);
+  assert.equal(app.element('costResult').textContent, '—');
+  assert.equal(app.element('calculatorActions').hidden, true);
+  assert.equal(app.element('calculate').disabled, false);
+});
+
+test('failed quotes clear previous prices and missing comparison data stays unavailable', async () => {
+  const app = fixture();
+  await tick();
+  await app.element('calculate').handlers.click();
+  app.failQuote(true);
+  await app.element('calculate').handlers.click();
+  assert.equal(app.element('calculatorPlanComparison').hidden, true);
+  assert.equal(app.element('calculatorActions').hidden, true);
+  assert.equal(app.element('costResult').textContent, '—');
+  app.failQuote(false);
+  app.quote({ units: 2, cost: 4000, recommendedPlan: 'Basic' });
+  await app.element('calculate').handlers.click();
+  assert.equal(app.element('costResult').textContent, '₦4,000');
+  assert.equal(app.element('calculatorPlanComparison').hidden, true);
+  assert.equal(app.element('calculatorActions').hidden, false);
+  assert.equal(app.element('calculatorPlanLink').hidden, true);
+  assert.match(app.element('calcNote').textContent, /Plan pricing is temporarily unavailable/);
 });
 
 test('returning to the page loads new locations and labels while retaining the selected route', async () => {

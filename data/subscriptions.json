@@ -34,5 +34,17 @@
     "paidAt": "2026-10-13T10:41:07.724118+00:00",
     "periodStart": "2026-10-13T10:41:07.724118+00:00",
     "periodEnd": "2026-11-12T10:41:07.724118+00:00"
+  },
+  {
+    "id": "SUB-00004",
+    "email": "toluwaloseoyinloye@gmail.com",
+    "subscriberId": "FL-SUB-0001",
+    "plan": "Basic",
+    "amount": 67500,
+    "unitsAllocated": 45,
+    "paymentStatus": "paid",
+    "paidAt": "2026-11-17T19:07:10.745379+00:00",
+    "periodStart": "2026-11-17T19:07:10.745379+00:00",
+    "periodEnd": "2026-12-17T19:07:10.745379+00:00"
   }
 ]

@@ -87,20 +87,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     ).join('');
     $('routingZoneUnits').innerHTML = config.zoneUnits.map((route, index) =>
       `<label><span data-zone-route-label="${index}">${escape(pricingZones[route.from])} ↔ ${escape(pricingZones[route.to])}</span>
-        <input data-zone-units="${index}" aria-label="Units: ${escape(pricingZones[route.from])} to ${escape(pricingZones[route.to])}" type="number" min="1" max="7" step="1" value="${route.units}" required ${canManage ? '' : 'disabled'}></label>`
+        <input data-zone-units="${index}" aria-label="Units for different locations: ${escape(pricingZones[route.from])} to ${escape(pricingZones[route.to])}" type="number" min="2" max="7" step="1" value="${route.units}" required ${canManage ? '' : 'disabled'}></label>`
     ).join('');
     renderOneUnitReview();
   }
 
   function renderOneUnitReview() {
-    const rows = config.zoneUnits.filter(route => route.units === 1).map(route => {
-      const zones = [...new Set([route.from, route.to])];
-      const members = zones.map(zone => config.locations.filter(location => location.zone === zone));
-      if (members.some(locations => !locations.length) || (zones.length === 1 && members[0].length < 2)) return '';
-      return `<div class="routing-rate-review"><strong>${zones.map(zone => escape(config.pricingZones[zone])).join(' ↔ ')}: 1 unit</strong>
-        ${members.map(locations => `<span>${locations.map(location => escape(location.label)).join(', ')}</span>`).join('')}</div>`;
-    }).filter(Boolean);
-    $('routingOneUnitReview').innerHTML = rows.join('') || '<p class="muted">No routes between different locations currently share a 1-unit rate.</p>';
+    $('routingOneUnitReview').innerHTML = [...config.locations]
+      .sort((a, b) => a.label.localeCompare(b.label))
+      .map(location => `<div class="routing-rate-review"><strong>${escape(location.label)} → ${escape(location.label)}: 1 unit</strong></div>`).join('');
   }
 
   function renderGroups() {
@@ -249,6 +244,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (area) area.label = event.target.value;
     location.label = event.target.value;
     changed();
+    renderOneUnitReview();
   });
   $('routingAddLocation').addEventListener('click', () => {
     if (!canManage) return;
@@ -369,7 +365,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         + quote.groups.map(group => `<div class="routing-result-group"><strong>${escape(group.label)}</strong>
           <span>${escape(group.destinationAreas.join(', '))}</span>
           <span>${group.deliveryCount} deliveries · ${Math.round(group.discountRate * 100)}% tier · ${group.originalUnits} → ${group.chargedUnits} units</span>
-          <span>${group.unitsSaved} units saved${group.discountRate && !group.unitsSaved ? ' after whole-unit rounding' : ''}</span></div>`).join('')
+          <span>${group.unitsSaved} units saved${group.discountRate && !group.unitsSaved ? ' after whole-unit rounding and minimum route charges' : ''}</span></div>`).join('')
         + `<p><strong>Total: ${quote.chargedUnits} units · ${quote.unitsSaved} units saved.</strong> No bookings or balance changes.</p>`;
     } catch (error) {
       if (sequence !== testSequence) return;

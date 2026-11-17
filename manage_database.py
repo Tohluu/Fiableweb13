@@ -28,7 +28,7 @@ def load_source(directory):
     # Check routing before connecting, preserving all dispatcher edits.
     if "batch_routing" in documents:
         import server
-        documents["batch_routing"] = server.validate_batch_routing(documents["batch_routing"])
+        documents["batch_routing"] = server.normalize_saved_batch_routing(documents["batch_routing"])
     proof_root = directory / "proof"
     if proof_root.is_dir():
         for path in sorted(proof_root.iterdir()):

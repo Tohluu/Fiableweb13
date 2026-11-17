@@ -17,7 +17,7 @@ async function fixture(canManage = true) {
   const config = {
     pricingZones: { 'mainland-east': 'Mainland East', 'mainland-south': 'Mainland South',
       'mainland-south-west': 'Mainland South-West', 'mainland-south-east': 'Mainland South-East' },
-    zoneUnits: [{ from: 'mainland-east', to: 'mainland-east', units: 1 },
+    zoneUnits: [{ from: 'mainland-east', to: 'mainland-east', units: 2 },
       { from: 'mainland-south-east', to: 'mainland-east', units: 2 }],
     locations: [{ id: 'magodo', label: 'Magodo', zone: 'mainland-east' },
       { id: 'ojota', label: '<Ojota>', zone: 'mainland-east' },
@@ -37,23 +37,28 @@ async function fixture(canManage = true) {
   return { get, config };
 }
 
-test('southern zones appear in location choices and the review shows actual 1-unit routes safely', async () => {
+test('zones require at least 2 units and the 1-unit review lists only matching locations safely', async () => {
   const { get } = await fixture();
   for (const name of ['Mainland South', 'Mainland South-West', 'Mainland South-East']) {
     assert(get('routingLocationZone').innerHTML.includes(name));
     assert(get('routingLocations').innerHTML.includes(name));
   }
-  assert.match(get('routingOneUnitReview').innerHTML, /Magodo, &lt;Ojota&gt;/);
-  assert.doesNotMatch(get('routingOneUnitReview').innerHTML, /Gbagada|<Ojota>/);
-  get('routingZoneUnits').handlers.input({ target: { dataset: { zoneUnits: '0' }, value: '2' } });
-  assert.match(get('routingOneUnitReview').innerHTML, /No routes/);
+  assert.match(get('routingZoneUnits').innerHTML, /min="2" max="7"/);
+  assert.match(get('routingOneUnitReview').innerHTML, /Magodo → Magodo: 1 unit/);
+  assert.match(get('routingOneUnitReview').innerHTML, /&lt;Ojota&gt; → &lt;Ojota&gt;: 1 unit/);
+  assert.match(get('routingOneUnitReview').innerHTML, /Gbagada → Gbagada: 1 unit/);
+  assert.doesNotMatch(get('routingOneUnitReview').innerHTML, /<Ojota>|Magodo → Gbagada/);
+  const review = get('routingOneUnitReview').innerHTML;
+  get('routingZoneUnits').handlers.input({ target: { dataset: { zoneUnits: '0' }, value: '7' } });
+  assert.equal(get('routingOneUnitReview').innerHTML, review);
   assert.equal(get('routingSave').disabled, false);
 });
 
-test('the review updates on location reassignment and viewers cannot edit it', async () => {
+test('sharing a zone cannot change the 1-unit review and viewers cannot edit rates', async () => {
   const { get } = await fixture();
   get('routingLocations').handlers.change({ target: { dataset: { locationZone: 'gbagada' }, value: 'mainland-east' } });
   assert.match(get('routingOneUnitReview').innerHTML, /Gbagada/);
+  assert.doesNotMatch(get('routingOneUnitReview').innerHTML, /Gbagada → Magodo/);
   const viewer = await fixture(false);
   viewer.get('routingZoneUnits').handlers.input({ target: { dataset: { zoneUnits: '0' }, value: '7' } });
   assert.match(viewer.get('routingOneUnitReview').innerHTML, /Magodo/);
@@ -96,6 +101,7 @@ test('directory follows added locations, edited assignments and names, save and 
   get('routingLocationArea').value = 'ikeja';
   get('routingAddLocation').handlers.click();
   assert.match(get('routingDirectoryRows').innerHTML, /New Town/);
+  assert.match(get('routingOneUnitReview').innerHTML, /New Town → New Town: 1 unit/);
   assert.match(get('routingDirectoryCount').textContent, /4 of 4.*unsaved changes/);
 
   get('routingLocations').handlers.change({ target: { dataset: { locationZone: 'new-town' }, value: 'mainland-south' } });
@@ -104,6 +110,7 @@ test('directory follows added locations, edited assignments and names, save and 
   get('routingAreas').handlers.input({ target: { dataset: { areaName: 'ikeja' }, value: '<New Area>' } });
   get('routingLocations').handlers.input({ target: { dataset: { locationName: 'new-town' }, value: '<New Name>' } });
   assert.match(get('routingDirectoryRows').innerHTML, /&lt;New Name&gt;<\/th>\s*<td><span[^>]*>&lt;South Zone&gt;<\/span><\/td>\s*<td>&lt;New Area&gt;/);
+  assert.match(get('routingOneUnitReview').innerHTML, /&lt;New Name&gt; → &lt;New Name&gt;: 1 unit/);
   await get('routingSave').handlers.click();
   assert.match(get('routingDirectoryCount').textContent, /saved assignments/);
   await get('routingReload').handlers.click();

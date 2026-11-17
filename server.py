@@ -198,7 +198,8 @@ PLAN_UNIT_PRICES = {
 EXPRESS_UNIT_PRICE = 2000
 PRIORITY_SURCHARGE = 2000
 RIDER_PAYOUT_RATE = 0.80
-PRICING_VERSION = "2026-09-v1"
+PRICING_VERSION = "2026-11-same-location-v2"
+LOCATION_PRICING_VERSION = 1
 BATCH_DISCOUNT_TIERS = (
     (11, 0.15),
     (6, 0.10),
@@ -445,15 +446,14 @@ def default_zone_units(zones=None):
                     pair = frozenset("lekki" if zone.startswith("lekki-corridor-") else zone
                                      for zone in (source, target))
                     candidates.append(ZONE_UNIT_MATRIX.get(pair, EXTENDED_UNITS if "extended" in pair else 3))
-            units = max(candidates)
-            if any(zone in NEW_MAINLAND_ZONES or zone in SOUTH_MAINLAND_ZONE_SOURCES
-                   for zone in (origin, destination)):
-                units = max(2, units)
+            # Zone rates apply to different location IDs, including two
+            # locations in the same zone. Exact-location trips are priced below.
+            units = max(2, *candidates)
             routes.append({"from": origin, "to": destination, "units": units})
     return routes
 
 
-def validate_zone_pricing(config, zone_labels=None):
+def validate_zone_pricing(config, zone_labels=None, *, minimum_units=1):
     zone_labels = PRICING_ZONE_LABELS if zone_labels is None else zone_labels
     labels = config.get("pricingZones", zone_labels)
     if not isinstance(labels, dict) or set(labels) != set(zone_labels):
@@ -482,8 +482,9 @@ def validate_zone_pricing(config, zone_labels=None):
         pair = frozenset((origin, destination))
         if pair not in expected or pair in values:
             raise ValueError("Each pricing zone pair must appear exactly once.")
-        if type(units) is not int or not 1 <= units <= 7:
-            raise ValueError("Route units must be whole numbers from 1 to 7.")
+        if type(units) is not int or not minimum_units <= units <= 7:
+            raise ValueError(f"Route units must be whole numbers from {minimum_units} to 7."
+                             + (" Matching pickup and delivery locations automatically use 1 unit." if minimum_units == 2 else ""))
         values[pair] = units
     return normalized, [{**route, "units": values[frozenset((route["from"], route["to"]))]}
                         for route in defaults]
@@ -694,6 +695,7 @@ def default_batch_routing():
     # Starting areas for dispatcher review; no cross-area combinations until
     # an administrator explicitly configures them for a pickup area.
     return name_delivery_areas_after_locations(expand_lagos_location_catalog({
+        "locationPricingVersion": LOCATION_PRICING_VERSION,
         "pricingZones": dict(PRICING_ZONE_LABELS),
         "zoneUnits": default_zone_units(),
         "locations": default_delivery_locations(),
@@ -703,17 +705,21 @@ def default_batch_routing():
     }))
 
 
-def validate_batch_routing(config):
+def validate_batch_routing(config, *, allow_legacy_rates=False):
     if not isinstance(config, dict):
         raise ValueError("Delivery routing must be an object.")
     config = upgrade_southern_mainland_pricing(upgrade_mainland_pricing(config))
+    pricing_version = config.get("locationPricingVersion", 0)
+    if type(pricing_version) is not int or not 0 <= pricing_version <= LOCATION_PRICING_VERSION:
+        raise ValueError("Unsupported delivery location pricing version.")
     catalog_version = config.get("locationCatalogVersion", 0)
     if type(catalog_version) is not int or not 0 <= catalog_version <= LAGOS_LOCATION_CATALOG_VERSION:
         raise ValueError("Unsupported delivery location catalog version.")
     area_naming_version = config.get("areaNamingVersion", 0)
     if type(area_naming_version) is not int or not 0 <= area_naming_version <= DELIVERY_AREA_NAMING_VERSION:
         raise ValueError("Unsupported delivery area naming version.")
-    pricing_zones, zone_units = validate_zone_pricing(config)
+    pricing_zones, zone_units = validate_zone_pricing(config,
+        minimum_units=1 if allow_legacy_rates and pricing_version == 0 else 2)
     # Older saved routing files contain only areas, pickup rules and locations.
     fallback_catalog = default_batch_routing()["locations"] if catalog_version else default_delivery_locations()
     catalog = validate_delivery_locations(config.get("locations", fallback_catalog))
@@ -770,8 +776,28 @@ def validate_batch_routing(config):
             raise ValueError("Each destination area must appear in exactly one group per pickup area.")
         normalized_rules[pickup] = output
     return {"locationCatalogVersion": catalog_version, "areaNamingVersion": area_naming_version,
+            "locationPricingVersion": pricing_version if allow_legacy_rates else LOCATION_PRICING_VERSION,
             "pricingZones": pricing_zones, "zoneUnits": zone_units,
             "locations": catalog, "areas": normalized, "pickupRules": normalized_rules}
+
+
+def upgrade_same_location_pricing(config):
+    """Upgrade validated old settings once without reducing any zone rate."""
+    if config.get("locationPricingVersion", 0) >= LOCATION_PRICING_VERSION:
+        return config
+    upgraded = deepcopy(config)
+    for route in upgraded["zoneUnits"]:
+        route["units"] = max(2, route["units"])
+    upgraded["locationPricingVersion"] = LOCATION_PRICING_VERSION
+    return upgraded
+
+
+def normalize_saved_batch_routing(config):
+    """Validate stored rules before applying catalog, area and pricing upgrades."""
+    config = validate_batch_routing(config, allow_legacy_rates=True)
+    config = expand_lagos_location_catalog(config)
+    config = name_delivery_areas_after_locations(config)
+    return validate_batch_routing(upgrade_same_location_pricing(config))
 
 
 def load_batch_routing():
@@ -781,8 +807,7 @@ def load_batch_routing():
         config = default_batch_routing()
     except (OSError, json.JSONDecodeError) as error:
         raise ValueError("Delivery routing could not be loaded. Contact an administrator.") from error
-    return validate_batch_routing(name_delivery_areas_after_locations(
-        expand_lagos_location_catalog(validate_batch_routing(config))))
+    return normalize_saved_batch_routing(config)
 
 
 def batch_routing_version(config):
@@ -843,9 +868,13 @@ def estimate_delivery(pickup, dropoff, plan=None, priority="Standard", location_
     if not pickup_zone or not dropoff_zone:
         raise ValueError("Pickup and delivery locations must be valid Lagos locations")
 
-    pair = frozenset((pickup_zone, dropoff_zone))
-    units = next(route["units"] for route in routing["zoneUnits"]
-                 if frozenset((route["from"], route["to"])) == pair)
+    minimum_units = 1 if pickup == dropoff else 2
+    if pickup == dropoff:
+        units = 1
+    else:
+        pair = frozenset((pickup_zone, dropoff_zone))
+        units = max(minimum_units, next(route["units"] for route in routing["zoneUnits"]
+                    if frozenset((route["from"], route["to"])) == pair))
 
     recommended = "Basic" if units <= 2 else "Growth" if units <= 4 else "Business"
     billed_plan = plan if plan in PLAN_UNIT_PRICES else recommended
@@ -860,6 +889,7 @@ def estimate_delivery(pickup, dropoff, plan=None, priority="Standard", location_
     cost = base_cost + priority_surcharge
     return {
         "units": units,
+        "minimumUnits": minimum_units,
         "baseCost": base_cost,
         "prioritySurcharge": priority_surcharge,
         "cost": cost,
@@ -964,10 +994,12 @@ def estimate_batch_deliveries(delivery_requests, plan=None, routing=None):
         original_units = sum(originals)
         rate = batch_discount_rate(len(indexes))
         percent = round(rate * 100)
-        charged_units = max(len(indexes), (original_units * (100 - percent) + 99) // 100)
+        minimums = [quotes[index]["minimumUnits"] for index in indexes]
+        charged_units = max(sum(minimums), (original_units * (100 - percent) + 99) // 100)
         saved_units = original_units - charged_units
-        # Allocate whole-unit savings without ever charging <1 or >original units.
-        capacities = [units - 1 for units in originals]
+        # Discounts cannot reduce a different-location delivery below 2 units
+        # or a matching-location delivery below 1, even in a combined group.
+        capacities = [units - minimum for units, minimum in zip(originals, minimums)]
         capacity = sum(capacities)
         savings = [saved_units * spare // capacity if capacity else 0 for spare in capacities]
         remainder = saved_units - sum(savings)
@@ -997,6 +1029,7 @@ def estimate_batch_deliveries(delivery_requests, plan=None, routing=None):
                                  if area["id"] in {quotes[i]["deliveryArea"] for i in indexes}],
             "deliveryIndexes": indexes, "discountRate": rate,
             "originalUnits": original_units, "chargedUnits": charged_units,
+            "minimumUnits": sum(minimums),
             "unitsSaved": saved_units,
             "vendorSaving": sum(quotes[i]["vendorDiscountAmount"] for i in indexes),
         })
@@ -2971,6 +3004,21 @@ def ensure_tracking_code(order):
     return order["trackingCode"]
 
 
+def tracking_rider_contact(order):
+    """Contact fields for an authorized delivery tracking view."""
+    rider_id = order.get("riderId")
+    if not rider_id:
+        return None
+    rider = next(
+        (r for r in load_riders() if str(r.get("id")) == str(rider_id)),
+        {},
+    )
+    return {
+        "name": rider.get("name") or order.get("riderName") or "Assigned rider",
+        "phone": rider.get("phone") or order.get("riderPhone") or "",
+    }
+
+
 def rider_safe_order(order):
     """Strip fields a rider must never read from their own session - most
     importantly the delivery OTP. The whole point of the OTP is that the
@@ -4179,11 +4227,13 @@ class FiableHandler(SimpleHTTPRequestHandler):
             self.wfile = output
         output.write(response)
 
-    def _json_response(self, status, body):
+    def _json_response(self, status, body, headers=None):
         encoded = json.dumps(body).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(encoded)))
+        for name, value in (headers or {}).items():
+            self.send_header(name, value)
         self.end_headers()
         self.wfile.write(encoded)
 
@@ -5452,6 +5502,19 @@ class FiableHandler(SimpleHTTPRequestHandler):
                     pickup, dropoff, account.get("plan"),
                     clean(payload.get("priority"), 40) or "Standard"
                 ) if account else estimate_express_delivery(pickup, dropoff)
+                recommended_plan = result["recommendedPlan"]
+                plan_unit_price = PLAN_UNIT_PRICES[recommended_plan]
+                plan_route_cost = result["units"] * plan_unit_price
+                express_route_cost = result["units"] * EXPRESS_UNIT_PRICE
+                result["planComparison"] = {
+                    "plan": recommended_plan,
+                    "unitPrice": plan_unit_price,
+                    "deliveryCost": plan_route_cost,
+                    "expressCost": express_route_cost,
+                    "savingPerDelivery": express_route_cost - plan_route_cost,
+                    "monthlyPrice": plan_price(recommended_plan),
+                    "monthlyUnits": PLANS[recommended_plan]["units"],
+                }
                 self._json_response(200, result)
                 return
             if path in ("/api/vendor", "/api/contact"):
@@ -8543,7 +8606,7 @@ class FiableHandler(SimpleHTTPRequestHandler):
             return
 
         # =====================================================
-        # PUBLIC DELIVERY TRACKING (no authentication - safe fields only)
+        # DELIVERY TRACKING (website bookings share rider contact via tracking code)
         # =====================================================
         if self.path.startswith("/api/track"):
             code = clean(parse_qs(urlparse(self.path).query).get("code", [""])[0], 20).upper()
@@ -8571,17 +8634,24 @@ class FiableHandler(SimpleHTTPRequestHandler):
                 if PUBLIC_TRACKING_STATUS_MAP.get(event.get("status"))
             ]
 
-            self._json_response(
-                200,
-                {
-                    "trackingCode": order.get("trackingCode"),
-                    "orderRef": order.get("orderRef"),
-                    "status": PUBLIC_TRACKING_STATUS_MAP.get(status, "Order Received"),
-                    "createdAt": order.get("createdAt"),
-                    "updatedAt": order.get("updatedAt"),
-                    "timeline": safe_timeline,
-                }
+            result = {
+                "trackingCode": order.get("trackingCode"),
+                "orderRef": order.get("orderRef"),
+                "status": PUBLIC_TRACKING_STATUS_MAP.get(status, "Order Received"),
+                "createdAt": order.get("createdAt"),
+                "updatedAt": order.get("updatedAt"),
+                "timeline": safe_timeline,
+            }
+            vendor_email = get_logged_in_vendor_email(self)
+            is_owning_vendor = (
+                vendor_email and vendor_email == str(order.get("accountEmail", "")).lower()
             )
+            is_website_booking = (
+                order.get("bookingType") == "express" and order.get("bookingSource") == "website"
+            )
+            if is_owning_vendor or is_website_booking:
+                result["riderContact"] = tracking_rider_contact(order)
+            self._json_response(200, result, headers={"Cache-Control": "private, no-store", "Vary": "Cookie"})
             return
 
         # =====================================================

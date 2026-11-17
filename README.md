@@ -204,11 +204,29 @@ delivery area by default. You can still choose an existing area explicitly.
 Ikeja exceptions, pricing, custom locations, pickup rules and saved edits.
 
 In **Pricing zone names and route units**, rename any pricing zone and set
-1–7 units for every pair of zones. Prices are symmetric: a route has the same
-units in either direction. A zone paired with itself controls within-zone
-journeys, including bookings with the same pickup and destination location.
+2–7 units for every pair of zones. Prices are symmetric: a route has the same
+units in either direction. A zone paired with itself controls journeys between
+different locations within that zone. Matching pickup and delivery location IDs
+always cost **1 unit**, such as Egbeda → Egbeda. Different locations cost at least
+**2 units**, including Ikeja → Opebi even though both share a delivery area.
 Use **Delivery areas and location assignments** to change the pricing zone
 of any standard or custom location. Save with **Save routing rules**.
+
+Existing saved 1-unit zone rates upgrade to 2 on read. Higher saved rates, zone
+names, location assignments, delivery areas and explicit batch groups are
+preserved. The pricing-policy version is retained when rules are saved. Invalid
+old configurations still fail validation; this migration does not repair them.
+New same-location quotes use 1 unit even if the saved within-zone rate is higher.
+Existing bookings and payment amounts retain their booked values. Restart the
+server after updating Python code; customers must review fresh batch quotes.
+
+Batch discounts round up to whole units and respect each delivery's floor:
+1 unit for matching locations and 2 for different locations. A group of 2-unit
+routes can have a discount tier but no unit saving. Larger routes can still
+receive savings. Express surcharges and rider payouts use the existing rules.
+`python -B tests/same_location_pricing_checks.py` checks every ordered location
+pair across all three plans, legacy upgrades, all batch tiers, customer booking
+flows, invalid admin rates, stale quotes and preserved booked prices.
 
 The original Lekki zone is split into **Lekki Corridor 1** (Ikate, Ilasan,
 Marwa, Jakande, Osapa London, Chevron, Ikota and Orchid Road) and **Lekki
@@ -250,10 +268,10 @@ original rates, Gbagada–Magodo, Surulere–Yaba and Apapa–Ojo each start at 
 Later admin changes to these assignments or rates are retained. Existing orders
 keep their booked prices. Restart the server after updating the code.
 
-Expand **Review locations sharing a 1-unit rate** inside the pricing section
-to see the locations covered by each remaining 1-unit route. This list updates
-as you edit route units or location assignments. Use it to decide whether to
-raise a rate or move a location before saving.
+Expand **Review matching-location journeys: 1 unit** inside the pricing section
+to see every location paired with itself. New locations and renamed locations
+appear automatically. Moving a location to another zone does not change its
+same-location price.
 
 `python -B tests/southern_pricing_checks.py` checks the rollout, all old route
 prices, custom settings, symmetric quotes, express/single/batch booking,

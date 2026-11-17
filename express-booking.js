@@ -15,6 +15,9 @@
   const paymentEmail = document.getElementById('expressPaymentEmail');
   const checkoutStorage = 'fiableExpressCheckout';
   const money = value => `₦${Number(value).toLocaleString('en-NG')}`;
+  const entryParams = new URLSearchParams(location.search);
+  const calculatorEntry = entryParams.get('service') === 'express' && !entryParams.has('expressPayment');
+  let routePrefillPending = calculatorEntry;
   let locationsReady = false;
   let loading = false;
   let submitting = false;
@@ -151,10 +154,11 @@
       const result = await response.json();
       if (!response.ok || !Array.isArray(result.locations) || !result.locations.length) throw new Error('Unable to load delivery areas. Try again or continue on WhatsApp.');
       for (const [select, label] of [[pickup, 'Choose pickup area'], [dropoff, 'Choose delivery area']]) {
-        const value = select.value;
+        const value = select.value || (routePrefillPending ? entryParams.get(select === pickup ? 'pickup' : 'dropoff') : '');
         select.replaceChildren(new Option(label, ''), ...result.locations.map(location => new Option(location.label, location.id)));
         if (result.locations.some(location => location.id === value)) select.value = value;
       }
+      routePrefillPending = false;
       locationsReady = true;
       retry.hidden = true;
       await updateQuote();
@@ -273,7 +277,12 @@
     }
   });
   controls();
-  const returnParams = new URLSearchParams(location.search);
-  const returnedReference = returnParams.get('reference') || returnParams.get('trxref');
-  if (returnParams.has('expressPayment') && returnedReference) verifyCheckout(returnedReference);
+  const returnedReference = entryParams.get('reference') || entryParams.get('trxref');
+  if (entryParams.has('expressPayment') && returnedReference) verifyCheckout(returnedReference);
+  else if (calculatorEntry) {
+    form.elements.bookingMethod.value = 'website';
+    controls();
+    loadLocations();
+    paymentOptions();
+  }
 })();

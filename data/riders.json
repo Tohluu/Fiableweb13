@@ -101,14 +101,14 @@
     "passwordHash": "625b331f4b9da6a5fe5d663d69eeb032ceb959e666826cc667a75bbe4685c1e9",
     "salt": "7dc8f401c94327cfabac6122bdd70b9c",
     "vehicle": "Car",
-    "status": "available",
-    "totalDeliveries": 7,
-    "completedDeliveries": 7,
+    "status": "on_delivery",
+    "totalDeliveries": 9,
+    "completedDeliveries": 9,
     "failedDeliveries": 0,
     "createdAt": "2026-08-26T20:32:08.744195+00:00",
     "passwordResetAt": "2026-10-13T10:39:20.465289+00:00",
     "mustChangePassword": false,
-    "lastLoginAt": "2026-11-11T14:05:07.255113+00:00"
+    "lastLoginAt": "2026-11-17T19:13:39.066636+00:00"
   },
   {
     "id": 9,
