@@ -9,6 +9,7 @@
 <link rel="stylesheet" href="fiable.css?v=5">
 <link rel="stylesheet" href="design.css?v=12">
 <link rel="stylesheet" href="brand.css?v=1">
+<link rel="stylesheet" href="services-businesses.css?v=2">
 <link rel="icon" type="image/png" href="images/apexwings-symbol.png">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="apple-touch-icon" href="/images/app-180.png">
@@ -232,23 +233,59 @@
 </section>
 <section id="vendors" class="section">
 <div class="container">
+<div class="businesses-heading">
 <div class="section-head center">
 <div class="eyebrow">More than delivery</div>
 <h2>Built for Lagos businesses.</h2>
 <p>You focus on selling. We focus on getting it there.</p>
 </div>
-<div class="audience">
-<span>Fashion vendors</span>
-<span>Food businesses</span>
-<span>E-commerce sellers</span>
-<span>Beauty businesses</span>
-<span>Electronics sellers</span>
-<span>Pharmacies</span>
-<span>Home businesses</span>
-<span>Instagram vendors</span>
-<span>WhatsApp businesses</span>
-<span>SMEs</span>
+<button id="businessMotionToggle" class="business-motion-toggle" type="button" aria-controls="businessGrid" aria-pressed="false" hidden>
+<svg aria-hidden="true" viewBox="0 0 24 24"><path class="business-pause-icon" d="M8 5v14M16 5v14"/><path class="business-play-icon" d="m9 5 10 7-10 7Z"/></svg>
+<span>Pause animation</span>
+</button>
 </div>
+<ul id="businessGrid" class="business-grid" aria-label="Businesses we deliver for">
+<li class="business-card business-fashion">
+<div class="business-illustration"><svg aria-hidden="true" viewBox="0 0 24 24"><use href="images/site-icons.svg?v=2#fashion"/></svg></div>
+<div class="business-card-copy"><strong>Fashion vendors</strong><small>Clothing &amp; accessories</small></div>
+</li>
+<li class="business-card business-food">
+<div class="business-illustration"><svg aria-hidden="true" viewBox="0 0 24 24"><use href="images/site-icons.svg?v=2#food"/></svg></div>
+<div class="business-card-copy"><strong>Food businesses</strong><small>Meals &amp; fresh orders</small></div>
+</li>
+<li class="business-card business-commerce">
+<div class="business-illustration"><svg aria-hidden="true" viewBox="0 0 24 24"><use href="images/site-icons.svg?v=2#commerce"/></svg></div>
+<div class="business-card-copy"><strong>E-commerce sellers</strong><small>Online store orders</small></div>
+</li>
+<li class="business-card business-beauty">
+<div class="business-illustration"><svg aria-hidden="true" viewBox="0 0 24 24"><use href="images/site-icons.svg?v=2#beauty"/></svg></div>
+<div class="business-card-copy"><strong>Beauty businesses</strong><small>Skincare &amp; cosmetics</small></div>
+</li>
+<li class="business-card business-electronics">
+<div class="business-illustration"><svg aria-hidden="true" viewBox="0 0 24 24"><use href="images/site-icons.svg?v=2#electronics"/></svg></div>
+<div class="business-card-copy"><strong>Electronics sellers</strong><small>Gadgets &amp; accessories</small></div>
+</li>
+<li class="business-card business-pharmacy">
+<div class="business-illustration"><svg aria-hidden="true" viewBox="0 0 24 24"><use href="images/site-icons.svg?v=2#pharmacy"/></svg></div>
+<div class="business-card-copy"><strong>Pharmacies</strong><small>Health &amp; wellness</small></div>
+</li>
+<li class="business-card business-home">
+<div class="business-illustration"><svg aria-hidden="true" viewBox="0 0 24 24"><use href="images/site-icons.svg?v=2#home-business"/></svg></div>
+<div class="business-card-copy"><strong>Home businesses</strong><small>Made &amp; packed at home</small></div>
+</li>
+<li class="business-card business-instagram">
+<div class="business-illustration"><svg aria-hidden="true" viewBox="0 0 24 24"><use href="images/site-icons.svg?v=2#social-shop"/></svg></div>
+<div class="business-card-copy"><strong>Instagram vendors</strong><small>From your feed to their door</small></div>
+</li>
+<li class="business-card business-whatsapp">
+<div class="business-illustration"><svg aria-hidden="true" viewBox="0 0 24 24"><use href="images/site-icons.svg?v=2#chat-shop"/></svg></div>
+<div class="business-card-copy"><strong>WhatsApp businesses</strong><small>Chat, confirm &amp; deliver</small></div>
+</li>
+<li class="business-card business-sme">
+<div class="business-illustration"><svg aria-hidden="true" viewBox="0 0 24 24"><use href="images/site-icons.svg?v=2#small-business"/></svg></div>
+<div class="business-card-copy"><strong>SMEs</strong><small>Everyday business deliveries</small></div>
+</li>
+</ul>
 <div class="service-visuals">
 <article class="service-visual">
 <img loading="lazy" src="https://images.unsplash.com/photo-1526367790999-0150786686a2?auto=format&fit=crop&w=1000&q=85" alt="Delivery rider carrying a package for an express delivery">
@@ -267,32 +304,55 @@
 </div>
 </article>
 </div>
-<div class="benefits">
-<div class="benefit">
-<h3>Delivery Infrastructure</h3>
-<p>Reliable delivery capacity without maintaining your own fleet.</p>
+<section class="delivery-advantages" aria-labelledby="deliveryAdvantagesHeading">
+<div class="advantages-intro">
+<div class="eyebrow">The Apexwings advantage</div>
+<h2 id="deliveryAdvantagesHeading">Give your business a stronger delivery operation.</h2>
+<p>From the first booking to your next month of orders, get the support and visibility to make delivery part of your business plan.</p>
 </div>
-<div class="benefit">
-<h3>Cost Predictability</h3>
-<p>Monthly subscription pricing makes delivery expenses easier to plan.</p>
+<div class="advantages-grid">
+<article class="advantage-card advantage-card-featured">
+<div class="advantage-card-top"><div class="advantage-icon"><svg aria-hidden="true" viewBox="0 0 24 24"><use href="images/site-icons.svg?v=3#package"/></svg></div><span class="advantage-category">Delivery infrastructure</span></div>
+<h3>Keep orders moving as you grow.</h3>
+<p>Bring your bookings and dispatch coordination into one delivery service. Access delivery capacity across Lagos while your team focuses on your products and customers.</p>
+<span class="advantage-detail">Booking. Dispatch. Delivery.</span>
+</article>
+<article class="advantage-card">
+<div class="advantage-card-top"><div class="advantage-icon"><svg aria-hidden="true" viewBox="0 0 24 24"><use href="images/site-icons.svg?v=3#wallet"/></svg></div><span class="advantage-category">Cost predictability</span></div>
+<h3>Plan your delivery spend with clarity.</h3>
+<p>Choose a monthly allocation of delivery units and see what each route uses before you book. Set a practical budget and keep track of your remaining capacity.</p>
+<span class="advantage-detail">Know your units. Plan your month.</span>
+</article>
+<article class="advantage-card">
+<div class="advantage-card-top"><div class="advantage-icon"><svg aria-hidden="true" viewBox="0 0 24 24"><use href="images/site-icons.svg?v=3#rider-network"/></svg></div><span class="advantage-category">Rider network</span></div>
+<h3>A clear connection to your rider.</h3>
+<p>Our dispatch team coordinates rider assignments for your orders. Once assigned, your rider's contact details are available in your portal, with tap-to-call access when you need to get in touch.</p>
+<span class="advantage-detail">Coordinated dispatch. Direct contact.</span>
+</article>
+<article class="advantage-card">
+<div class="advantage-card-top"><div class="advantage-icon"><svg aria-hidden="true" viewBox="0 0 24 24"><use href="images/site-icons.svg?v=3#order-tracking"/></svg></div><span class="advantage-category">Operational tracking</span></div>
+<h3>Keep customers informed at every stage.</h3>
+<p>Check recorded delivery updates, share tracking links and view proof of delivery from your portal. Give customers clear answers about the progress of their orders.</p>
+<span class="advantage-detail">Order updates through to delivery.</span>
+</article>
+<article class="advantage-card">
+<div class="advantage-card-top"><div class="advantage-icon"><svg aria-hidden="true" viewBox="0 0 24 24"><use href="images/site-icons.svg?v=3#business-visibility"/></svg></div><span class="advantage-category">Business visibility</span></div>
+<h3>Create more opportunities to be discovered.</h3>
+<p>Subscribers may be featured across Apexwings' social channels, giving their products another opportunity to reach potential customers alongside their own marketing.</p>
+<span class="advantage-detail">Promotional opportunities for subscribers.</span>
+</article>
+<article class="advantage-card">
+<div class="advantage-card-top"><div class="advantage-icon"><svg aria-hidden="true" viewBox="0 0 24 24"><use href="images/site-icons.svg?v=3#delivery-insights"/></svg></div><span class="advantage-category">Data &amp; performance</span></div>
+<h3>Turn delivery records into better decisions.</h3>
+<p>Review your delivery history, completed orders and unit usage in one place. Use a clearer picture of your activity to choose capacity that fits your next month of business.</p>
+<span class="advantage-detail">Review activity. Plan your next step.</span>
+</article>
 </div>
-<div class="benefit">
-<h3>Rider Network</h3>
-<p>Access to Apexwings' coordinated rider network.</p>
+<div class="advantages-footer">
+<p>Your orders, your customers. A delivery service to support both.</p>
+<a class="btn btn-primary" href="#plans">Explore delivery plans <span aria-hidden="true">&nearr;</span></a>
 </div>
-<div class="benefit">
-<h3>Operational Tracking</h3>
-<p>Delivery and rider performance can be monitored through our system.</p>
-</div>
-<div class="benefit">
-<h3>Business Visibility</h3>
-<p>Subscribers can receive promotional exposure through Apexwings' social channels.</p>
-</div>
-<div class="benefit">
-<h3>Data & Performance</h3>
-<p>We track activity and operational performance to improve efficiency.</p>
-</div>
-</div>
+</section>
 </div>
 </section>
 </main>
@@ -325,9 +385,9 @@
 <div class="footer-col">
 <strong>Services</strong>
 <a href="services.html#plans">Subscription Delivery</a>
-<a href="services.html#plans">Business Delivery</a>
+<a href="index.html#batch-saver">Batch Saver</a>
 <a href="services.html#calculator">Express Delivery</a>
-<a href="services.html#vendors">Vendor Logistics</a>
+<a href="get-started.html?service=bulk#get-started">Bulk Haulage</a>
 </div>
 </div>
 <div class="container copyright">
@@ -342,6 +402,7 @@
 <script src="csrf.js"></script>
 <script src="site.js"></script>
 <script src="services-calculator.js?v=3"></script>
+<script src="services-businesses.js?v=1"></script>
 <script>
         document.querySelectorAll('#plans .plan').forEach(card => card.addEventListener('click', event => {
             if (event.target.closest('a, button')) return;

@@ -1,0 +1,100 @@
+/* Small illustrations and gentle motion for the Services business directory. */
+.businesses-heading { display:flex; align-items:center; justify-content:space-between; gap:24px; margin-block-end:32px; }
+.businesses-heading .section-head { margin-block-end:0; }
+.business-motion-toggle { display:inline-flex; align-items:center; justify-content:center; flex-shrink:0; gap:8px; padding:10px 14px; border:1px solid var(--line); border-radius:999px; background:#fff; color:var(--muted); font:inherit; font-size:12px; cursor:pointer; }
+.business-motion-toggle[hidden] { display:none; }
+.business-motion-toggle:hover { border-color:var(--blue); color:var(--blue); }
+.business-motion-toggle:focus-visible { outline:3px solid var(--blue); outline-offset:4px; }
+.business-motion-toggle svg { inline-size:16px; block-size:16px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+.business-play-icon, .business-motion-toggle[aria-pressed="true"] .business-pause-icon { display:none; }
+.business-motion-toggle[aria-pressed="true"] .business-play-icon { display:block; }
+.business-grid { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:16px; margin:0 0 40px; padding:8px 0; list-style:none; }
+.business-card { --business-color:#1769e0; --business-tint:#eef5ff; --business-delay:0s; display:flex; align-items:center; gap:12px; min-inline-size:0; min-block-size:112px; padding:18px 14px; border:1px solid var(--line); border-radius:14px; background:#fff; box-shadow:0 3px 10px rgb(20 38 59 / 3%); animation:business-card-drift 6s ease-in-out var(--business-delay) infinite; transition:background .25s,border-color .25s; }
+.business-card:nth-child(2n) { --business-delay:-1.2s; }
+.business-card:nth-child(3n) { --business-delay:-2.4s; }
+.business-card:nth-child(5n) { --business-delay:-3.6s; }
+.business-illustration { display:grid; place-items:center; flex:0 0 44px; inline-size:44px; block-size:48px; border-radius:12px; color:var(--business-color); background:var(--business-tint); transition:transform .3s ease; }
+.business-illustration svg { display:block; inline-size:29px; block-size:29px; fill:none; stroke:currentColor; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; }
+.business-card-copy { min-inline-size:0; }
+.business-card-copy strong { display:block; color:var(--ink); font-size:14px; font-weight:650; line-height:1.35; }
+.business-card-copy small { display:block; margin-block-start:5px; color:var(--muted); font-size:11px; line-height:1.45; }
+.business-fashion { --business-color:#ac3761; --business-tint:#fff0f5; }
+.business-food { --business-color:#b6531d; --business-tint:#fff2e8; }
+.business-beauty { --business-color:#8150b4; --business-tint:#f5efff; }
+.business-electronics { --business-color:#137983; --business-tint:#eaf8fa; }
+.business-pharmacy { --business-color:#29814b; --business-tint:#edf8ef; }
+.business-home { --business-color:#9d7020; --business-tint:#fff7e6; }
+.business-instagram { --business-color:#aa3f88; --business-tint:#fceef8; }
+.business-whatsapp { --business-color:#1d8059; --business-tint:#e9f8f0; }
+.business-sme { --business-color:#555bb7; --business-tint:#f0f0ff; }
+.business-grid.is-paused .business-card, .business-grid.is-offscreen .business-card { animation-play-state:paused; }
+@keyframes business-card-drift {
+  0%,100% { transform:translateY(0); box-shadow:0 3px 10px rgb(20 38 59 / 3%); }
+  50% { transform:translateY(-5px); box-shadow:0 10px 22px rgb(20 38 59 / 8%); }
+}
+@media (hover:hover) and (pointer:fine) {
+  .business-card:hover { animation-play-state:paused; border-color:var(--business-color); background:var(--business-tint); }
+  .business-card:hover .business-illustration { transform:rotate(-7deg) scale(1.08); }
+}
+@media (max-width:1120px) { .business-grid { grid-template-columns:repeat(3,minmax(0,1fr)); } }
+@media (max-width:760px) {
+  .businesses-heading { align-items:flex-start; flex-direction:column; gap:18px; }
+  .business-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+  .business-card { padding:16px 12px; gap:10px; }
+}
+@media (max-width:460px) {
+  .business-grid { grid-template-columns:minmax(0,1fr); }
+  .business-card { min-block-size:88px; padding:16px 18px; gap:16px; }
+  .business-card-copy strong { font-size:15px; }
+  .business-card-copy small { font-size:12px; }
+}
+@media (prefers-reduced-motion:reduce) {
+  .business-card { animation:none; }
+  .business-card, .business-illustration { transition:none; }
+  .business-card:hover .business-illustration { transform:none; }
+}
+
+/* Services benefits: an editorial introduction and six practical business outcomes. */
+.delivery-advantages { margin-block-start:64px; padding:40px; border:1px solid #e1e8f0; border-radius:24px; background:#f4f7fb; }
+.advantages-intro { max-inline-size:720px; margin-block-end:32px; }
+.advantages-intro .eyebrow { margin-block-end:12px; }
+.advantages-intro h2 { margin:0; font-size:clamp(28px,3vw,38px); line-height:1.16; text-wrap:balance; }
+.advantages-intro > p { max-inline-size:640px; margin:16px 0 0; color:var(--muted); font-size:15px; line-height:1.75; }
+.advantages-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:18px; }
+.advantage-card { display:flex; flex-direction:column; min-inline-size:0; padding:26px 24px 22px; border:1px solid #dce5ee; border-radius:16px; background:#fff; box-shadow:0 3px 12px rgb(20 38 59 / 3%); transition:transform .22s ease,box-shadow .22s ease,border-color .22s ease; }
+.advantage-card-top { display:flex; align-items:center; gap:12px; margin-block-end:24px; }
+.advantage-icon { display:grid; place-items:center; flex:0 0 42px; inline-size:42px; block-size:42px; border-radius:12px; background:#eef5ff; color:var(--blue); transition:transform .22s ease; }
+.advantage-icon svg { inline-size:24px; block-size:24px; fill:none; stroke:currentColor; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; }
+.advantage-category { color:#536982; font-size:10px; font-weight:700; letter-spacing:.1em; line-height:1.5; text-transform:uppercase; }
+.advantage-card h3 { margin:0; color:var(--ink); font-size:22px; line-height:1.25; letter-spacing:-.025em; text-wrap:balance; }
+.advantage-card > p { margin:14px 0 24px; color:var(--muted); font-size:14px; line-height:1.75; }
+.advantage-detail { display:block; margin-block-start:auto; padding-block-start:16px; border-block-start:1px solid #e8edf3; color:#355476; font-size:11px; font-weight:600; line-height:1.6; }
+.advantage-card-featured { background:linear-gradient(145deg,#10365d,#0a2039); border-color:#22476a; box-shadow:0 8px 24px rgb(12 45 81 / 12%); }
+.advantage-card-featured .advantage-icon { color:#b3d9ff; background:#24476b; }
+.advantage-card-featured .advantage-category { color:#b9d7f4; }
+.advantage-card-featured h3 { color:#fff; }
+.advantage-card-featured > p { color:#d0deec; }
+.advantage-card-featured .advantage-detail { border-color:#38516b; color:#c5e2ff; }
+.advantages-footer { display:flex; align-items:center; justify-content:space-between; gap:24px; margin-block-start:28px; padding-block-start:24px; border-block-start:1px solid #dce5ee; }
+.advantages-footer p { margin:0; color:#405871; font-size:14px; }
+.advantages-footer .btn { display:inline-flex; align-items:center; justify-content:center; gap:12px; flex-shrink:0; border-radius:8px; }
+@media (hover:hover) and (pointer:fine) {
+  .advantage-card:hover { transform:translateY(-5px); border-color:#93b7db; box-shadow:0 14px 30px rgb(20 38 59 / 10%); }
+  .advantage-card:hover .advantage-icon { transform:translateY(-2px) rotate(-5deg); }
+}
+@media (max-width:1050px) {
+  .delivery-advantages { padding:32px; }
+  .advantages-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
+@media (max-width:650px) {
+  .delivery-advantages { margin-block-start:40px; padding:24px 18px; border-radius:18px; }
+  .advantages-grid { grid-template-columns:minmax(0,1fr); gap:14px; }
+  .advantage-card { padding:24px 22px 20px; }
+  .advantage-card-top { margin-block-end:20px; }
+  .advantages-footer { align-items:flex-start; flex-direction:column; gap:18px; }
+  .advantages-footer .btn { inline-size:100%; }
+}
+@media (prefers-reduced-motion:reduce) {
+  .advantage-card, .advantage-icon { transition:none; }
+  .advantage-card:hover, .advantage-card:hover .advantage-icon { transform:none; }
+}
